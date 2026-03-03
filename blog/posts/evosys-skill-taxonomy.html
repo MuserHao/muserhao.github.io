@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EvoSys: Teaching Machines to Build Their Own Muscles | Hao Xin</title>
+    <meta name="description" content="A taxonomy of skills from regex to reasoning, and how EvoSys learns which muscle to grow. Covering the six tiers of skill distillation, maturation stages, and the bootstrapping paradox.">
+    <meta name="author" content="Hao Xin">
+    <link rel="canonical" href="https://muserhao.github.io/blog/posts/evosys-skill-taxonomy.html">
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="EvoSys: Teaching Machines to Build Their Own Muscles">
+    <meta property="og:description" content="A taxonomy of skills from regex to reasoning, and how EvoSys learns which muscle to grow. The six tiers of skill distillation, maturation stages, and the bootstrapping paradox.">
+    <meta property="og:url" content="https://muserhao.github.io/blog/posts/evosys-skill-taxonomy.html">
+    <meta property="og:site_name" content="Hao Xin">
+    <meta property="article:published_time" content="2026-03-02">
+    <meta property="article:author" content="Hao Xin">
+    <meta property="article:tag" content="Systems">
+    <meta property="article:tag" content="LLM">
+    <meta property="article:tag" content="Tutorial">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="EvoSys: Teaching Machines to Build Their Own Muscles">
+    <meta name="twitter:description" content="A taxonomy of skills from regex to reasoning. How EvoSys distills expensive intelligence into cheap, specialized micro-skills.">
+    <!-- JSON-LD Article -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "EvoSys: Teaching Machines to Build Their Own Muscles",
+        "author": {"@type": "Person", "name": "Hao Xin", "url": "https://muserhao.github.io"},
+        "datePublished": "2026-03-02",
+        "description": "A taxonomy of skills from regex to reasoning, and how EvoSys learns which muscle to grow. Covering the six tiers of skill distillation, maturation stages, shadow mode, and the bootstrapping paradox.",
+        "url": "https://muserhao.github.io/blog/posts/evosys-skill-taxonomy.html",
+        "keywords": ["EvoSys", "skill distillation", "LLM", "systems design", "knowledge distillation", "micro-skills", "automation"]
+    }
+    </script>
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="../blog.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <!-- KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+        });"></script>
+    <script>
+        (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+</head>
+<body>
+    <!-- SVG liquid distortion filter -->
+    <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
+        <defs>
+            <filter id="liquid-distort" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence id="liquid-turbulence" type="fractalNoise"
+                    baseFrequency="0.006 0.009" numOctaves="4" seed="3" result="noise"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise"
+                    scale="50" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="grid-bg"></div>
+
+    <!-- Floating gradient orbs -->
+    <div class="gradient-orbs" aria-hidden="true">
+        <div class="orb orb-cyan"></div>
+        <div class="orb orb-pink"></div>
+        <div class="orb orb-purple"></div>
+        <div class="orb orb-gold"></div>
+        <div class="orb orb-teal"></div>
+    </div>
+
+    <div id="particles"></div>
+
+    <header>
+        <nav>
+            <a href="../../index.html" class="logo" aria-label="HAO.XIN">
+                <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="d1a" x1="100%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="12%" stop-color="#D8C060"/>
+                            <stop offset="28%" stop-color="#E8D888"/>
+                            <stop offset="44%" stop-color="#F0E8B0"/>
+                            <stop offset="55%" stop-color="#F8F0C8"/>
+                            <stop offset="70%" stop-color="#E8D888"/>
+                            <stop offset="100%" stop-color="#C8A840"/>
+                        </linearGradient>
+                        <linearGradient id="d1b" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="30%" stop-color="#B09030"/>
+                            <stop offset="65%" stop-color="#987828"/>
+                            <stop offset="100%" stop-color="#806020"/>
+                        </linearGradient>
+                        <linearGradient id="d1c" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#A08830"/>
+                            <stop offset="35%" stop-color="#887020"/>
+                            <stop offset="70%" stop-color="#706018"/>
+                            <stop offset="100%" stop-color="#605010"/>
+                        </linearGradient>
+                        <linearGradient id="d2a" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#C0A038"/>
+                            <stop offset="14%" stop-color="#D0B858"/>
+                            <stop offset="30%" stop-color="#E0D080"/>
+                            <stop offset="46%" stop-color="#EEE4A8"/>
+                            <stop offset="56%" stop-color="#F8F0C8"/>
+                            <stop offset="70%" stop-color="#E0D080"/>
+                            <stop offset="100%" stop-color="#C0A038"/>
+                        </linearGradient>
+                        <linearGradient id="d2b" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#D0B858"/>
+                            <stop offset="28%" stop-color="#B09030"/>
+                            <stop offset="60%" stop-color="#987828"/>
+                            <stop offset="100%" stop-color="#806020"/>
+                        </linearGradient>
+                        <linearGradient id="d2c" x1="100%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="#A08830"/>
+                            <stop offset="30%" stop-color="#908028"/>
+                            <stop offset="65%" stop-color="#706018"/>
+                            <stop offset="100%" stop-color="#605010"/>
+                        </linearGradient>
+                        <linearGradient id="d3a" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="18%" stop-color="#D8C060"/>
+                            <stop offset="36%" stop-color="#E8D888"/>
+                            <stop offset="52%" stop-color="#F0E8B0"/>
+                            <stop offset="62%" stop-color="#F8F0C8"/>
+                            <stop offset="76%" stop-color="#E0D080"/>
+                            <stop offset="100%" stop-color="#C0A038"/>
+                        </linearGradient>
+                        <linearGradient id="d3b" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="25%" stop-color="#B09030"/>
+                            <stop offset="58%" stop-color="#987828"/>
+                            <stop offset="100%" stop-color="#806020"/>
+                        </linearGradient>
+                        <linearGradient id="d3c" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#A08830"/>
+                            <stop offset="32%" stop-color="#908028"/>
+                            <stop offset="68%" stop-color="#706018"/>
+                            <stop offset="100%" stop-color="#605010"/>
+                        </linearGradient>
+                        <linearGradient id="d4a" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#C0A038"/>
+                            <stop offset="20%" stop-color="#D0B858"/>
+                            <stop offset="38%" stop-color="#E0D080"/>
+                            <stop offset="54%" stop-color="#EEE4A8"/>
+                            <stop offset="64%" stop-color="#F8F0C8"/>
+                            <stop offset="78%" stop-color="#E8D888"/>
+                            <stop offset="100%" stop-color="#C8A840"/>
+                        </linearGradient>
+                        <linearGradient id="d4b" x1="100%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="#D0B858"/>
+                            <stop offset="28%" stop-color="#B09030"/>
+                            <stop offset="62%" stop-color="#987828"/>
+                            <stop offset="100%" stop-color="#806020"/>
+                        </linearGradient>
+                        <linearGradient id="d4c" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#A08830"/>
+                            <stop offset="35%" stop-color="#908028"/>
+                            <stop offset="70%" stop-color="#706018"/>
+                            <stop offset="100%" stop-color="#605010"/>
+                        </linearGradient>
+                        <linearGradient id="dHub" x1="50%" y1="100%" x2="50%" y2="0%">
+                            <stop offset="0%" stop-color="#907828"/>
+                            <stop offset="25%" stop-color="#A89038"/>
+                            <stop offset="50%" stop-color="#C8A840"/>
+                            <stop offset="75%" stop-color="#D8C060"/>
+                            <stop offset="100%" stop-color="#E8D888"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M24.14 35.45 A16 16 0 0 1 4.97 14.53" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path d="M7.75 9.72 A16 16 0 0 1 32.25 9.72" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path d="M35.03 14.53 A16 16 0 0 1 29.18 33.10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <line x1="11" y1="32" x2="18.5" y2="8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="21.5" y1="8" x2="29" y2="32" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="14" y1="23" x2="26" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <polygon points="4,4 17,18 20,14" fill="url(#d1a)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                    <polygon points="4,4 17,18 18.5,16" fill="url(#d1b)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="4,4 20,14 18.5,16" fill="url(#d1c)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="36,4 20,14 23,18" fill="url(#d2a)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                    <polygon points="36,4 23,18 21.5,16" fill="url(#d2b)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="36,4 20,14 21.5,16" fill="url(#d2c)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="36,32 23,18 20,20" fill="url(#d3a)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                    <polygon points="36,32 23,18 21.5,19" fill="url(#d3b)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="36,32 20,20 21.5,19" fill="url(#d3c)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="4,32 20,20 17,18" fill="url(#d4a)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                    <polygon points="4,32 20,20 18.5,19" fill="url(#d4b)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="4,32 17,18 18.5,19" fill="url(#d4c)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="20,14 23,18 20,20 17,18" fill="url(#dHub)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                </svg>
+            </a>
+            <ul class="nav-links">
+                <li><a href="../../index.html" class="nav-link">HOME</a></li>
+                <li><a href="../index.html" class="nav-link active">BLOG</a></li>
+                <li><a href="../../index.html#contact" class="nav-link">CONTACT</a></li>
+                <li>
+                    <button class="theme-toggle" aria-label="Toggle theme">
+                        <span class="theme-toggle-icon-light">&#9728;</span>
+                        <span class="theme-toggle-slider"></span>
+                        <span class="theme-toggle-icon-dark">&#9790;</span>
+                    </button>
+                </li>
+            </ul>
+            <div class="hamburger" id="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </nav>
+    </header>
+
+    <main class="post-main">
+        <article>
+            <div class="post-header">
+                <div class="post-meta">
+                    <time class="blog-date" datetime="2026-03-02"><i class="fas fa-clock"></i> Mar 02, 2026</time>
+                    <span class="read-time"><i class="fas fa-book-open"></i> 15 min read</span>
+                </div>
+                <div class="blog-tags" style="justify-content: center; margin-bottom: 1.5rem;">
+                    <span class="blog-tag">SYSTEMS</span>
+                    <span class="blog-tag">LLM</span>
+                    <span class="blog-tag">TUTORIAL</span>
+                </div>
+                <h1 class="post-title">EvoSys: Teaching Machines to Build Their Own Muscles</h1>
+                <p class="post-subtitle">// a taxonomy of skills, from regex to reasoning -- and how a system learns which muscle to grow</p>
+                <div class="post-divider"></div>
+            </div>
+
+            <div class="post-content">
+                <h2>01 // THE COST OF REPETITION</h2>
+
+                <p>
+                    Every time you ask a cloud LLM to extract a date from a string, you pay the same price.
+                    Every time it parses a JSON response, reformats a table, or classifies an email -- the same
+                    tokens flow through the same billions of parameters, burning the same compute. The task
+                    might take a human three seconds with a regex, but the LLM treats it as if it has never
+                    seen the problem before. Because it hasn't. Stateless by design, every call starts from zero.
+                </p>
+
+                <p>
+                    Biology does not work this way. When you first learn to catch a ball, the entire cortex
+                    lights up -- visual processing, spatial reasoning, motor planning, error correction.
+                    It is expensive, slow, and error-prone. But repetition changes the wiring. Neural pathways
+                    myelinate. Reflexes form. Eventually the catch is handled by the cerebellum -- fast,
+                    cheap, unconscious. The expensive general intelligence that learned the skill is freed up
+                    for new problems.
+                </p>
+
+                <p>
+                    This is the core principle behind <strong>EvoSys</strong>: <em>observe, distill, specialize</em>.
+                    The system watches itself work. It notices when the same kinds of tasks recur. And then it
+                    asks a dangerous question: can this be done cheaper?
+                </p>
+
+                <p>
+                    The goal is not to replace the cloud LLM. The goal is to transform expensive general
+                    intelligence into a growing network of cheap, specialized <strong>micro-skills</strong> --
+                    each one a frozen solution to a problem that was once costly to solve but is now nearly
+                    free to repeat. The cloud LLM becomes the teacher, not the worker. The system grows
+                    muscles.
+                </p>
+
+                <h2>02 // WHAT IS A SKILL?</h2>
+
+                <p>
+                    At its most abstract, a skill is anything that accepts structured input and produces
+                    structured output. A function. A transformation. A mapping from question to answer,
+                    from raw data to processed result.
+                </p>
+
+                <p>
+                    But skills span a massive spectrum. On one end: a three-line regex that extracts phone
+                    numbers from text. Deterministic. Instant. Free. On the other end: a full agent delegation
+                    that hands an ambiguous research question to Claude Code, which spawns sub-tasks, reads
+                    documentation, writes code, tests it, and returns a synthesized answer. Non-deterministic.
+                    Slow. Expensive.
+                </p>
+
+                <p>
+                    Both are skills. Both accept input and produce output. But they differ by orders of
+                    magnitude in latency, cost, reliability, and the <em>kind of intelligence</em> they
+                    require. The regex encodes a pattern. The agent delegation encodes a reasoning process.
+                </p>
+
+                <p>
+                    The question EvoSys asks is not "can we automate this?" -- almost anything can be
+                    automated at Tier 5 by throwing it at a powerful LLM. The real question is:
+                    <strong>at what level of abstraction?</strong> Can this task, which currently requires
+                    general reasoning, be reduced to something simpler? And if so, how far down can it go?
+                </p>
+
+                <blockquote>
+                    <p>"A skill is a frozen moment of intelligence -- a solution that was expensive to discover but cheap to repeat."</p>
+                </blockquote>
+
+                <h2>03 // THE SIX TIERS</h2>
+
+                <p>
+                    EvoSys organizes skills into six tiers, ordered by decreasing intelligence and increasing
+                    efficiency. Each tier represents a different trade-off between the generality of the
+                    solution and the cost of executing it.
+                </p>
+
+                <table style="width:100%; border-collapse:collapse; margin: 1.5rem 0;">
+                    <tr style="border-bottom: 1px solid var(--text-secondary);">
+                        <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Tier</th>
+                        <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Name</th>
+                        <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Example</th>
+                        <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Latency</th>
+                        <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Cost/Call</th>
+                        <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Learning Cost</th>
+                    </tr>
+                    <tr><td style="padding:0.5rem;">0</td><td style="padding:0.5rem;">Deterministic Code</td><td style="padding:0.5rem;">Regex date extraction</td><td style="padding:0.5rem;">&lt;1ms</td><td style="padding:0.5rem;">$0</td><td style="padding:0.5rem;">Low</td></tr>
+                    <tr><td style="padding:0.5rem;">1</td><td style="padding:0.5rem;">Algorithmic Code</td><td style="padding:0.5rem;">spaCy NER pipeline</td><td style="padding:0.5rem;">1-100ms</td><td style="padding:0.5rem;">$0</td><td style="padding:0.5rem;">Medium</td></tr>
+                    <tr><td style="padding:0.5rem;">2</td><td style="padding:0.5rem;">Cached Prompt</td><td style="padding:0.5rem;">Few-shot on local 3B model</td><td style="padding:0.5rem;">100-500ms</td><td style="padding:0.5rem;">~$0</td><td style="padding:0.5rem;">Low</td></tr>
+                    <tr><td style="padding:0.5rem;">3</td><td style="padding:0.5rem;">Fine-tuned Model</td><td style="padding:0.5rem;">LoRA on 0.5B model</td><td style="padding:0.5rem;">50-200ms</td><td style="padding:0.5rem;">~$0</td><td style="padding:0.5rem;">High</td></tr>
+                    <tr><td style="padding:0.5rem;">4</td><td style="padding:0.5rem;">Cloud LLM Call</td><td style="padding:0.5rem;">Single Sonnet API call</td><td style="padding:0.5rem;">500-5000ms</td><td style="padding:0.5rem;">$0.001-0.01</td><td style="padding:0.5rem;">None</td></tr>
+                    <tr><td style="padding:0.5rem;">5</td><td style="padding:0.5rem;">Agent Delegation</td><td style="padding:0.5rem;">Hand off to Claude Code</td><td style="padding:0.5rem;">5-60s+</td><td style="padding:0.5rem;">$0.05-1+</td><td style="padding:0.5rem;">None</td></tr>
+                </table>
+
+                <p>
+                    Notice the inverse relationship: tiers 4 and 5 require no learning cost because they
+                    leverage general intelligence directly, but they pay a steep per-call price. Tiers 0 and 1
+                    are essentially free to run, but someone -- or some<em>thing</em> -- had to invest the
+                    effort to build them. The purpose of EvoSys is to automate that investment.
+                </p>
+
+                <div class="info-box">
+                    <div class="info-title">THE LOWEST VIABLE TIER</div>
+                    <p>
+                        Not every skill descends to Tier 0. Some tasks are inherently semantic -- they require
+                        understanding context, resolving ambiguity, or exercising judgment that cannot be
+                        captured in deterministic rules. The goal is the <strong>lowest viable tier</strong>,
+                        not the lowest possible tier. A skill that stabilizes at Tier 2 (cached prompt on a
+                        local model) is still a massive win over Tier 4 (cloud API call) -- it's faster,
+                        cheaper, and runs offline.
+                    </p>
+                </div>
+
+                <h2>04 // THE DISTILLATION LADDER</h2>
+
+                <p>
+                    Skills don't jump from cloud LLM to local regex in a single leap. The gap between
+                    Tier 5 and Tier 0 is too vast -- it spans the distance from general reasoning to
+                    pattern matching. Instead, skills <strong>descend gradually</strong>, one rung at a time,
+                    through a process we call the distillation ladder.
+                </p>
+
+                <pre><code>Tier 5: Agent handles entire sub-task
+  |  system observes, records I/O pairs
+  v
+Tier 4: Single LLM call with learned prompt template
+  |  accumulate examples, validate consistency
+  v
+Tier 3: Fine-tuned local model on collected pairs
+  |  analyze for deterministic patterns
+  v
+Tier 1: Algorithmic code (Python + libraries)
+  |  simplify if rules are extractable
+  v
+Tier 0: Pure deterministic function</code></pre>
+
+                <p>
+                    Each descent is a bet: <em>can this be done cheaper?</em> The system tries the next
+                    tier down, validates the output against the ground truth from the tier above, and
+                    either commits the descent or retreats. A failed descent is not a failure -- it's
+                    information. The system now knows the task's floor.
+                </p>
+
+                <p>
+                    The key insight is that the intermediate tiers exist because the jump from Tier 4
+                    to Tier 0 is too large to make reliably. Consider a task like "extract the main
+                    topic from an email subject line." A cloud LLM handles it easily at Tier 4. Can
+                    you write a regex? Almost certainly not -- subject lines are too varied. But can
+                    you fine-tune a tiny model on 500 labeled examples? Probably yes. Can you build a
+                    few-shot prompt for a local 3B model? Even easier. Cached prompts at Tier 2 are
+                    the stepping stone that makes distillation practical.
+                </p>
+
+                <p>
+                    You might notice Tier 2 is missing from the ladder diagram. That's intentional --
+                    Tier 2 (cached prompts) often serves as the first landing point for skills
+                    descending from Tier 4, before enough data accumulates to attempt Tier 3 fine-tuning.
+                    The path through the ladder is not always linear. Some skills skip tiers; others
+                    oscillate before settling.
+                </p>
+
+                <h2>05 // MATURATION -- FROM OBSERVATION TO MUSCLE MEMORY</h2>
+
+                <p>
+                    Every skill in EvoSys passes through a lifecycle of maturation stages. These stages
+                    govern how much trust the system places in the skill and how much supervision it
+                    receives.
+                </p>
+
+                <pre><code>OBSERVED ---> PROMPTED ---> SYNTHESIZED ---> OPTIMIZED ---> STABLE
+                                                                       |
+                                                                    DEGRADED
+                                                                       |
+                                                                 re-enter pipeline</code></pre>
+
+                <p>
+                    <strong>OBSERVED.</strong> A recurring pattern has been detected in the system's
+                    operation logs. The same kind of input-output mapping appears repeatedly. Data is
+                    accumulating passively -- I/O pairs are being recorded, but no skill has been created
+                    yet. The system is watching and waiting for statistical confidence.
+                </p>
+
+                <p>
+                    <strong>PROMPTED.</strong> Enough examples exist to construct a cached prompt. A
+                    few-shot template is created and deployed in <em>shadow mode</em> -- running alongside
+                    the cloud LLM on a sample of real traffic. The cloud LLM's output remains the
+                    system of record; the prompted skill's output is compared but not served. Agreement
+                    builds confidence. Divergence signals that the prompt needs refinement or the task
+                    is harder than expected.
+                </p>
+
+                <p>
+                    <strong>SYNTHESIZED.</strong> The skill has been implemented as code or a fine-tuned
+                    model, with a full test suite generated from the accumulated I/O pairs. It runs in
+                    production with spot-check validation -- the cloud LLM is called on a declining
+                    percentage of requests to verify correctness.
+                </p>
+
+                <p>
+                    <strong>OPTIMIZED / STABLE.</strong> The skill has proven itself over time. Shadow
+                    frequency has dropped to near zero. The skill handles its task class autonomously,
+                    with minimal monitoring. It has become muscle memory.
+                </p>
+
+                <p>
+                    <strong>DEGRADED.</strong> Drift has been detected. The skill's outputs have begun
+                    diverging from what the cloud LLM would produce, or error rates have crept up, or
+                    the distribution of inputs has shifted. The skill re-enters the pipeline: shadow mode
+                    goes back to 100%, fresh examples are collected, and the Forge attempts a new synthesis.
+                </p>
+
+                <p>
+                    Shadow mode deserves special attention. It is the mechanism by which EvoSys
+                    builds trust in a skill without risking production quality. Every skill, at every
+                    maturation stage below STABLE, runs alongside the cloud LLM at some sampling rate.
+                    This rate starts at 100% (every request is double-processed) and decays as agreement
+                    accumulates. The shadow comparison serves three purposes: it validates the skill's
+                    correctness, it generates training data for future improvements, and it detects
+                    degradation early.
+                </p>
+
+                <div class="info-box">
+                    <div class="info-title">THE TUITION FEE</div>
+                    <p>
+                        Shadow mode is the tuition fee for learning. While a skill is maturing, the system
+                        pays <em>more</em> than it would without the skill -- it runs both the cheap local
+                        version and the expensive cloud version. This is an investment, not waste. The cloud
+                        LLM cost during shadow mode pays off as skills mature and shadow frequency drops to
+                        near zero. A skill that reaches STABLE has repaid its tuition many times over. The
+                        key metric is <strong>time to break-even</strong>: how many calls until the
+                        cumulative shadow cost is recovered by the per-call savings.
+                    </p>
+                </div>
+
+                <h2>06 // HOW DOES THE SYSTEM KNOW WHAT'S EASY?</h2>
+
+                <p>
+                    Not all patterns are equally forgeable. Some tasks are trivially reducible to
+                    deterministic code. Others are fundamentally semantic and will never descend below
+                    Tier 3 or 4. The system needs to estimate <strong>learnability</strong> before
+                    investing resources in a distillation attempt.
+                </p>
+
+                <p>
+                    EvoSys computes a learnability score from several signals observed in the accumulated
+                    I/O pairs:
+                </p>
+
+                <table style="width:100%; border-collapse:collapse; margin: 1.5rem 0;">
+                    <tr style="border-bottom: 1px solid var(--text-secondary);">
+                        <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Signal</th>
+                        <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Easy to Forge (Tier 0-1)</th>
+                        <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Hard to Forge (Tier 4-5)</th>
+                    </tr>
+                    <tr><td style="padding:0.5rem;">I/O mapping</td><td style="padding:0.5rem;">Deterministic</td><td style="padding:0.5rem;">Variable / creative</td></tr>
+                    <tr><td style="padding:0.5rem;">Output type</td><td style="padding:0.5rem;">Structured JSON</td><td style="padding:0.5rem;">Free-form text</td></tr>
+                    <tr><td style="padding:0.5rem;">Schema consistency</td><td style="padding:0.5rem;">&gt;95% across examples</td><td style="padding:0.5rem;">&lt;80%</td></tr>
+                    <tr><td style="padding:0.5rem;">Examples needed</td><td style="padding:0.5rem;">5-10 sufficient</td><td style="padding:0.5rem;">50+ still ambiguous</td></tr>
+                    <tr><td style="padding:0.5rem;">Can describe in one sentence</td><td style="padding:0.5rem;">Yes</td><td style="padding:0.5rem;">No</td></tr>
+                </table>
+
+                <p>
+                    The learnability score is a weighted combination of these signals. High determinism,
+                    structured output, consistent schema, fast convergence with few examples, and a
+                    concise task description all push the score toward "easy." The system uses this score
+                    to prioritize which patterns to attempt forging first -- low-hanging fruit yields the
+                    fastest return on investment.
+                </p>
+
+                <p>
+                    For ambiguous cases -- where the signals are mixed -- the system can escalate to the
+                    cloud LLM itself: "Given these 20 input-output examples, what implementation tier
+                    would you recommend?" This is meta-reasoning: using intelligence to decide how to
+                    deploy intelligence. It adds cost, but it's a one-time cost per skill class, not a
+                    per-call cost.
+                </p>
+
+                <p>
+                    But ultimately, the safest strategy is empirical. <strong>Try the cheapest viable tier.
+                    Validate against ground truth. Escalate on failure.</strong> Theoretical learnability
+                    estimates are useful for prioritization, but the definitive answer comes from
+                    attempting the distillation and measuring the result.
+                </p>
+
+                <h2>07 // THE BOOTSTRAPPING PARADOX</h2>
+
+                <p>
+                    There is a circularity at the heart of EvoSys that cannot be designed away: the system
+                    needs intelligence to decide how to deploy intelligence. Choosing the right tier for a
+                    skill requires understanding the task. Understanding the task requires the kind of
+                    reasoning that only the expensive tiers provide. The system must spend intelligence to
+                    save intelligence.
+                </p>
+
+                <p>
+                    Early in its life, EvoSys will make bad decisions. It will try to forge tasks that
+                    are fundamentally unforgeable -- spending compute on a Tier 0 regex for a task that
+                    requires semantic understanding. It will pick the wrong tier, generate brittle code,
+                    and waste cloud LLM calls on shadow validation for skills that never converge.
+                </p>
+
+                <p>
+                    This is expected. This is acceptable. Here is why:
+                </p>
+
+                <p>
+                    <strong>First</strong>, each failure is bounded in cost. A failed forge attempt consumes
+                    a few LLM calls for code generation and a handful of test executions. The system sets
+                    budgets on distillation attempts -- if convergence isn't achieved within $N$ iterations
+                    or $M$ dollars, the attempt is abandoned and the skill stays at its current tier.
+                </p>
+
+                <p>
+                    <strong>Second</strong>, each failure generates data that improves future decisions.
+                    A failed Tier 0 attempt for a semantic task teaches the system that tasks with similar
+                    learnability profiles should not be attempted at Tier 0. The failure history becomes a
+                    training signal.
+                </p>
+
+                <p>
+                    <strong>Third</strong>, the heuristics that make early decisions get replaced by learned
+                    policies over time. The initial learnability scoring is hand-crafted -- a weighted sum
+                    of signals with manually chosen thresholds. But as the system accumulates a history of
+                    forge successes and failures, those outcomes become training data for a meta-learning
+                    model. The system literally learns how to learn.
+                </p>
+
+                <blockquote>
+                    <p>"The alternative -- waiting until we have a perfect policy before starting -- means never starting."</p>
+                </blockquote>
+
+                <p>
+                    Over time, the bootstrapping paradox resolves itself. The system's forge history --
+                    which tasks succeeded at which tiers, which failed, what the learnability signals
+                    were -- becomes a dataset for predicting forge outcomes. The meta-learner gets better
+                    at picking tiers, which means fewer wasted attempts, which means faster skill
+                    maturation, which means more data for the meta-learner. A virtuous cycle, once you
+                    accept the cost of the cold start.
+                </p>
+
+                <h2>08 // WHEN MUSCLES ATROPHY</h2>
+
+                <p>
+                    Skills degrade. This is not a bug -- it is an inevitable consequence of operating in a
+                    changing world. Websites restructure their HTML. APIs evolve their schemas. User
+                    expectations shift. A date parser that worked perfectly for US formats fails when the
+                    user base expands to Europe. A classifier trained on 2024 data drifts as language
+                    patterns evolve.
+                </p>
+
+                <p>
+                    EvoSys monitors three staleness signals for every active skill:
+                </p>
+
+                <p>
+                    <strong>1. Shadow divergence.</strong> Even after a skill reaches STABLE, the system
+                    periodically runs shadow comparisons at a low sampling rate (e.g., 1-5% of requests).
+                    When the skill's output begins diverging from what the cloud LLM produces on the same
+                    input, the divergence counter increments. A sustained divergence rate above threshold
+                    triggers a DEGRADED transition.
+                </p>
+
+                <p>
+                    <strong>2. Error rate increase.</strong> Runtime errors -- exceptions, timeouts,
+                    malformed outputs, schema validation failures -- are tracked with an exponentially
+                    weighted moving average. A spike in error rate signals that something has changed in
+                    the input distribution or the external dependencies the skill relies on.
+                </p>
+
+                <p>
+                    <strong>3. Input distribution shift.</strong> The system maintains a statistical
+                    fingerprint of each skill's input space -- simple features like string length
+                    distributions, character frequencies, or structural patterns. When new inputs
+                    deviate significantly from the training distribution, the skill is flagged for
+                    review even if it hasn't started failing yet. Prevention is cheaper than repair.
+                </p>
+
+                <p>
+                    When a skill transitions to DEGRADED, the response is systematic: shadow mode goes
+                    back to 100%, fresh I/O pairs are collected from the cloud LLM, and the Forge
+                    re-attempts synthesis with the updated data. The old skill is not deleted -- it is
+                    archived with its full genealogy: the I/O pairs it was trained on, its test suite,
+                    its performance history, and the reason for its retirement.
+                </p>
+
+                <p>
+                    Skills are never truly lost. A retired skill's test suite and accumulated I/O pairs
+                    are preserved as training data for its successor. The new version inherits its
+                    ancestor's knowledge, augmented with fresh examples that cover the drift. Evolution,
+                    not revolution.
+                </p>
+
+                <h2>09 // THE ROAD AHEAD</h2>
+
+                <p>
+                    This post is Part 1 of the EvoSys design series, focused on the conceptual framework:
+                    what skills are, how they're tiered, how they mature, and how the system decides what
+                    to learn. The architecture has been described in terms of principles and processes.
+                    Now comes the engineering.
+                </p>
+
+                <p>
+                    <strong>Phase 0</strong> -- the data foundation -- is complete. This includes the
+                    data contracts and interfaces that define how skills communicate, the input/output
+                    sanitization layer, and the schema validation framework. The code is available in the
+                    EvoSys GitHub repository <a href="#ref-1">[1]</a>.
+                </p>
+
+                <p>
+                    <strong>Phase 1</strong> is trajectory logging: the all-seeing eye. Before the system
+                    can learn from its own operation, it needs to record that operation in structured,
+                    queryable form. Every LLM call, every tool invocation, every input-output pair must
+                    be captured with enough context to reconstruct the reasoning chain. This is the
+                    foundation on which pattern detection and skill synthesis will be built.
+                </p>
+
+                <p>
+                    <strong>Phase 2</strong> is the reflection daemon: the sleeping brain. A background
+                    process that analyzes trajectory logs offline, detects recurring patterns, estimates
+                    learnability, and proposes skill candidates to the Forge. This is where the system
+                    transitions from passive recording to active learning.
+                </p>
+
+                <p>
+                    The hardest unsolved problems lie further ahead. <strong>Optimal DAG granularity</strong>:
+                    when a complex task decomposes into sub-tasks, how fine-grained should the decomposition
+                    be? Too coarse and the skills aren't reusable. Too fine and the coordination overhead
+                    dominates. <strong>Evaluation of semantic skills</strong>: how do you validate the
+                    output of a Tier 2 or 3 skill when the "correct" answer is fuzzy? Automated evaluation
+                    is itself a research frontier. <strong>The meta-learning feedback loop</strong>: training
+                    a model to predict forge outcomes requires forge outcomes, which requires attempting
+                    forges, which benefits from predicting outcomes. The chicken-and-egg problem at scale.
+                </p>
+
+                <p>
+                    EvoSys is not a chatbot wrapper. It is not a prompt chain. It is not a RAG pipeline
+                    with a fancy name. It is an attempt to build a system that genuinely learns from its
+                    own operation -- one that gets better, faster, and cheaper with every task it
+                    completes. The muscles grow. The reflexes sharpen. The expensive intelligence is
+                    gradually freed to tackle problems that actually require it.
+                </p>
+
+                <div class="post-divider"></div>
+
+                <div class="references">
+                    <h2>REFERENCES</h2>
+                    <ol class="ref-list">
+                        <li id="ref-1">
+                            <span class="ref-authors">EvoSys GitHub Repository</span>
+                            <span class="ref-title">github.com/muserhao/EvoSys</span>
+                        </li>
+                        <li id="ref-2">
+                            <span class="ref-authors">Hinton, G., Vinyals, O. &amp; Dean, J.</span>
+                            <span class="ref-title">Distilling the Knowledge in a Neural Network.</span>
+                            <span class="ref-venue">arXiv:1503.02531, 2015.</span>
+                            <a href="https://arxiv.org/abs/1503.02531" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-3">
+                            <span class="ref-authors">Hu, E. J. et al.</span>
+                            <span class="ref-title">LoRA: Low-Rank Adaptation of Large Language Models.</span>
+                            <span class="ref-venue">ICLR 2022.</span>
+                            <a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-4">
+                            <span class="ref-authors">Anthropic</span>
+                            <span class="ref-title">Claude Models Documentation.</span>
+                            <span class="ref-venue">docs.anthropic.com, 2024.</span>
+                        </li>
+                        <li id="ref-5">
+                            <span class="ref-authors">Brown, T. et al.</span>
+                            <span class="ref-title">Language Models are Few-Shot Learners.</span>
+                            <span class="ref-venue">NeurIPS 2020.</span>
+                            <a href="https://arxiv.org/abs/2005.14165" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </article>
+
+        <div class="post-nav">
+            <a href="../index.html"><i class="fas fa-arrow-left"></i> BACK TO BLOG</a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <p class="footer-text">// built with caffeine and mass GPU hours</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="../../shared.js"></script>
+    <script>
+        createParticles(30);
+    </script>
+</body>
+</html>
