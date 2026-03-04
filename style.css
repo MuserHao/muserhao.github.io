@@ -538,6 +538,11 @@ nav {
     margin-bottom: 2.5rem;
 }
 
+#rotating-tagline {
+    display: inline-block;
+    transition: opacity 0.5s ease;
+}
+
 /* Buttons */
 .hero-buttons {
     display: flex;
