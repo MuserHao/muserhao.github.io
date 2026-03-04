@@ -209,6 +209,7 @@
                 <li><a href="#skills" class="nav-link">SKILLS</a></li>
                 <li><a href="#publications" class="nav-link">RESEARCH</a></li>
                 <li><a href="blog/index.html" class="nav-link">BLOG</a></li>
+                <li><a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer" class="nav-link">SUBSTACK</a></li>
                 <li><a href="#contact" class="nav-link">CONTACT</a></li>
                 <li>
                     <button class="theme-toggle" aria-label="Toggle theme">
@@ -543,6 +544,16 @@
             <a href="blog/index.html" class="btn neon-btn view-all-btn">VIEW ALL POSTS &gt;&gt;</a>
         </section>
 
+        <!-- Substack Section -->
+        <section id="substack" class="substack-section">
+            <h2 class="section-title"><span class="title-decoration">&lt;</span> SUBSTACK.FEED <span class="title-decoration">/&gt;</span></h2>
+            <p class="substack-subtitle">// longer thoughts, less math, more caffeine</p>
+            <div id="substack-feed" class="substack-feed-grid">
+                <!-- Populated from RSS feed -->
+            </div>
+            <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer" class="btn neon-btn substack-btn">READ ON SUBSTACK &gt;&gt;</a>
+        </section>
+
         <!-- Contact Section -->
         <section id="contact" class="contact">
             <h2 class="section-title"><span class="title-decoration">&lt;</span> CONTACT.IO <span class="title-decoration">/&gt;</span></h2>
@@ -557,6 +568,14 @@
                             <span>hao9xin@gmail.com</span>
                         </a>
                     </div>
+                    <p class="terminal-line" style="margin-top:1.5rem;"><span class="prompt">$</span> subscribe --newsletter</p>
+                    <p class="terminal-output" style="margin-bottom:0.8rem;">Get new posts straight to your inbox — no spam, just ML thoughts.</p>
+                    <form class="substack-form" action="https://haoxin9.substack.com/api/v1/free?nojs=true" method="post" target="_blank">
+                        <div class="substack-input-row">
+                            <input type="email" name="email" placeholder="your@email.com" required class="substack-input" />
+                            <button type="submit" class="btn neon-btn substack-submit">SUBSCRIBE</button>
+                        </div>
+                    </form>
                 </div>
                 <div class="social-links">
                     <a href="https://github.com/MuserHao" target="_blank" rel="noopener noreferrer" class="social-icon" title="GitHub">
@@ -570,6 +589,10 @@
                     <a href="https://scholar.google.com/" target="_blank" rel="noopener noreferrer" class="social-icon" title="Google Scholar">
                         <i class="fas fa-graduation-cap"></i>
                         <span class="social-label">Scholar</span>
+                    </a>
+                    <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer" class="social-icon substack-social" title="Substack">
+                        <i class="fas fa-newspaper"></i>
+                        <span class="social-label">Substack</span>
                     </a>
                 </div>
             </div>
@@ -707,6 +730,57 @@
                 .catch(() => {
                     // Fallback: show a link to the blog
                     grid.innerHTML = '<p style="color:var(--text-secondary);font-family:var(--font-mono);text-align:center;">Could not load posts. <a href="blog/index.html" style="color:var(--neon-cyan);">Visit the blog &rarr;</a></p>';
+                });
+        })();
+
+        // ========== SUBSTACK RSS FEED ==========
+        (function loadSubstackFeed() {
+            const grid = document.getElementById('substack-feed');
+            if (!grid) return;
+
+            // Use rss2json public API to sidestep CORS on the RSS feed
+            const RSS_URL = encodeURIComponent('https://haoxin9.substack.com/feed');
+            const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${RSS_URL}&count=3`;
+
+            fetch(API_URL)
+                .then(r => r.json())
+                .then(data => {
+                    const items = (data.items || []).slice(0, 3);
+                    if (items.length === 0) throw new Error('empty');
+
+                    items.forEach(item => {
+                        const date = new Date(item.pubDate);
+                        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        // Strip HTML tags from description for plain excerpt
+                        const tmp = document.createElement('div');
+                        tmp.innerHTML = item.description || '';
+                        const excerpt = (tmp.textContent || '').trim().slice(0, 160) + '…';
+
+                        const card = document.createElement('a');
+                        card.href = item.link;
+                        card.target = '_blank';
+                        card.rel = 'noopener noreferrer';
+                        card.className = 'substack-card';
+                        card.innerHTML = `
+                            <div class="substack-card-meta">
+                                <span class="substack-badge">SUBSTACK</span>
+                                <span class="substack-date">${dateStr}</span>
+                            </div>
+                            <h3 class="substack-card-title">${item.title}</h3>
+                            <p class="substack-card-excerpt">${excerpt}</p>`;
+                        grid.appendChild(card);
+                    });
+                })
+                .catch(() => {
+                    grid.innerHTML = `
+                        <div class="substack-empty">
+                            <p>// no posts yet — first one is brewing</p>
+                            <p style="margin-top:0.8rem;">
+                                <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">
+                                    subscribe to get notified when it drops &rarr;
+                                </a>
+                            </p>
+                        </div>`;
                 });
         })();
 

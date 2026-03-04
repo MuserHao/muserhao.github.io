@@ -1761,6 +1761,168 @@ footer {
     font-size: 0.9rem;
 }
 
+/* ========== SUBSTACK SECTION ========== */
+.substack-section {
+    padding: 5rem 2rem;
+    text-align: center;
+    position: relative;
+}
+
+.substack-subtitle {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    margin-bottom: 2.5rem;
+    font-size: 0.9rem;
+}
+
+.substack-feed-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    max-width: 1100px;
+    margin: 0 auto 2.5rem;
+}
+
+/* Substack cards: gold/amber accent to distinguish from cyan blog cards */
+.substack-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid rgba(255, 214, 0, 0.15);
+    border-radius: 12px;
+    padding: 1.8rem;
+    text-align: left;
+    transition: all 0.3s ease;
+}
+
+.substack-card:hover {
+    border-color: rgba(255, 214, 0, 0.4);
+    box-shadow: 0 0 30px rgba(255, 214, 0, 0.08), 0 0 60px rgba(255, 214, 0, 0.04);
+    transform: translateY(-3px);
+}
+
+.substack-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.8rem;
+}
+
+.substack-badge {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: var(--neon-yellow);
+    border: 1px solid rgba(255, 214, 0, 0.4);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.substack-date {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.substack-card-title {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-heading);
+    margin-bottom: 0.6rem;
+    line-height: 1.4;
+}
+
+.substack-card-excerpt {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Empty state */
+.substack-empty {
+    grid-column: 1 / -1;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    padding: 3rem;
+    border: 1px dashed rgba(255, 214, 0, 0.2);
+    border-radius: 12px;
+    text-align: center;
+}
+
+.substack-empty a {
+    color: var(--neon-yellow);
+    text-decoration: none;
+}
+
+.substack-empty a:hover {
+    text-decoration: underline;
+}
+
+.substack-btn {
+    border-color: var(--neon-yellow) !important;
+    color: var(--neon-yellow) !important;
+}
+
+.substack-btn:hover {
+    background: rgba(255, 214, 0, 0.1) !important;
+    box-shadow: 0 0 20px rgba(255, 214, 0, 0.2) !important;
+}
+
+/* Subscribe form */
+.substack-input-row {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.substack-input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--bg-terminal);
+    border: 1px solid rgba(255, 214, 0, 0.25);
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.substack-input:focus {
+    border-color: var(--neon-yellow);
+    box-shadow: 0 0 10px rgba(255, 214, 0, 0.15);
+}
+
+.substack-input::placeholder {
+    color: var(--text-secondary);
+}
+
+.substack-submit {
+    border-color: var(--neon-yellow) !important;
+    color: var(--neon-yellow) !important;
+    white-space: nowrap;
+}
+
+.substack-submit:hover {
+    background: rgba(255, 214, 0, 0.1) !important;
+    box-shadow: 0 0 15px rgba(255, 214, 0, 0.2) !important;
+}
+
+.substack-social:hover {
+    color: var(--neon-yellow) !important;
+}
+
 /* ========== SCROLLBAR ========== */
 ::-webkit-scrollbar {
     width: 6px;
