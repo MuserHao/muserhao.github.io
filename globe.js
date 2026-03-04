@@ -23,6 +23,87 @@
         { name: 'Boston',        lat: 42.3601,  lng:  -71.0589 },
     ];
 
+    // ── Seeded Perlin noise (fixed seed = same "planet" every load) ────────────
+    const PERM = new Uint8Array(512);
+    (function () {
+        // LCG for deterministic shuffle — seed 1337
+        let s = 1337;
+        function rnd() { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 0x100000000; }
+        const arr = new Uint8Array(256);
+        for (let i = 0; i < 256; i++) arr[i] = i;
+        for (let i = 255; i > 0; i--) {
+            const j = Math.floor(rnd() * (i + 1));
+            const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+        }
+        for (let i = 0; i < 512; i++) PERM[i] = arr[i & 255];
+    })();
+
+    const G2 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+    function fade(t) { return t*t*t*(t*(t*6-15)+10); }
+    function lerp(a, b, t) { return a + t*(b-a); }
+    function dot2(g, x, y) { return g[0]*x + g[1]*y; }
+    function pnoise(x, y) {
+        const X=Math.floor(x)&255, Y=Math.floor(y)&255;
+        const xf=x-Math.floor(x), yf=y-Math.floor(y);
+        const u=fade(xf), v=fade(yf);
+        const aa=PERM[PERM[X]+Y],   ab=PERM[PERM[X]+Y+1];
+        const ba=PERM[PERM[X+1]+Y], bb=PERM[PERM[X+1]+Y+1];
+        return lerp(
+            lerp(dot2(G2[aa&7],xf,yf),   dot2(G2[ba&7],xf-1,yf),   u),
+            lerp(dot2(G2[ab&7],xf,yf-1), dot2(G2[bb&7],xf-1,yf-1), u), v
+        );
+    }
+    // Fractal Brownian Motion — 6 octaves gives fractal coastlines
+    function fbm(x, y) {
+        let v=0, amp=0.5, freq=1;
+        for (let i=0; i<6; i++) { v += pnoise(x*freq, y*freq)*amp; amp*=0.5; freq*=2.05; }
+        return v;
+    }
+
+    // ── Procedural earth texture ───────────────────────────────────────────────
+    // Equirectangular projection: x=longitude (0→2π), y=latitude (π/2→-π/2)
+    // Palette: deep navy ocean / dark olive land / pale polar ice
+    function makeEarthTexture() {
+        const W = 512, H = 256;
+        const cvs = document.createElement('canvas');
+        cvs.width = W; cvs.height = H;
+        const ctx = cvs.getContext('2d');
+        const img = ctx.createImageData(W, H);
+
+        for (let py = 0; py < H; py++) {
+            const lat = (0.5 - py / H) * Math.PI;            // +π/2 (N) → -π/2 (S)
+            const poleFactor = Math.max(0, (Math.abs(lat) - 1.1) / (Math.PI/2 - 1.1));
+
+            for (let px = 0; px < W; px++) {
+                const terrain = fbm(px * 0.032, py * 0.048);  // slightly anisotropic
+
+                let r, g, b;
+                if (poleFactor > 0.25) {
+                    // Polar ice caps — blue-white
+                    const ic = Math.floor(150 + poleFactor * 80);
+                    r = ic - 10; g = ic; b = ic + 15;
+                } else if (terrain > 0.10) {
+                    // Land — dark olive / forest green
+                    const sh = Math.floor(Math.min((terrain - 0.10) * 55, 35));
+                    r = 18 + sh; g = 35 + sh; b = 12 + sh;
+                } else {
+                    // Ocean — dark navy blue, slightly deeper in troughs
+                    const depth = Math.floor((0.10 - terrain) * 25);
+                    r = 6; g = 16 + depth; b = 44 + depth;
+                }
+
+                const idx = (py * W + px) * 4;
+                img.data[idx]     = r;
+                img.data[idx + 1] = g;
+                img.data[idx + 2] = b;
+                img.data[idx + 3] = 255;
+            }
+        }
+
+        ctx.putImageData(img, 0, 0);
+        return new THREE.CanvasTexture(cvs);
+    }
+
     // ── Renderer ───────────────────────────────────────────────────────────────
     const W = container.clientWidth;
     const H = container.clientHeight;
@@ -38,37 +119,33 @@
     camera.position.z = 280;
 
     // ── Lighting rig ───────────────────────────────────────────────────────────
-    // Deep fill so the dark side has colour, not pure black
     scene.add(new THREE.AmbientLight(0x0d1b2a, 10));
     scene.add(new THREE.HemisphereLight(0x003366, 0x1a002a, 2.5));
 
-    // Cyan key light — front-right, orbits slowly
     const keyLight = new THREE.PointLight(0x00f0ff, 120, 700);
     keyLight.position.set(180, 80, 200);
     scene.add(keyLight);
 
-    // Pink fill — left side
     const fillLight = new THREE.PointLight(0xff006e, 55, 650);
     fillLight.position.set(-200, -60, 120);
     scene.add(fillLight);
 
-    // Purple rim — behind-top, silhouette halo
     const rimLight = new THREE.PointLight(0xb026ff, 80, 750);
     rimLight.position.set(-80, 220, -180);
     scene.add(rimLight);
 
-    // Gold accent — bottom-front, warm continent glow
     const goldLight = new THREE.PointLight(0xffd600, 40, 550);
     goldLight.position.set(60, -180, 150);
     scene.add(goldLight);
 
-    // ── Custom globe material (renders immediately, no texture required) ────────
+    // ── Globe material with procedural texture ─────────────────────────────────
     const globeMat = new THREE.MeshPhongMaterial({
-        color:             new THREE.Color(0x0d2236),   // deep ocean blue
+        map:               makeEarthTexture(),
+        color:             new THREE.Color(0xffffff),  // white tint so texture shows true colour
         emissive:          new THREE.Color(0x040e1a),
-        emissiveIntensity: 1.0,
-        shininess:         25,
-        specular:          new THREE.Color(0x003355),
+        emissiveIntensity: 0.4,
+        shininess:         20,
+        specular:          new THREE.Color(0x002244),
     });
 
     // ── ThreeGlobe ─────────────────────────────────────────────────────────────
@@ -81,46 +158,19 @@
         .pointColor(() => '#00f0ff')
         .pointResolution(8);
 
-    // Inject custom material — gives a solid good-looking globe without textures
     globe.globeMaterial(globeMat);
-
     scene.add(globe);
 
-    // ── Async texture enhancement ──────────────────────────────────────────────
-    // If the CDN texture loads, apply it on top of the existing material.
-    // The globe already looks good; this just makes it better.
-    const loader = new THREE.TextureLoader();
-    loader.crossOrigin = 'anonymous';
-    loader.load(
-        'https://cdn.jsdelivr.net/npm/three-globe@2.30.0/example/img/earth-dark.jpg',
-        (tex) => {
-            globeMat.map = tex;
-            globeMat.needsUpdate = true;
-        }
-    );
-
     // ── Neon wireframe grid overlay ────────────────────────────────────────────
-    // Visible immediately; doubles as a lat/lng grid aesthetic
-    const wireMesh = new THREE.Mesh(
+    globe.add(new THREE.Mesh(
         new THREE.SphereGeometry(101.5, 36, 18),
-        new THREE.MeshBasicMaterial({
-            color: 0x00f0ff,
-            wireframe: true,
-            transparent: true,
-            opacity: 0.055,
-        })
-    );
-    globe.add(wireMesh);
+        new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.04 })
+    ));
 
     // ── Outer glow halo ────────────────────────────────────────────────────────
     globe.add(new THREE.Mesh(
         new THREE.SphereGeometry(109, 32, 16),
-        new THREE.MeshBasicMaterial({
-            color: 0x00f0ff,
-            side: THREE.BackSide,
-            transparent: true,
-            opacity: 0.045,
-        })
+        new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.BackSide, transparent: true, opacity: 0.04 })
     ));
 
     // ── Arcs ───────────────────────────────────────────────────────────────────
@@ -149,38 +199,33 @@
             .arcDashGap(0.2)
             .arcDashAnimateTime(1800);
     }
-
     refreshArcs();
     setInterval(refreshArcs, 4000);
 
     // ── Drag rotation ──────────────────────────────────────────────────────────
-    let isDragging = false;
-    let prevMouse  = { x: 0, y: 0 };
-    let rotVel     = { x: 0, y: 0 };
-
-    function onDown(cx, cy) { isDragging = true; prevMouse = { x: cx, y: cy }; rotVel = { x: 0, y: 0 }; }
-    function onMove(cx, cy) {
+    let isDragging = false, prevMouse = {x:0,y:0}, rotVel = {x:0,y:0};
+    function onDown(cx,cy) { isDragging=true; prevMouse={x:cx,y:cy}; rotVel={x:0,y:0}; }
+    function onMove(cx,cy) {
         if (!isDragging) return;
-        rotVel.y = (cx - prevMouse.x) * 0.005;
-        rotVel.x = (cy - prevMouse.y) * 0.005;
+        rotVel.y = (cx-prevMouse.x)*0.005;
+        rotVel.x = (cy-prevMouse.y)*0.005;
         globe.rotation.y += rotVel.y;
-        globe.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, globe.rotation.x + rotVel.x));
-        prevMouse = { x: cx, y: cy };
+        globe.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, globe.rotation.x+rotVel.x));
+        prevMouse = {x:cx,y:cy};
     }
-    function onUp() { isDragging = false; }
+    function onUp() { isDragging=false; }
 
-    renderer.domElement.addEventListener('mousedown',  e => onDown(e.clientX, e.clientY));
-    renderer.domElement.addEventListener('mousemove',  e => onMove(e.clientX, e.clientY));
+    renderer.domElement.addEventListener('mousedown',  e => onDown(e.clientX,e.clientY));
+    renderer.domElement.addEventListener('mousemove',  e => onMove(e.clientX,e.clientY));
     renderer.domElement.addEventListener('mouseup',    onUp);
     renderer.domElement.addEventListener('mouseleave', onUp);
-    renderer.domElement.addEventListener('touchstart', e => onDown(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-    renderer.domElement.addEventListener('touchmove',  e => onMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+    renderer.domElement.addEventListener('touchstart', e => onDown(e.touches[0].clientX,e.touches[0].clientY), {passive:true});
+    renderer.domElement.addEventListener('touchmove',  e => onMove(e.touches[0].clientX,e.touches[0].clientY), {passive:true});
     renderer.domElement.addEventListener('touchend',   onUp);
 
     // ── Responsive resize ──────────────────────────────────────────────────────
     new ResizeObserver(() => {
-        const w = container.clientWidth;
-        const h = container.clientHeight;
+        const w = container.clientWidth, h = container.clientHeight;
         renderer.setSize(w, h);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
@@ -188,26 +233,21 @@
 
     // ── Animation loop ─────────────────────────────────────────────────────────
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const AUTO_ROT = 0.0015;
     let lightAngle = 0;
 
     function animate() {
         requestAnimationFrame(animate);
-
         if (!prefersReduced) {
             if (!isDragging) {
-                globe.rotation.y += AUTO_ROT;
-                rotVel.x *= 0.92;
-                rotVel.y *= 0.92;
+                globe.rotation.y += 0.0015;
+                rotVel.x *= 0.92; rotVel.y *= 0.92;
                 globe.rotation.y  += rotVel.y;
-                globe.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, globe.rotation.x + rotVel.x));
+                globe.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, globe.rotation.x+rotVel.x));
             }
-            // Key light orbits slowly — shifting cyan highlights across continents
             lightAngle += 0.004;
             keyLight.position.x = Math.cos(lightAngle) * 220;
             keyLight.position.z = Math.sin(lightAngle) * 220;
         }
-
         renderer.render(scene, camera);
     }
     animate();
