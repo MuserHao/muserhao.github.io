@@ -138,15 +138,55 @@
     goldLight.position.set(60, -180, 150);
     scene.add(goldLight);
 
-    // ── Globe material with procedural texture ─────────────────────────────────
+    // ── Globe material — procedural texture is shown immediately ──────────────
+    // Real NASA/Three.js textures load async and upgrade it transparently.
     const globeMat = new THREE.MeshPhongMaterial({
-        map:               makeEarthTexture(),
-        color:             new THREE.Color(0xffffff),  // white tint so texture shows true colour
+        map:               makeEarthTexture(),   // instant fallback, always visible
+        color:             new THREE.Color(0xffffff),
         emissive:          new THREE.Color(0x040e1a),
         emissiveIntensity: 0.4,
         shininess:         20,
-        specular:          new THREE.Color(0x002244),
+        specular:          new THREE.Color(0x004488),
     });
+
+    // ── Async real-texture upgrade ─────────────────────────────────────────────
+    // Priority chain: three.js GitHub raw → NASA Earth Observatory fallback.
+    // If both fail the procedural map is still perfectly visible.
+    (function loadTextures() {
+        const loader = new THREE.TextureLoader();
+        loader.crossOrigin = 'anonymous';
+
+        const DAY_URLS = [
+            'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg',
+            'https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57730/land_ocean_ice_cloud_2048.jpg',
+        ];
+        const LIGHTS_URL =
+            'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_lights_2048.png';
+
+        function tryDay(idx) {
+            if (idx >= DAY_URLS.length) return;
+            loader.load(
+                DAY_URLS[idx],
+                (tex) => {
+                    // Real texture loaded — swap out the procedural one
+                    globeMat.map = tex;
+                    globeMat.emissiveIntensity = 0;   // reset; night lights handle dark side
+                    globeMat.needsUpdate = true;
+
+                    // Now layer the city-lights emissive map on the night side
+                    loader.load(LIGHTS_URL, (lightTex) => {
+                        globeMat.emissiveMap       = lightTex;
+                        globeMat.emissive          = new THREE.Color(0xffffff);
+                        globeMat.emissiveIntensity = 0.55;
+                        globeMat.needsUpdate       = true;
+                    });
+                },
+                undefined,
+                () => tryDay(idx + 1)   // try next URL on error
+            );
+        }
+        tryDay(0);
+    })();
 
     // ── ThreeGlobe ─────────────────────────────────────────────────────────────
     const globe = new ThreeGlobe()
