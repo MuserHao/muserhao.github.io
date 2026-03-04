@@ -4,16 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EvoSys: Teaching Machines to Build Their Own Muscles | Hao Xin</title>
-    <meta name="description" content="A taxonomy of skills from regex to reasoning, and how EvoSys learns which muscle to grow. Covering the six tiers of skill distillation, maturation stages, and the bootstrapping paradox.">
+    <meta name="description" content="A taxonomy of skills from regex to reasoning, how EvoSys learns which muscle to grow, and what we actually built. Covering the six tiers, maturation stages, the bootstrapping paradox, and implementation reality.">
     <meta name="author" content="Hao Xin">
     <link rel="canonical" href="https://muserhao.github.io/blog/posts/evosys-skill-taxonomy.html">
     <!-- Open Graph -->
     <meta property="og:type" content="article">
     <meta property="og:title" content="EvoSys: Teaching Machines to Build Their Own Muscles">
-    <meta property="og:description" content="A taxonomy of skills from regex to reasoning, and how EvoSys learns which muscle to grow. The six tiers of skill distillation, maturation stages, and the bootstrapping paradox.">
+    <meta property="og:description" content="A taxonomy of skills from regex to reasoning, how EvoSys learns which muscle to grow, and what we actually built. The six tiers, maturation stages, the bootstrapping paradox, and implementation lessons.">
     <meta property="og:url" content="https://muserhao.github.io/blog/posts/evosys-skill-taxonomy.html">
     <meta property="og:site_name" content="Hao Xin">
     <meta property="article:published_time" content="2026-03-02">
+    <meta property="article:modified_time" content="2026-03-03">
     <meta property="article:author" content="Hao Xin">
     <meta property="article:tag" content="Systems">
     <meta property="article:tag" content="LLM">
@@ -21,7 +22,7 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="EvoSys: Teaching Machines to Build Their Own Muscles">
-    <meta name="twitter:description" content="A taxonomy of skills from regex to reasoning. How EvoSys distills expensive intelligence into cheap, specialized micro-skills.">
+    <meta name="twitter:description" content="A taxonomy of skills from regex to reasoning, and what happens when you actually build the system. Implementation lessons from EvoSys.">
     <!-- JSON-LD Article -->
     <script type="application/ld+json">
     {
@@ -30,7 +31,8 @@
         "headline": "EvoSys: Teaching Machines to Build Their Own Muscles",
         "author": {"@type": "Person", "name": "Hao Xin", "url": "https://muserhao.github.io"},
         "datePublished": "2026-03-02",
-        "description": "A taxonomy of skills from regex to reasoning, and how EvoSys learns which muscle to grow. Covering the six tiers of skill distillation, maturation stages, shadow mode, and the bootstrapping paradox.",
+        "description": "A taxonomy of skills from regex to reasoning, how EvoSys learns which muscle to grow, and what we actually built. Covering the six tiers, maturation stages, shadow mode, and implementation lessons.",
+        "dateModified": "2026-03-03",
         "url": "https://muserhao.github.io/blog/posts/evosys-skill-taxonomy.html",
         "keywords": ["EvoSys", "skill distillation", "LLM", "systems design", "knowledge distillation", "micro-skills", "automation"]
     }
@@ -224,7 +226,7 @@
             <div class="post-header">
                 <div class="post-meta">
                     <time class="blog-date" datetime="2026-03-02"><i class="fas fa-clock"></i> Mar 02, 2026</time>
-                    <span class="read-time"><i class="fas fa-book-open"></i> 15 min read</span>
+                    <span class="read-time"><i class="fas fa-book-open"></i> 20 min read</span>
                 </div>
                 <div class="blog-tags" style="justify-content: center; margin-bottom: 1.5rem;">
                     <span class="blog-tag">SYSTEMS</span>
@@ -232,7 +234,7 @@
                     <span class="blog-tag">TUTORIAL</span>
                 </div>
                 <h1 class="post-title">EvoSys: Teaching Machines to Build Their Own Muscles</h1>
-                <p class="post-subtitle">// a taxonomy of skills, from regex to reasoning -- and how a system learns which muscle to grow</p>
+                <p class="post-subtitle">// a taxonomy of skills, from regex to reasoning -- and what happens when you actually build it</p>
                 <div class="post-divider"></div>
             </div>
 
@@ -626,54 +628,138 @@ Tier 0: Pure deterministic function</code></pre>
                     not revolution.
                 </p>
 
-                <h2>09 // THE ROAD AHEAD</h2>
+                <h2>09 // WHAT WE ACTUALLY BUILT</h2>
 
                 <p>
-                    This post is Part 1 of the EvoSys design series, focused on the conceptual framework:
-                    what skills are, how they're tiered, how they mature, and how the system decides what
-                    to learn. The architecture has been described in terms of principles and processes.
-                    Now comes the engineering.
+                    The conceptual framework described above is now a working system. Phases 0
+                    through 4 are implemented: 303 tests passing, the full evolution loop
+                    operational. Here is how the theory mapped to reality.
                 </p>
 
                 <p>
-                    <strong>Phase 0</strong> -- the data foundation -- is complete. This includes the
-                    data contracts and interfaces that define how skills communicate, the input/output
-                    sanitization layer, and the schema validation framework. The code is available in the
-                    EvoSys GitHub repository <a href="#ref-1">[1]</a>.
+                    <strong>Phase 0</strong> -- data contracts and interfaces. Pydantic schemas for
+                    TrajectoryRecord, SkillRecord, and SliceCandidate. Abstract base classes for
+                    every pluggable component. A PII sanitizer that strips API keys, emails, SSNs,
+                    and credit card numbers from trajectory data before storage.
                 </p>
 
                 <p>
-                    <strong>Phase 1</strong> is trajectory logging: the all-seeing eye. Before the system
-                    can learn from its own operation, it needs to record that operation in structured,
-                    queryable form. Every LLM call, every tool invocation, every input-output pair must
-                    be captured with enough context to reconstruct the reasoning chain. This is the
-                    foundation on which pattern detection and skill synthesis will be built.
+                    <strong>Phase 1</strong> -- the extraction pipeline and skill routing. URL goes
+                    in, structured JSON comes out. The path: HTTP fetch via httpx, LLM extraction
+                    via LiteLLM (Claude Sonnet), JSON parsing, SQLite persistence via SQLAlchemy.
+                    Every action is logged as a TrajectoryRecord. A RoutingOrchestrator checks the
+                    SkillRegistry before falling back to the LLM -- domain-based lookup with a
+                    confidence threshold gate. Seven hand-crafted Tier 0 skills ship out of the box:
+                    Hacker News, Wikipedia, and article metadata for five major domains.
                 </p>
 
                 <p>
-                    <strong>Phase 2</strong> is the reflection daemon: the sleeping brain. A background
-                    process that analyzes trajectory logs offline, detects recurring patterns, estimates
-                    learnability, and proposes skill candidates to the Forge. This is where the system
-                    transitions from passive recording to active learning.
+                    <strong>Phase 2</strong> -- the reflection daemon. A PatternDetector scans
+                    trajectory data for recurring LLM extractions grouped by domain. When a domain
+                    appears above a frequency threshold (default: 3), it becomes a candidate. A
+                    ShadowEvaluator compares skill outputs against LLM ground truth with
+                    field-level matching and an 80% agreement threshold.
                 </p>
 
                 <p>
-                    The hardest unsolved problems lie further ahead. <strong>Optimal DAG granularity</strong>:
-                    when a complex task decomposes into sub-tasks, how fine-grained should the decomposition
-                    be? Too coarse and the skills aren't reusable. Too fine and the coordination overhead
-                    dominates. <strong>Evaluation of semantic skills</strong>: how do you validate the
-                    output of a Tier 2 or 3 skill when the "correct" answer is fuzzy? Automated evaluation
-                    is itself a research frontier. <strong>The meta-learning feedback loop</strong>: training
-                    a model to predict forge outcomes requires forge outcomes, which requires attempting
-                    forges, which benefits from predicting outcomes. The chicken-and-egg problem at scale.
+                    <strong>Phase 3</strong> -- the Forge. A SkillSynthesizer prompts the LLM to
+                    generate a Python async function from sample I/O pairs. The generated code
+                    passes through an AST safety check (blocks os, sys, subprocess, eval, exec,
+                    open), gets compiled and tested against historical data, and is registered in
+                    the SkillRegistry on success. Input/output schemas are inferred from sample
+                    data. Lineage traces link the forged skill to the trajectories it was born from.
                 </p>
 
                 <p>
-                    EvoSys is not a chatbot wrapper. It is not a prompt chain. It is not a RAG pipeline
-                    with a fancy name. It is an attempt to build a system that genuinely learns from its
-                    own operation -- one that gets better, faster, and cheaper with every task it
-                    completes. The muscles grow. The reflexes sharpen. The expensive intelligence is
-                    gradually freed to tackle problems that actually require it.
+                    <strong>Phase 4</strong> -- the evolution loop. An EvolutionLoop ties it all
+                    together: query trajectory store, detect patterns, forge skills, shadow-evaluate,
+                    register. A FastAPI server (<code>evosys serve</code>) runs the evolution loop
+                    every 5 minutes in the background. The system gets cheaper the longer it runs.
+                </p>
+
+                <h2>10 // WHAT WE LEARNED</h2>
+
+                <p>
+                    The most surprising lesson: <strong>the simple version works</strong>. The
+                    original design called for HDBSCAN clustering on sentence embeddings, vector
+                    database lookups for semantic routing, and Docker sandboxing for forged skills.
+                    None of that was needed for the first working version.
+                </p>
+
+                <p>
+                    Domain-based routing (extract the domain from the URL, look up
+                    <code>extract:{domain}</code> in a dictionary) is fast, predictable, and
+                    testable. Frequency counting by domain (how many times has this domain been
+                    extracted via LLM?) detects patterns without embeddings. AST walking catches
+                    dangerous code without a Docker sandbox. The system works because the problem
+                    -- structured data extraction from web pages -- has natural domain boundaries
+                    that align with simple string matching.
+                </p>
+
+                <p>
+                    This validated the prediction from our reality check (Thought 006): "80% of the
+                    value comes from the simplest version." But the important nuance is that the
+                    simple version is the <em>starting point</em>, not the ceiling. Frequency
+                    counting will stop being enough when the system needs to route
+                    <code>blog.example.com</code> to an <code>example.com</code> skill, or when it
+                    needs to recognize that two structurally different URLs serve the same content
+                    type. That is when embeddings and semantic routing earn their complexity.
+                </p>
+
+                <p>
+                    The other lesson: <strong>test exhaustively at every boundary</strong>. Each
+                    phase introduced new components that interacted with everything built before.
+                    303 tests caught real bugs at phase boundaries -- backward compatibility issues,
+                    type mismatches, missing fields, and subtle behavioral regressions. The system's
+                    confidence is proportional to its test coverage.
+                </p>
+
+                <h2>11 // THE ROAD AHEAD</h2>
+
+                <p>
+                    What remains is the transition from "working prototype" to "continuously
+                    learning system." The core loop exists: extract, log, detect, forge, route. But
+                    several capabilities are not yet built:
+                </p>
+
+                <p>
+                    <strong>Confidence lifecycle.</strong> Skills should gain confidence on
+                    successful invocations and lose it on failures, drift, or disuse. The forgetting
+                    curve from Section 08 is designed but not implemented. A skill that hasn't been
+                    called in 90 days should gradually lose routing priority.
+                </p>
+
+                <p>
+                    <strong>Embedding-based routing.</strong> When domain-exact-match stops being
+                    sufficient, semantic similarity over skill descriptions and input patterns will
+                    be needed. LanceDB is in the dependency list, waiting for this.
+                </p>
+
+                <p>
+                    <strong>Proper sandboxing.</strong> Currently, forged code runs in-process with
+                    only AST-level safety checks. Production deployment needs process isolation or
+                    WASM-level containment.
+                </p>
+
+                <p>
+                    <strong>The meta-learning feedback loop.</strong> The system accumulates forge
+                    outcomes -- which patterns succeeded, which failed, at which tiers. This data
+                    can train a learnability predictor that prioritizes high-ROI forge attempts.
+                    The interface exists (<code>BaseLearnabilityEstimator</code>); the
+                    implementation waits for enough forge history to be meaningful.
+                </p>
+
+                <p>
+                    <strong>Skill composition.</strong> When Skill A's output consistently feeds
+                    Skill B's input, the system should forge a composite Skill AB that eliminates
+                    the orchestrator round-trip. This requires production traffic patterns that
+                    don't exist yet.
+                </p>
+
+                <p>
+                    The system is running. The muscles are growing. The expensive intelligence is
+                    being gradually freed to tackle problems that actually require it. What remains
+                    is time, traffic, and iteration.
                 </p>
 
                 <div class="post-divider"></div>
