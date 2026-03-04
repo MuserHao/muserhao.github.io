@@ -51,6 +51,9 @@
         </defs>
     </svg>
 
+    <!-- Generative art canvas background -->
+    <canvas id="gen-art-canvas" aria-hidden="true" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0;transition:opacity 2s ease;"></canvas>
+
     <!-- Animated background grid -->
     <div class="grid-bg"></div>
 
@@ -571,6 +574,13 @@
                 </div>
             </div>
         </section>
+
+        <!-- Globe Section -->
+        <section id="globe-section" class="globe-section">
+            <h2 class="section-title"><span class="title-decoration">&lt;</span> GLOBAL.REACH <span class="title-decoration">/&gt;</span></h2>
+            <p class="globe-subtitle">// ideas traveling at the speed of gradients</p>
+            <div id="globe-container"></div>
+        </section>
     </main>
 
     <footer>
@@ -581,6 +591,10 @@
     </footer>
 
     <script src="shared.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three-globe@2.30.0/dist/three-globe.min.js"></script>
+    <script src="globe.js"></script>
+    <script src="generative-bg.js"></script>
     <script>
         // ========== PAGE-SPECIFIC: PARTICLES (higher count for main page) ==========
         createParticles(50);

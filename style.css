@@ -1729,6 +1729,32 @@ footer {
     }
 }
 
+/* ========== GLOBE SECTION ========== */
+.globe-section {
+    padding: 4rem 2rem;
+    text-align: center;
+    position: relative;
+}
+
+#globe-container {
+    width: 100%;
+    max-width: 600px;
+    height: 500px;
+    margin: 0 auto;
+    cursor: grab;
+}
+
+#globe-container:active {
+    cursor: grabbing;
+}
+
+.globe-subtitle {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+}
+
 /* ========== SCROLLBAR ========== */
 ::-webkit-scrollbar {
     width: 6px;
