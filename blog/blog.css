@@ -1,6 +1,24 @@
 /* ========== BLOG STYLES ========== */
 
-/* Blog Hero */
+/* ── Background: suppress heavy neon decorations for readability ── */
+/* Orbs: dial back to barely-there — they were designed for the hero's dark stage,
+   not a text-reading context. Bloom + blur still present, just very faint. */
+.blog-page .gradient-orbs .orb {
+    opacity: 0.06 !important;
+    filter: blur(110px) !important;
+}
+
+/* Grid lines: 40% of normal opacity — structural texture without visual noise */
+.blog-page .grid-bg {
+    opacity: 0.2 !important;
+}
+
+/* Floating sparkle particles: already 30 on blog, but dim them further */
+.blog-page #particles .particle {
+    opacity: 0.25 !important;
+}
+
+/* ── Blog Hero ── */
 .blog-main {
     padding-top: 100px;
 }

@@ -26,7 +26,7 @@
         (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
     </script>
 </head>
-<body>
+<body class="blog-page">
     <!-- SVG liquid distortion filter -->
     <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
         <defs>
@@ -272,6 +272,7 @@
     </footer>
 
     <script src="../shared.js"></script>
+    <script src="blog-bg.js"></script>
     <script>
         // Page-specific: particles + filter
         createParticles(30);
