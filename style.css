@@ -1331,11 +1331,15 @@ footer {
     padding: 3rem;
     border-radius: 16px;
     border: 2px solid transparent;
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(5, 12, 20, 0.08);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     background-clip: padding-box;
     background-origin: border-box;
+}
+
+[data-theme="light"] .hero-content {
+    background: rgba(255, 253, 250, 0.08);
 }
 
 .hero-content::before {
@@ -1356,7 +1360,7 @@ footer {
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     animation: gradient-rotate 4s linear infinite;
-    opacity: 0.6;
+    opacity: 0.85;
     pointer-events: none;
 }
 
