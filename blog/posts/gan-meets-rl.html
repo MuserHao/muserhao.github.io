@@ -1048,7 +1048,8 @@
         </article>
 
         <div class="post-nav">
-            <a href="../index.html"><i class="fas fa-arrow-left"></i> BACK TO BLOG</a>
+            <a href="score-matching-explained.html"><i class="fas fa-arrow-left"></i> SCORE MATCHING EXPLAINED</a>
+            <a href="evosys-skill-taxonomy.html">EVOSYS: SKILL TAXONOMY <i class="fas fa-arrow-right"></i></a>
         </div>
     </main>
 
@@ -1064,6 +1065,35 @@
     <script src="../../shared.js"></script>
     <script>
         createParticles(30);
+
+        // ── Reading progress bar ──
+        const bar = document.createElement('div');
+        bar.id = 'reading-progress';
+        document.body.prepend(bar);
+        window.addEventListener('scroll', () => {
+            const doc = document.documentElement;
+            const pct = doc.scrollTop / (doc.scrollHeight - doc.clientHeight) * 100;
+            bar.style.width = Math.min(pct, 100) + '%';
+        }, { passive: true });
+
+        // ── Copy buttons on code blocks ──
+        document.querySelectorAll('.post-content pre').forEach(pre => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pre-wrapper';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = 'COPY';
+            btn.addEventListener('click', () => {
+                navigator.clipboard.writeText(pre.innerText).then(() => {
+                    btn.textContent = 'COPIED';
+                    btn.classList.add('copied');
+                    setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 2000);
+                });
+            });
+            wrapper.appendChild(btn);
+        });
     </script>
 </body>
 </html>
