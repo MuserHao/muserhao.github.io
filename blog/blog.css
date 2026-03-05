@@ -364,6 +364,17 @@
     color: var(--text-primary);
 }
 
+/* Prism.js overrides — keep background consistent with glass theme */
+.post-content pre[class*="language-"],
+.post-content code[class*="language-"] {
+    background: transparent;
+    text-shadow: none;
+}
+
+.post-content pre[class*="language-"] {
+    border: 1px solid var(--glass-border);
+}
+
 /* Math blocks */
 .math-block {
     background: var(--glass-bg);
