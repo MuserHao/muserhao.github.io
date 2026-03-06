@@ -74,32 +74,6 @@
     80% { transform: translate(110px, 70px) scale(0.92); }
 }
 
-/* Particles: colorful accents among the stars */
-.particle {
-    box-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
-}
-
-@keyframes float-particle {
-    0% {
-        opacity: 0;
-        transform: translateY(0) translateX(0) scale(1);
-    }
-    10% {
-        opacity: 0.7;
-    }
-    50% {
-        transform: translateY(-50vh) translateX(40px) scale(1.5);
-        opacity: 0.5;
-    }
-    90% {
-        opacity: 0.4;
-    }
-    100% {
-        opacity: 0;
-        transform: translateY(-100vh) translateX(-30px) scale(0.5);
-    }
-}
-
 /* Grid: dim so stars shine through */
 .grid-bg {
     opacity: 0.04;
@@ -111,9 +85,6 @@
 @media (prefers-reduced-motion: reduce) {
     .orb {
         animation-duration: 60s;
-        opacity: 0.2;
-    }
-    .particle {
-        box-shadow: 0 0 6px currentColor;
+        opacity: 0.1;
     }
 }
