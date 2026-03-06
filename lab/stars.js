@@ -24,7 +24,7 @@
     var stars = [];
     var meteors = [];
     var blackHoles = [];
-    var STAR_COUNT = 600;
+    var STAR_COUNT = 1000;
     var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function resize() {
@@ -42,8 +42,8 @@
     function generateStars() {
         stars = [];
         for (var i = 0; i < STAR_COUNT; i++) {
-            // 30% of stars cluster along the milky way band (diagonal)
-            var inBand = Math.random() < 0.3;
+            // 55% of stars cluster along the milky way band (diagonal)
+            var inBand = Math.random() < 0.55;
             var x, y;
             if (inBand) {
                 // Band runs from top-left to bottom-right at ~30 degrees
@@ -330,8 +330,8 @@
             ctx.restore();
         }
 
-        // Spawn meteors
-        if (!reducedMotion && Math.random() < 0.012) spawnMeteor();
+        // Spawn meteors — ~1 every 0.5 seconds at 60fps
+        if (!reducedMotion && Math.random() < 0.035) spawnMeteor();
     }
 
     // ---- Loop ----
