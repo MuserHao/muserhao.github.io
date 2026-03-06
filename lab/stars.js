@@ -24,8 +24,16 @@
     var stars = [];
     var meteors = [];
     var blackHoles = [];
-    var STAR_COUNT = 1000;
+    var STAR_COUNT = 1200;
     var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Box-Muller: Gaussian random (mean=0, std=1)
+    function randn() {
+        var u = 0, v = 0;
+        while (u === 0) u = Math.random();
+        while (v === 0) v = Math.random();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    }
 
     function resize() {
         W = window.innerWidth * dpr;
@@ -37,31 +45,44 @@
     }
 
     // ================================================================
-    // STARS — dense field with clusters along milky way
+    // STARS — Gaussian density falloff from milky way center line
     // ================================================================
     function generateStars() {
         stars = [];
+        // Milky way diagonal: angle ≈ -0.5 rad (~30°)
+        var bandAngle = -0.5;
+        var cosA = Math.cos(bandAngle), sinA = Math.sin(bandAngle);
+        // Screen diagonal length for scaling
+        var diag = Math.sqrt(W * W + H * H);
+
         for (var i = 0; i < STAR_COUNT; i++) {
-            // 55% of stars cluster along the milky way band (diagonal)
-            var inBand = Math.random() < 0.55;
+            // 65% of stars drawn from the Gaussian milky way distribution
+            var inBand = Math.random() < 0.65;
             var x, y;
+
             if (inBand) {
-                // Band runs from top-left to bottom-right at ~30 degrees
-                var t = Math.random();
-                var bandCenter = t;
-                x = t * W + (Math.random() - 0.5) * W * 0.25;
-                y = t * H * 0.7 + H * 0.15 + (Math.random() - 0.5) * H * 0.2;
+                // Uniform position along the band axis
+                var along = (Math.random() - 0.5) * 1.5;
+                // Gaussian perpendicular offset — σ = 0.10 of diagonal
+                // This gives smooth density: dense core → gradual thinning
+                var perp = randn() * 0.10;
+
+                // Convert band-local coords to screen coords
+                x = W / 2 + along * diag * cosA - perp * diag * sinA;
+                y = H / 2 + along * diag * sinA + perp * diag * cosA;
             } else {
                 x = Math.random() * W;
                 y = Math.random() * H;
             }
 
-            var depth = Math.random(); // 0 = far, 1 = near
+            var depth = Math.random();
+            // Band stars: smaller and slightly dimmer (dense distant cluster look)
+            var bandScale = inBand ? 0.65 : 1.0;
             stars.push({
                 x: x,
                 y: y,
-                r: inBand ? (depth * 1.0 + 0.2) : (depth * 1.8 + 0.2),
-                baseAlpha: inBand ? (depth * 0.4 + 0.1) : (depth * 0.7 + 0.15),
+                r: depth * 1.6 * bandScale + 0.2,
+                baseAlpha: depth * 0.6 * bandScale + 0.12,
                 twinkleSpeed: Math.random() * 3 + 0.3,
                 twinklePhase: Math.random() * Math.PI * 2,
                 hue: Math.random() < 0.5 ? 0 : (Math.random() < 0.6 ? 210 + Math.random() * 30 : 20 + Math.random() * 30),
