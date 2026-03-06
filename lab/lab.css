@@ -1,17 +1,27 @@
-/* ========== FUN LAB — LIVELY BACKGROUND OVERRIDES ========== */
-/* Brighter, faster, more chaotic than blog/home pages */
+/* ========== FUN LAB — STARFIELD + LIVELY BACKGROUNDS ========== */
 
-/* Orbs: brighter, faster, bigger movement range */
-.orb {
-    opacity: 0.4;
-    filter: blur(55px);
+/* Starfield canvas — sits behind everything */
+#starfield {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
 }
 
-.orb-cyan  { animation-duration: 12s; }
-.orb-pink  { animation-duration: 14s; }
-.orb-purple { animation-duration: 10s; }
-.orb-gold  { animation-duration: 16s; }
-.orb-teal  { animation-duration: 11s; }
+/* Orbs: softer so they blend with stars like nebulae */
+.orb {
+    opacity: 0.2;
+    filter: blur(80px);
+}
+
+.orb-cyan  { animation-duration: 14s; }
+.orb-pink  { animation-duration: 16s; }
+.orb-purple { animation-duration: 12s; }
+.orb-gold  { animation-duration: 18s; }
+.orb-teal  { animation-duration: 13s; }
 
 /* Wilder drift paths for lab */
 @keyframes orb-drift-1 {
@@ -54,9 +64,9 @@
     80% { transform: translate(110px, 70px) scale(0.92); }
 }
 
-/* Particles: faster, brighter, more visible */
+/* Particles: colorful accents among the stars */
 .particle {
-    box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+    box-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
 }
 
 @keyframes float-particle {
