@@ -616,9 +616,29 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
                 <p>
+                    <strong>The exploration problem.</strong> Even with the sign fix, REINFORCE would
+                    initialize with the paddle stuck at one position and never move. The issue: unlike
+                    Q-Learning and DQN which have &epsilon;-greedy exploration, vanilla REINFORCE samples
+                    from its own policy. If the initial random weights slightly favor STAY, the paddle
+                    parks itself, never hits the ball, never gets the +0.3 reward, and the tiny distance
+                    penalty (-0.01) gets washed out by baseline normalization. Two fixes were needed:
+                </p>
+
+                <ul>
+                    <li><strong>&epsilon;-greedy exploration</strong> (&epsilon;=0.3, decaying): 30% of the time,
+                        pick a random action regardless of the policy. This guarantees the paddle moves,
+                        discovers ball hits, and generates diverse trajectories for learning.</li>
+                    <li><strong>Entropy regularization</strong> (&beta;=0.02): add
+                        $\beta \cdot H(\pi)$ to the objective, where $H(\pi) = -\sum_k \pi_k \log \pi_k$.
+                        This gradient pushes action probabilities away from 0 or 1, preventing the policy
+                        from collapsing to a single action. The agent stays stochastic enough to explore
+                        even as &epsilon; decays.</li>
+                </ul>
+
+                <p>
                     <strong>Learning rate matters more here.</strong> DQN trains every 4 steps — thousands
                     of gradient updates per episode. REINFORCE trains once at episode end, on a subsample
-                    of up to 200 trajectory steps. With lr=0.001 (same as DQN), the weights barely moved.
+                    of up to 300 trajectory steps. With lr=0.001 (same as DQN), the weights barely moved.
                     Bumping to lr=0.005 gave the single end-of-episode update enough magnitude to actually
                     shift the policy.
                 </p>

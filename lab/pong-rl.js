@@ -89,8 +89,10 @@ const PongRL = (function () {
         return out;
     };
 
-    // Backprop for policy gradient log-likelihood
-    MiniNet.prototype.trainPG = function (input, actionIdx, advantage, lr) {
+    // Backprop for policy gradient with entropy regularization
+    // Objective: maximize advantage * log π(a|s) + β * H(π)
+    // where H(π) = -Σ π_k log π_k is the entropy bonus
+    MiniNet.prototype.trainPG = function (input, actionIdx, advantage, lr, entropyCoef) {
         const { nIn, nHid, nOut, wH, bH, wO, bO } = this;
         const { out, hidden } = this.forward(input);
 
@@ -105,12 +107,22 @@ const PongRL = (function () {
         const probs = new Float64Array(nOut);
         for (let k = 0; k < nOut; k++) probs[k] = exps[k] / sumExp;
 
-        // Gradient of log π(a|s) w.r.t. logits: (one_hot - probs)
-        // We want gradient ASCENT on advantage * log π(a|s).
-        // Since updates use w -= lr * dOut, set dOut = -advantage * (one_hot - probs)
+        // Policy gradient: dJ/dz_k = advantage * (one_hot_k - probs_k)
+        // Entropy gradient: dH/dz_k = -probs_k * (log probs_k + H)
+        //   where H = -Σ probs_j * log probs_j
+        // Combined for gradient ASCENT, negated for w -= convention:
+        var entropy = 0;
+        for (let k = 0; k < nOut; k++) {
+            if (probs[k] > 1e-10) entropy -= probs[k] * Math.log(probs[k]);
+        }
+
         const dOut = new Float64Array(nOut);
         for (let k = 0; k < nOut; k++) {
-            dOut[k] = -advantage * ((k === actionIdx ? 1 : 0) - probs[k]);
+            var policyGrad = (k === actionIdx ? 1 : 0) - probs[k];
+            var logP = probs[k] > 1e-10 ? Math.log(probs[k]) : -20;
+            var entropyGrad = -probs[k] * (logP + entropy);
+            // Negate for w -= lr * dOut convention (ascent)
+            dOut[k] = -(advantage * policyGrad + (entropyCoef || 0) * entropyGrad);
         }
 
         // Backprop through output layer
@@ -347,6 +359,10 @@ const PongRL = (function () {
         this.net = new MiniNet(6, 32, 3);
         this.lr = 0.005;
         this.gamma = 0.99;
+        this.entropyCoef = 0.02;     // entropy bonus to prevent policy collapse
+        this.epsilon = 0.3;          // exploration rate
+        this.epsilonDecay = 0.997;
+        this.epsilonMin = 0.05;
         this.episodes = 0;
         this.wins = 0;
         this.totalGames = 0;
@@ -356,8 +372,12 @@ const PongRL = (function () {
     }
 
     ReinforceAgent.prototype.chooseAction = function (state) {
+        // ε-greedy: random action with probability ε
+        if (Math.random() < this.epsilon) {
+            return Math.floor(Math.random() * 3);
+        }
         const probs = this.net.softmax(state);
-        // Sample from distribution
+        // Sample from policy distribution
         const r = Math.random();
         let cumulative = 0;
         for (let i = 0; i < probs.length; i++) {
@@ -375,6 +395,7 @@ const PongRL = (function () {
         this.episodes++;
         this.totalGames++;
         if (winner === 'ai') this.wins++;
+        this.epsilon = Math.max(this.epsilonMin, this.epsilon * this.epsilonDecay);
 
         // Compute discounted returns
         const T = this.trajectory.length;
@@ -393,13 +414,12 @@ const PongRL = (function () {
         for (let t = 0; t < T; t++) std += (returns[t] - mean) ** 2;
         std = Math.sqrt(std / T + 1e-8);
 
-        // Train — gradient ascent on log-likelihood weighted by advantage
-        // Process a subsample to keep training fast
-        const maxSteps = Math.min(T, 200);
+        // Train — gradient ascent on log-likelihood weighted by advantage + entropy
+        const maxSteps = Math.min(T, 300);
         const stride = Math.max(1, Math.floor(T / maxSteps));
         for (let t = 0; t < T; t += stride) {
             const advantage = (returns[t] - mean) / std;
-            this.net.trainPG(this.trajectory[t].state, this.trajectory[t].action, advantage, this.lr);
+            this.net.trainPG(this.trajectory[t].state, this.trajectory[t].action, advantage, this.lr, this.entropyCoef);
         }
 
         this.trajectory = [];
@@ -410,7 +430,8 @@ const PongRL = (function () {
             net: this.net.serialize(),
             episodes: this.episodes,
             wins: this.wins,
-            totalGames: this.totalGames
+            totalGames: this.totalGames,
+            epsilon: this.epsilon
         };
     };
 
@@ -420,6 +441,7 @@ const PongRL = (function () {
         a.episodes = d.episodes || 0;
         a.wins = d.wins || 0;
         a.totalGames = d.totalGames || 0;
+        a.epsilon = d.epsilon !== undefined ? d.epsilon : 0.3;
         return a;
     };
 
