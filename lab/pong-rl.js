@@ -105,17 +105,13 @@ const PongRL = (function () {
         const probs = new Float64Array(nOut);
         for (let k = 0; k < nOut; k++) probs[k] = exps[k] / sumExp;
 
-        // d(log_prob) / d(out) = -probs, but +1 for the chosen action
+        // Gradient of log π(a|s) w.r.t. logits: (one_hot - probs)
+        // We want gradient ASCENT on advantage * log π(a|s).
+        // Since updates use w -= lr * dOut, set dOut = -advantage * (one_hot - probs)
         const dOut = new Float64Array(nOut);
-        for (let k = 0; k < nOut; k++) dOut[k] = -advantage * (-probs[k]);
-        dOut[actionIdx] += -advantage * (1 - probs[actionIdx]) - (-advantage * (-probs[actionIdx]));
-        // Simplify: gradient of log p(a) w.r.t. logits = (one_hot - probs)
-        // We want to maximize advantage * log p(a), so gradient ascent:
         for (let k = 0; k < nOut; k++) {
             dOut[k] = -advantage * ((k === actionIdx ? 1 : 0) - probs[k]);
         }
-        // Negate for gradient ascent (we subtract lr * dOut, so negate to ascend)
-        for (let k = 0; k < nOut; k++) dOut[k] = -dOut[k];
 
         // Backprop through output layer
         const dHidden = new Float64Array(nHid);
@@ -349,7 +345,7 @@ const PongRL = (function () {
     // ========================================================
     function ReinforceAgent() {
         this.net = new MiniNet(6, 32, 3);
-        this.lr = 0.001;
+        this.lr = 0.005;
         this.gamma = 0.99;
         this.episodes = 0;
         this.wins = 0;

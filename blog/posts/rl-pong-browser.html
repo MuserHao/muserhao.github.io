@@ -597,16 +597,30 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
                 <p>
-                    <strong>Baseline normalization is non-optional.</strong> Without subtracting the mean
-                    return and dividing by std, the gradient signal is dominated by the absolute magnitude
-                    of returns rather than which actions were better than average. With it, REINFORCE
-                    converges -- slowly, noisily, but it converges.
+                    <strong>The gradient sign bug.</strong> Our first REINFORCE implementation didn't learn
+                    at all. After hours of debugging hyperparameters and reward shaping, the real culprit
+                    was a sign error in the policy gradient backprop. The gradient of
+                    $\log \pi(a|s)$ w.r.t. logits is $(\mathbf{1}_{k=a} - \pi_k)$. We want gradient
+                    <em>ascent</em> (maximize reward), but our weight update uses <code>w -= lr * dOut</code>
+                    (descent convention). So we need <code>dOut = -\text{advantage} \cdot (\mathbf{1} - \pi)</code>.
+                    The original code computed this correctly, then <em>negated it again</em> "for gradient
+                    ascent" — making it gradient descent. The agent was trained to make good actions
+                    <em>less</em> likely. One line removal fixed everything.
                 </p>
 
                 <p>
-                    We subsample long trajectories (max 200 steps for gradient computation) to keep
-                    training fast. A 1000-step episode with full backprop through every step would make
-                    each training pass take 5x longer for marginal benefit.
+                    <strong>Baseline normalization is non-optional.</strong> Without subtracting the mean
+                    return and dividing by std, the gradient signal is dominated by the absolute magnitude
+                    of returns rather than which actions were better than average. With it, REINFORCE
+                    converges — slowly, noisily, but it converges.
+                </p>
+
+                <p>
+                    <strong>Learning rate matters more here.</strong> DQN trains every 4 steps — thousands
+                    of gradient updates per episode. REINFORCE trains once at episode end, on a subsample
+                    of up to 200 trajectory steps. With lr=0.001 (same as DQN), the weights barely moved.
+                    Bumping to lr=0.005 gave the single end-of-episode update enough magnitude to actually
+                    shift the policy.
                 </p>
 
                 <p>
