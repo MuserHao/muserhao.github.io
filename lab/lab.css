@@ -11,6 +11,16 @@
     pointer-events: none;
 }
 
+/* Override blog-page suppressions — lab needs its full space background */
+.lab-page.blog-page .gradient-orbs .orb {
+    opacity: 0.2 !important;
+    filter: blur(80px) !important;
+}
+
+.lab-page.blog-page .grid-bg {
+    opacity: 0.04 !important;
+}
+
 /* Orbs: softer so they blend with stars like nebulae */
 .orb {
     opacity: 0.2;
