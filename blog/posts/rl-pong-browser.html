@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teaching Pong to Play Itself: 3 RL Algorithms in the Browser | Hao Xin</title>
+    <meta name="description" content="How we trained Q-Learning, DQN, and REINFORCE agents to play Pong in pure JavaScript -- no GPU, no Python, just 323 parameters and a lot of reward shaping. A build log of what worked, what didn't, and what the textbooks don't tell you.">
+    <meta name="author" content="Hao Xin">
+    <link rel="canonical" href="https://muserhao.github.io/blog/posts/rl-pong-browser.html">
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Teaching Pong to Play Itself: 3 RL Algorithms in the Browser">
+    <meta property="og:description" content="How we trained Q-Learning, DQN, and REINFORCE to play Pong in pure JavaScript -- a build log of what worked, what didn't, and what the textbooks don't tell you.">
+    <meta property="og:url" content="https://muserhao.github.io/blog/posts/rl-pong-browser.html">
+    <meta property="og:site_name" content="Hao Xin">
+    <meta property="article:published_time" content="2026-03-05">
+    <meta property="article:author" content="Hao Xin">
+    <meta property="article:tag" content="Reinforcement Learning">
+    <meta property="article:tag" content="Tutorial">
+    <meta property="article:tag" content="JavaScript">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Teaching Pong to Play Itself: 3 RL Algorithms in the Browser">
+    <meta name="twitter:description" content="Q-Learning, DQN, and REINFORCE in pure JS. A build log of training Pong agents with 323 parameters.">
+    <!-- JSON-LD Article -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Teaching Pong to Play Itself: 3 RL Algorithms in the Browser",
+        "author": {"@type": "Person", "name": "Hao Xin", "url": "https://muserhao.github.io"},
+        "datePublished": "2026-03-05",
+        "description": "How we trained Q-Learning, DQN, and REINFORCE agents to play Pong in pure JavaScript. A build log of what worked, what didn't, and what the textbooks don't tell you.",
+        "url": "https://muserhao.github.io/blog/posts/rl-pong-browser.html",
+        "keywords": ["reinforcement learning", "Q-learning", "DQN", "REINFORCE", "policy gradient", "Pong", "JavaScript", "browser ML"]
+    }
+    </script>
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="../blog.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+    <!-- KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+        });"></script>
+    <script>
+        (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+</head>
+<body>
+    <!-- SVG liquid distortion filter -->
+    <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
+        <defs>
+            <filter id="liquid-distort" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence id="liquid-turbulence" type="fractalNoise"
+                    baseFrequency="0.006 0.009" numOctaves="4" seed="3" result="noise"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise"
+                    scale="50" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="grid-bg"></div>
+
+    <!-- Floating gradient orbs -->
+    <div class="gradient-orbs" aria-hidden="true">
+        <div class="orb orb-cyan"></div>
+        <div class="orb orb-pink"></div>
+        <div class="orb orb-purple"></div>
+        <div class="orb orb-gold"></div>
+        <div class="orb orb-teal"></div>
+    </div>
+
+    <div id="particles"></div>
+
+    <header>
+        <nav>
+            <a href="../../index.html" class="logo" aria-label="HAO.XIN">
+                <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="d1a" x1="100%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="12%" stop-color="#D8C060"/>
+                            <stop offset="28%" stop-color="#E8D888"/>
+                            <stop offset="44%" stop-color="#F0E8B0"/>
+                            <stop offset="55%" stop-color="#F8F0C8"/>
+                            <stop offset="70%" stop-color="#E8D888"/>
+                            <stop offset="100%" stop-color="#C8A840"/>
+                        </linearGradient>
+                        <linearGradient id="d1b" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="30%" stop-color="#B09030"/>
+                            <stop offset="65%" stop-color="#987828"/>
+                            <stop offset="100%" stop-color="#806020"/>
+                        </linearGradient>
+                        <linearGradient id="d1c" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#A08830"/>
+                            <stop offset="35%" stop-color="#887020"/>
+                            <stop offset="70%" stop-color="#706018"/>
+                            <stop offset="100%" stop-color="#605010"/>
+                        </linearGradient>
+                        <linearGradient id="d2a" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#C0A038"/>
+                            <stop offset="14%" stop-color="#D0B858"/>
+                            <stop offset="30%" stop-color="#E0D080"/>
+                            <stop offset="46%" stop-color="#EEE4A8"/>
+                            <stop offset="56%" stop-color="#F8F0C8"/>
+                            <stop offset="70%" stop-color="#E0D080"/>
+                            <stop offset="100%" stop-color="#C0A038"/>
+                        </linearGradient>
+                        <linearGradient id="d2b" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#D0B858"/>
+                            <stop offset="28%" stop-color="#B09030"/>
+                            <stop offset="60%" stop-color="#987828"/>
+                            <stop offset="100%" stop-color="#806020"/>
+                        </linearGradient>
+                        <linearGradient id="d2c" x1="100%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="#A08830"/>
+                            <stop offset="30%" stop-color="#908028"/>
+                            <stop offset="65%" stop-color="#706018"/>
+                            <stop offset="100%" stop-color="#605010"/>
+                        </linearGradient>
+                        <linearGradient id="d3a" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="18%" stop-color="#D8C060"/>
+                            <stop offset="36%" stop-color="#E8D888"/>
+                            <stop offset="52%" stop-color="#F0E8B0"/>
+                            <stop offset="62%" stop-color="#F8F0C8"/>
+                            <stop offset="76%" stop-color="#E0D080"/>
+                            <stop offset="100%" stop-color="#C0A038"/>
+                        </linearGradient>
+                        <linearGradient id="d3b" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="25%" stop-color="#B09030"/>
+                            <stop offset="58%" stop-color="#987828"/>
+                            <stop offset="100%" stop-color="#806020"/>
+                        </linearGradient>
+                        <linearGradient id="d3c" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#A08830"/>
+                            <stop offset="32%" stop-color="#908028"/>
+                            <stop offset="68%" stop-color="#706018"/>
+                            <stop offset="100%" stop-color="#605010"/>
+                        </linearGradient>
+                        <linearGradient id="d4a" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#C0A038"/>
+                            <stop offset="20%" stop-color="#D0B858"/>
+                            <stop offset="38%" stop-color="#E0D080"/>
+                            <stop offset="54%" stop-color="#EEE4A8"/>
+                            <stop offset="64%" stop-color="#F8F0C8"/>
+                            <stop offset="78%" stop-color="#E8D888"/>
+                            <stop offset="100%" stop-color="#C8A840"/>
+                        </linearGradient>
+                        <linearGradient id="d4b" x1="100%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="#D0B858"/>
+                            <stop offset="28%" stop-color="#B09030"/>
+                            <stop offset="62%" stop-color="#987828"/>
+                            <stop offset="100%" stop-color="#806020"/>
+                        </linearGradient>
+                        <linearGradient id="d4c" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#A08830"/>
+                            <stop offset="35%" stop-color="#908028"/>
+                            <stop offset="70%" stop-color="#706018"/>
+                            <stop offset="100%" stop-color="#605010"/>
+                        </linearGradient>
+                        <linearGradient id="dHub" x1="50%" y1="100%" x2="50%" y2="0%">
+                            <stop offset="0%" stop-color="#907828"/>
+                            <stop offset="25%" stop-color="#A89038"/>
+                            <stop offset="50%" stop-color="#C8A840"/>
+                            <stop offset="75%" stop-color="#D8C060"/>
+                            <stop offset="100%" stop-color="#E8D888"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M24.14 35.45 A16 16 0 0 1 4.97 14.53" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path d="M7.75 9.72 A16 16 0 0 1 32.25 9.72" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path d="M35.03 14.53 A16 16 0 0 1 29.18 33.10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <line x1="11" y1="32" x2="18.5" y2="8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="21.5" y1="8" x2="29" y2="32" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="14" y1="23" x2="26" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <polygon points="4,4 17,18 20,14" fill="url(#d1a)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                    <polygon points="4,4 17,18 18.5,16" fill="url(#d1b)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="4,4 20,14 18.5,16" fill="url(#d1c)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="36,4 20,14 23,18" fill="url(#d2a)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                    <polygon points="36,4 23,18 21.5,16" fill="url(#d2b)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="36,4 20,14 21.5,16" fill="url(#d2c)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="36,32 23,18 20,20" fill="url(#d3a)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                    <polygon points="36,32 23,18 21.5,19" fill="url(#d3b)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="36,32 20,20 21.5,19" fill="url(#d3c)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="4,32 20,20 17,18" fill="url(#d4a)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                    <polygon points="4,32 20,20 18.5,19" fill="url(#d4b)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="4,32 17,18 18.5,19" fill="url(#d4c)" stroke="#806020" stroke-width="0.2" stroke-linejoin="miter"/>
+                    <polygon points="20,14 23,18 20,20 17,18" fill="url(#dHub)" stroke="#806020" stroke-width="0.3" stroke-linejoin="miter"/>
+                </svg>
+            </a>
+            <ul class="nav-links">
+                <li><a href="../../index.html" class="nav-link">HOME</a></li>
+                <li><a href="../index.html" class="nav-link active">BLOG</a></li>
+                <li><a href="../../lab/pong.html" class="nav-link">LAB</a></li>
+                <li><a href="../../index.html#contact" class="nav-link">CONTACT</a></li>
+                <li>
+                    <button class="theme-toggle" aria-label="Toggle theme">
+                        <span class="theme-toggle-icon-light">&#9728;</span>
+                        <span class="theme-toggle-slider"></span>
+                        <span class="theme-toggle-icon-dark">&#9790;</span>
+                    </button>
+                </li>
+            </ul>
+            <div class="hamburger" id="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </nav>
+    </header>
+
+    <main class="post-main">
+        <article>
+            <div class="post-header">
+                <div class="post-meta">
+                    <time class="blog-date" datetime="2026-03-05"><i class="fas fa-clock"></i> Mar 05, 2026</time>
+                    <span class="read-time"><i class="fas fa-book-open"></i> 18 min read</span>
+                </div>
+                <div class="blog-tags" style="justify-content: center; margin-bottom: 1.5rem;">
+                    <span class="blog-tag">RL</span>
+                    <span class="blog-tag">TUTORIAL</span>
+                </div>
+                <h1 class="post-title">Teaching Pong to Play Itself: 3 RL Algorithms in the Browser</h1>
+                <p class="post-subtitle">// 323 parameters, zero GPUs, and the reward shaping tricks the textbooks leave out</p>
+                <div class="post-divider"></div>
+            </div>
+
+            <div class="post-content">
+                <h2>01 // THE SETUP</h2>
+
+                <p>
+                    I wanted to build something visitors could <em>feel</em>. Not a static chart showing a loss
+                    curve. Not a pre-trained demo where the AI is already good. I wanted people to watch
+                    reinforcement learning happen -- to see an agent start dumb, flail around, and gradually
+                    figure out how to hit a ball.
+                </p>
+
+                <p>
+                    The result is the <a href="../../lab/pong.html">RL Pong Lab</a>: a playable Pong game
+                    where you face three different RL algorithms that train in real time, right in your browser.
+                    No server. No Python. No GPU. Just pure JavaScript, a tiny neural network with 323
+                    parameters, and some hard-won lessons about what actually makes RL work on a budget.
+                </p>
+
+                <p>
+                    This post is the build log. Not the cleaned-up textbook version -- the real sequence of
+                    things that didn't work, why they didn't work, and what we changed. If you've read about
+                    Q-learning and DQN in theory but never watched them fail in practice, this is for you.
+                </p>
+
+                <blockquote>
+                    <p>"In theory, theory and practice are the same. In practice, they are not."</p>
+                </blockquote>
+
+
+                <h2>02 // THE THREE ALGORITHMS</h2>
+
+                <p>
+                    We implemented three fundamentally different approaches to the same problem: move a paddle
+                    up, down, or stay still to return a bouncing ball. Same game, same state, same actions --
+                    different learning philosophies.
+                </p>
+
+                <h3>Q-Learning: The Lookup Table</h3>
+
+                <p>
+                    The simplest possible approach. Discretize the game state into bins and build a giant table
+                    mapping every possible state to the value of each action. The update rule is the Bellman
+                    equation:
+                </p>
+
+                <p>
+                    $$Q(s, a) \leftarrow Q(s, a) + \alpha \Big[ r + \gamma \max_{a'} Q(s', a') - Q(s, a) \Big]$$
+                </p>
+
+                <p>
+                    We discretized the state into 1,728 bins: 8 ball-x positions &times; 6 ball-y &times;
+                    2 horizontal velocity signs &times; 3 vertical velocity buckets &times; 6 paddle-y positions.
+                    With 3 actions, that's 5,184 Q-values. The entire "model" fits in a JavaScript object literal.
+                </p>
+
+                <p>
+                    <strong>Exploration:</strong> &epsilon;-greedy. Start with &epsilon; = 1.0 (pure random),
+                    decay by a factor each episode, floor at 0.05 so it never stops exploring entirely.
+                </p>
+
+                <h3>DQN: The Neural Network</h3>
+
+                <p>
+                    Instead of discretizing, feed the continuous state directly into a neural network that
+                    outputs Q-values for each action. The architecture is deliberately tiny:
+                </p>
+
+<pre><code class="language-text">Input (6) → Dense(32, ReLU) → Dense(3, linear)
+Total: 6×32 + 32 + 32×3 + 3 = 323 parameters</code></pre>
+
+                <p>
+                    DQN adds two critical stabilization tricks from the DeepMind paper:
+                </p>
+
+                <ul>
+                    <li><strong>Experience replay:</strong> Store transitions $(s, a, r, s', \text{done})$ in a buffer of 10,000. Sample random mini-batches of 32 for training. This breaks temporal correlation and reuses data efficiently.</li>
+                    <li><strong>Target network:</strong> A frozen copy of the Q-network, synced every 200 steps. TD targets use this frozen copy so the network isn't chasing a moving target.</li>
+                </ul>
+
+                <p>
+                    The network is implemented from scratch -- no TensorFlow, no WebGL. Just <code>Float64Array</code>
+                    matrix multiplies, manual backprop, and Xavier initialization via Box-Muller sampling.
+                </p>
+
+                <h3>REINFORCE: The Policy Gradient</h3>
+
+                <p>
+                    Q-Learning and DQN learn <em>action values</em> (how good is each action in this state?).
+                    REINFORCE takes a fundamentally different approach: it directly learns a <em>policy</em> --
+                    a probability distribution over actions.
+                </p>
+
+                <p>
+                    Same 6&rarr;32&rarr;3 network, but the output goes through a softmax to produce action
+                    probabilities. The agent samples from this distribution, plays an entire episode, then
+                    updates the network to make high-reward actions more likely:
+                </p>
+
+                <p>
+                    $$\nabla_\theta J(\theta) = \mathbb{E}_{\tau} \left[ \sum_{t=0}^{T} \nabla_\theta \log \pi_\theta(a_t | s_t) \cdot G_t \right]$$
+                </p>
+
+                <p>
+                    where $G_t = \sum_{k=t}^{T} \gamma^{k-t} r_k$ is the discounted return from time $t$.
+                    We normalize returns by subtracting the mean and dividing by std (baseline normalization)
+                    to reduce variance.
+                </p>
+
+
+                <h2>03 // THE STATE REPRESENTATION</h2>
+
+                <p>
+                    This is the single most important design decision, and it's where the browser constraint
+                    actually helps us make the right choice.
+                </p>
+
+                <p>
+                    DeepMind's famous DQN paper trained on raw pixels -- 84&times;84 grayscale frames stacked
+                    4 deep. That's 28,224 input dimensions requiring a convolutional network, millions of
+                    frames of experience, and hours of GPU time. Karpathy's "Pong from Pixels" blog post
+                    needed 3 days on a CPU.
+                </p>
+
+                <p>
+                    We don't have 3 days. We have maybe 10 seconds of the visitor's patience. So we use
+                    <strong>engineered features</strong> -- 6 numbers that capture everything the agent needs
+                    to know:
+                </p>
+
+<pre><code class="language-javascript">const state = [
+    ball.x / W,              // Ball X position (0 to 1)
+    ball.y / H,              // Ball Y position (0 to 1)
+    ball.vx / BALL_SPEED_MAX, // Ball horizontal velocity (-1 to 1)
+    ball.vy / BALL_SPEED_MAX, // Ball vertical velocity (-1 to 1)
+    aiY / H,                  // AI paddle Y position (0 to 1)
+    playerY / H               // Opponent paddle Y position (0 to 1)
+];</code></pre>
+
+                <p>
+                    All values normalized to roughly [-1, 1]. This is critical -- neural networks train
+                    dramatically faster with normalized inputs. The velocity components are essential:
+                    without them, the agent has no idea which direction the ball is heading and can only
+                    react, never anticipate.
+                </p>
+
+                <p>
+                    <strong>The tradeoff:</strong> Feature-based state makes the problem trivially solvable
+                    (hundreds of episodes instead of millions) but requires that we have access to the game's
+                    internal state. Since we built the engine, we do. In a real-world setting where you only
+                    have pixels, you'd need the full DeepMind treatment.
+                </p>
+
+
+                <h2>04 // THE REWARD THAT BROKE EVERYTHING</h2>
+
+                <p>
+                    Here's where the textbook diverges from reality. The standard Pong reward is elegant:
+                </p>
+
+                <ul>
+                    <li>+1 when the AI scores</li>
+                    <li>-1 when the opponent scores</li>
+                    <li>0 otherwise</li>
+                </ul>
+
+                <p>
+                    This is mathematically clean. It's also <strong>practically useless</strong> for
+                    fast training.
+                </p>
+
+                <p>
+                    The problem is sparsity. A Pong episode runs for hundreds of frames. The ball bounces
+                    back and forth multiple times before anyone scores. During all those frames, the reward
+                    is exactly zero. The agent is flying blind. A random agent might play 50 episodes before
+                    stumbling into enough +1 signals to learn anything. In a browser with a 10-second patience
+                    budget, that's a death sentence.
+                </p>
+
+                <p>
+                    <strong>Version 1</strong> of our reward added distance shaping:
+                </p>
+
+<pre><code class="language-javascript">// Every frame: penalize being far from ball
+reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
+
+                <p>
+                    This helped the agent learn to track the ball. But it created a new problem:
+                    the agent would park itself near the ball's Y coordinate and <em>never actually hit it</em>.
+                    The tracking reward was dense and immediate; the scoring reward was sparse and delayed.
+                    The agent optimized for what it could measure easily.
+                </p>
+
+                <p>
+                    <strong>Version 2</strong> (the breakthrough) added a <strong>ball-hit reward</strong>:
+                </p>
+
+<pre><code class="language-javascript">if (aiHitBall) {
+    reward = 0.3;             // Successfully returned the ball
+} else if (aiScored) {
+    reward = 1.0;             // Scored a point
+} else if (opponentScored) {
+    reward = -1.0;            // Lost a point
+} else {
+    reward = -0.01 * dist;   // Small tracking incentive
+}</code></pre>
+
+                <p>
+                    The +0.3 for hitting the ball is the single highest-impact change we made. It transforms
+                    the reward landscape from "long stretches of near-zero with rare spikes" to "frequent
+                    positive feedback for doing the right thing." The agent learns the chain:
+                    track ball &rarr; move to intercept &rarr; hit ball (+0.3) &rarr; maybe score (+1.0).
+                </p>
+
+                <p>
+                    <strong>The calibration matters.</strong> If the hit reward is too large (say, 1.0), the agent
+                    learns to hit the ball but doesn't care about scoring -- it's already getting rewarded.
+                    Too small (0.05) and it gets drowned out by noise. 0.3 hit us a sweet spot where the
+                    agent learns to rally first, then gradually optimizes for scoring as &epsilon; decays.
+                </p>
+
+
+                <h2>05 // THE TRAINING LOOP EVOLUTION</h2>
+
+                <p>
+                    The training mechanism went through three iterations, each solving a real problem.
+                </p>
+
+                <h3>Iteration 1: Train-While-You-Play (Bad)</h3>
+
+                <p>
+                    The original design: the AI only trains when a human is playing. Every frame, the
+                    agent observes the state, takes an action, gets a reward, and updates. Elegant in
+                    theory. In practice:
+                </p>
+
+                <ul>
+                    <li>Training speed is capped at 60 FPS (the frame rate). That's 60 training steps per second.</li>
+                    <li>A visitor needs to play for 5-10 minutes before the AI shows improvement.</li>
+                    <li>Nobody plays a browser game for 10 minutes with a stupid opponent.</li>
+                </ul>
+
+                <h3>Iteration 2: Auto-Train With a Fixed Bot (Better, But Broken)</h3>
+
+                <p>
+                    We added a "AUTO-TRAIN" button that replaces the human with a bot and runs the game at
+                    high speed (200 physics steps per animation frame -- 200x acceleration). Now training
+                    takes seconds instead of minutes.
+                </p>
+
+                <p>
+                    But the bot was too good. We set it to strength 0.7 (on a 0-1 scale). The bot returned
+                    almost everything. The AI agent could barely score, so it only received negative reward
+                    signals. It learned to be <em>less bad</em> -- to lose slowly -- but never learned to win.
+                </p>
+
+                <p>
+                    <strong>The deeper issue:</strong> the &epsilon; decay was designed for interactive play.
+                    Q-Learning's <code>epsilonDecay = 0.9995</code> means that after 100 episodes,
+                    &epsilon; = 0.9995<sup>100</sup> &asymp; 0.95. Still almost completely random after
+                    100 rounds of training. The agent literally never gets to exploit what it's learned.
+                </p>
+
+                <h3>Iteration 3: Adaptive Curriculum (Current)</h3>
+
+                <p>
+                    Two key fixes:
+                </p>
+
+                <p>
+                    <strong>1. Adaptive bot difficulty.</strong> Instead of a fixed-strength opponent, the bot
+                    scales to match the AI's current ability. We track a rolling win rate over the last 20
+                    episodes:
+                </p>
+
+<pre><code class="language-javascript">function adaptiveBotStrength() {
+    var wr = rollingWinRate();
+    if (wr < 0.15) return 0.10;  // AI losing badly → very weak bot
+    if (wr < 0.30) return 0.25;
+    if (wr < 0.45) return 0.40;
+    if (wr < 0.60) return 0.55;
+    if (wr < 0.75) return 0.70;
+    return 0.85;                  // AI winning → strong bot
+}</code></pre>
+
+                <p>
+                    This is <strong>curriculum learning</strong>. When the AI is weak, the bot is weak too --
+                    the AI can actually score, gets +1 rewards, and learns that scoring is good. As the AI
+                    improves, the bot gets tougher, forcing the AI to develop real strategies instead of
+                    exploiting a weak opponent.
+                </p>
+
+                <p>
+                    <strong>2. Aggressive warmup hyperparameters.</strong> During the initial warmup
+                    (which runs automatically on first page load), we temporarily override the &epsilon;
+                    decay:
+                </p>
+
+<pre><code class="language-javascript">// Normal play: ε decays 0.9995 per episode (very slow, for stability)
+// Warmup:      ε decays 0.97 per episode (aggressive, for speed)
+// After 100 warmup episodes: ε = 0.97^100 ≈ 0.048 (exploiting)</code></pre>
+
+                <p>
+                    After warmup, we restore normal decay rates. The agent starts with a strong learned
+                    policy and continues to refine it during human play.
+                </p>
+
+
+                <h2>06 // ALGORITHM-SPECIFIC LESSONS</h2>
+
+                <h3>Q-Learning: Fast But Brittle</h3>
+
+                <p>
+                    <strong>The good:</strong> Q-Learning converges fastest because table lookups have zero
+                    generalization error. State 437 is state 437, and its Q-values are exactly right for
+                    that state. No function approximation noise. With 1,728 states and aggressive &epsilon;
+                    decay, it produces a competent player in ~100 episodes.
+                </p>
+
+                <p>
+                    <strong>The bad:</strong> Discretization throws away information. A ball at y=0.31 and
+                    y=0.34 might land in different bins and the agent treats them as completely unrelated.
+                    The agent also can't generalize to states it hasn't visited -- if it's never seen a
+                    particular ball-x/paddle-y combination, it has literally zero knowledge.
+                </p>
+
+                <p>
+                    <strong>The surprising:</strong> Despite these limitations, Q-Learning is the best
+                    "first 50 episodes" performer. The table fills in fast, there's no gradient instability,
+                    and the agent goes from random to competent in a smooth curve.
+                </p>
+
+                <h3>DQN: Slow Start, Smooth Ride</h3>
+
+                <p>
+                    The critical change that made DQN work: <strong>training every 4 steps instead of once
+                    per episode</strong>.
+                </p>
+
+                <p>
+                    Our first implementation trained a batch of 32 at episode end only. An episode is
+                    ~500-1000 frames, so training happened once per ~750 steps. The network barely moved.
+                    Switching to train-every-4-steps meant 200x more gradient updates per episode.
+                    Combined with target network syncs every 200 steps, DQN starts producing reasonable
+                    play around 100-150 episodes.
+                </p>
+
+                <p>
+                    <strong>The advantage over Q-Learning:</strong> generalization. DQN handles the continuous
+                    state space naturally. A ball at y=0.51 and y=0.52 produce similar network activations
+                    and get similar Q-values. The agent can interpolate between states it's seen.
+                </p>
+
+                <h3>REINFORCE: The Noisiest Learner</h3>
+
+                <p>
+                    Policy gradient methods have high variance by nature. REINFORCE collects an entire
+                    trajectory, then updates the network once. If the episode was good, all actions get
+                    reinforced. If it was bad, all actions get penalized. There's no per-step credit
+                    assignment like Q-Learning or DQN.
+                </p>
+
+                <p>
+                    <strong>Baseline normalization is non-optional.</strong> Without subtracting the mean
+                    return and dividing by std, the gradient signal is dominated by the absolute magnitude
+                    of returns rather than which actions were better than average. With it, REINFORCE
+                    converges -- slowly, noisily, but it converges.
+                </p>
+
+                <p>
+                    We subsample long trajectories (max 200 steps for gradient computation) to keep
+                    training fast. A 1000-step episode with full backprop through every step would make
+                    each training pass take 5x longer for marginal benefit.
+                </p>
+
+                <p>
+                    <strong>The payoff:</strong> REINFORCE learns a stochastic policy that's harder for a
+                    human to predict. Q-Learning and DQN are deterministic (always pick the best action),
+                    so an observant human can learn their patterns. The policy gradient agent occasionally
+                    makes surprising moves that keep human opponents off-balance.
+                </p>
+
+
+                <h2>07 // THE NEURAL NETWORK IN 150 LINES</h2>
+
+                <p>
+                    Building a neural network from scratch in JavaScript is an exercise in appreciating
+                    what frameworks do for you. Our <code>MiniNet</code> class handles:
+                </p>
+
+                <ul>
+                    <li><strong>Xavier initialization</strong> (scale = $\sqrt{2/n_\text{in}}$) via Box-Muller random normals</li>
+                    <li><strong>Forward pass:</strong> matrix multiply &rarr; ReLU &rarr; matrix multiply &rarr; output</li>
+                    <li><strong>MSE backprop</strong> for DQN: compute $\partial L / \partial w$ and apply gradient descent</li>
+                    <li><strong>Policy gradient backprop</strong> for REINFORCE: gradient of $\log \pi(a|s)$ weighted by advantage</li>
+                    <li><strong>Softmax</strong> for action probability distribution</li>
+                    <li><strong>Serialization</strong> to/from JSON for localStorage persistence</li>
+                </ul>
+
+                <p>
+                    Everything uses <code>Float64Array</code> for precision. The entire implementation is
+                    ~150 lines. No dependencies, no build step, no bundler. You can read every line in
+                    <code>pong-rl.js</code>.
+                </p>
+
+                <p>
+                    <strong>Performance:</strong> A forward pass through the 6&rarr;32&rarr;3 network takes
+                    roughly 0.01ms on modern hardware. That's 100,000 forward passes per second. During
+                    auto-training at 200 steps per frame, the bottleneck is DQN's batch training (32
+                    forward+backward passes every 4 steps), not the game physics.
+                </p>
+
+
+                <h2>08 // WHAT WOULD WE DO DIFFERENTLY</h2>
+
+                <p>
+                    If we rebuilt this from scratch:
+                </p>
+
+                <ul>
+                    <li><strong>Self-play instead of bot opponent.</strong> Two RL agents playing each other
+                    produce a natural curriculum -- neither is ever too strong or too weak for the other.
+                    The challenge is bootstrapping: two random agents rarely score, so the reward signal
+                    is sparse early on. You'd need the ball-hit reward to break the deadlock.</li>
+
+                    <li><strong>PPO instead of REINFORCE.</strong> Proximal Policy Optimization clips the
+                    policy update to prevent catastrophic changes, which would reduce the noise we see
+                    in REINFORCE learning curves. But PPO is significantly more complex to implement
+                    from scratch.</li>
+
+                    <li><strong>Web Worker for training.</strong> Currently, training runs on the main thread.
+                    During auto-train, the 200 physics steps per frame can occasionally cause dropped
+                    frames. Moving the game simulation + training to a Web Worker would keep the UI
+                    perfectly smooth.</li>
+
+                    <li><strong>Larger discretization for Q-Learning.</strong> 1,728 states is fairly coarse.
+                    With 12 ball-x &times; 10 ball-y &times; 2 vx &times; 3 vy &times; 10 paddle-y =
+                    7,200 states, Q-Learning would have finer resolution and probably outperform both
+                    neural network approaches for this simple game.</li>
+                </ul>
+
+
+                <h2>09 // TRY IT YOURSELF</h2>
+
+                <p>
+                    The <a href="../../lab/pong.html">RL Pong Lab</a> is live. Switch between algorithms
+                    with the tabs, hit AUTO-TRAIN to watch the AI practice at 200x speed, then take
+                    over and play against it. Your agent's learned weights persist in localStorage --
+                    come back tomorrow and it'll remember everything.
+                </p>
+
+                <p>
+                    The entire implementation is four files totaling ~600 lines of JavaScript:
+                </p>
+
+                <ul>
+                    <li><code>pong-engine.js</code> -- game physics, rendering, collision detection</li>
+                    <li><code>pong-rl.js</code> -- MiniNet neural network, Q-Learning, DQN, REINFORCE</li>
+                    <li><code>pong-ui.js</code> -- glue code, HUD, auto-training, localStorage</li>
+                    <li><code>pong.html</code> + <code>pong.css</code> -- page shell and styling</li>
+                </ul>
+
+                <p>
+                    No build step. No dependencies. View source and you'll see everything.
+                </p>
+
+
+                <h2>REFERENCES</h2>
+
+                <ol class="references">
+                    <li id="ref-1">Watkins, C. J. C. H., & Dayan, P. (1992). Q-Learning. <em>Machine Learning</em>, 8(3-4), 279-292.</li>
+                    <li id="ref-2">Mnih, V., et al. (2015). Human-level control through deep reinforcement learning. <em>Nature</em>, 518(7540), 529-533.</li>
+                    <li id="ref-3">Williams, R. J. (1992). Simple statistical gradient-following algorithms for connectionist reinforcement learning. <em>Machine Learning</em>, 8(3-4), 229-256.</li>
+                    <li id="ref-4">Karpathy, A. (2016). Deep Reinforcement Learning: Pong from Pixels. <em>Blog post</em>.</li>
+                    <li id="ref-5">Sutton, R. S., & Barto, A. G. (2018). <em>Reinforcement Learning: An Introduction</em>. 2nd ed. MIT Press.</li>
+                </ol>
+            </div>
+        </article>
+
+        <div class="post-nav">
+            <a href="evosys-skill-taxonomy.html"><i class="fas fa-arrow-left"></i> EVOSYS: SKILL TAXONOMY</a>
+            <a href="../index.html">BACK TO BLOG <i class="fas fa-arrow-right"></i></a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <p class="footer-text">// built with caffeine and mass GPU hours</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="../../shared.js"></script>
+    <script>
+        createParticles(30);
+
+        // ── Reading progress bar ──
+        const bar = document.createElement('div');
+        bar.id = 'reading-progress';
+        document.body.prepend(bar);
+        window.addEventListener('scroll', () => {
+            const doc = document.documentElement;
+            const pct = doc.scrollTop / (doc.scrollHeight - doc.clientHeight) * 100;
+            bar.style.width = Math.min(pct, 100) + '%';
+        }, { passive: true });
+
+        // ── Copy buttons on code blocks ──
+        document.querySelectorAll('.post-content pre').forEach(pre => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pre-wrapper';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = 'COPY';
+            btn.addEventListener('click', () => {
+                navigator.clipboard.writeText(pre.innerText).then(() => {
+                    btn.textContent = 'COPIED';
+                    btn.classList.add('copied');
+                    setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 2000);
+                });
+            });
+            wrapper.appendChild(btn);
+        });
+    </script>
+</body>
+</html>

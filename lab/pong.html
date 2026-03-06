@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RL Pong Lab | Hao Xin</title>
+    <meta name="description" content="Play Pong against 3 reinforcement learning algorithms that learn in real time. Watch Q-Learning, DQN, and REINFORCE improve before your eyes.">
+    <meta name="author" content="Hao Xin">
+    <link rel="canonical" href="https://muserhao.github.io/lab/pong.html">
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="RL Pong Lab | Hao Xin">
+    <meta property="og:description" content="Play Pong against 3 reinforcement learning algorithms that learn in real time.">
+    <meta property="og:url" content="https://muserhao.github.io/lab/pong.html">
+    <meta property="og:site_name" content="Hao Xin">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="RL Pong Lab | Hao Xin">
+    <meta name="twitter:description" content="Play Pong against 3 RL algorithms that learn in real time.">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="pong.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script>
+        (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+</head>
+<body>
+    <!-- SVG liquid distortion filter -->
+    <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
+        <defs>
+            <filter id="liquid-distort" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence id="liquid-turbulence" type="fractalNoise"
+                    baseFrequency="0.006 0.009" numOctaves="4" seed="3" result="noise"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise"
+                    scale="50" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="grid-bg"></div>
+
+    <div class="gradient-orbs" aria-hidden="true" style="opacity:0.4;">
+        <div class="orb orb-cyan"></div>
+        <div class="orb orb-pink"></div>
+        <div class="orb orb-purple"></div>
+    </div>
+
+    <div id="particles"></div>
+
+    <header>
+        <nav>
+            <a href="../index.html" class="logo" aria-label="HAO.XIN">
+                <svg class="logo-mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="d1a" x1="100%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="28%" stop-color="#E8D888"/>
+                            <stop offset="55%" stop-color="#F8F0C8"/>
+                            <stop offset="100%" stop-color="#C8A840"/>
+                        </linearGradient>
+                        <linearGradient id="d2a" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#C0A038"/>
+                            <stop offset="28%" stop-color="#E0D080"/>
+                            <stop offset="56%" stop-color="#F8F0C8"/>
+                            <stop offset="100%" stop-color="#C0A038"/>
+                        </linearGradient>
+                        <linearGradient id="d3a" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#C8A840"/>
+                            <stop offset="36%" stop-color="#E8D888"/>
+                            <stop offset="62%" stop-color="#F8F0C8"/>
+                            <stop offset="100%" stop-color="#C0A038"/>
+                        </linearGradient>
+                        <linearGradient id="d4a" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#C0A038"/>
+                            <stop offset="38%" stop-color="#E0D080"/>
+                            <stop offset="64%" stop-color="#F8F0C8"/>
+                            <stop offset="100%" stop-color="#C8A840"/>
+                        </linearGradient>
+                        <linearGradient id="dHub" x1="50%" y1="100%" x2="50%" y2="0%">
+                            <stop offset="0%" stop-color="#907828"/>
+                            <stop offset="50%" stop-color="#C8A840"/>
+                            <stop offset="100%" stop-color="#E8D888"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M24.14 35.45 A16 16 0 0 1 4.97 14.53" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path d="M7.75 9.72 A16 16 0 0 1 32.25 9.72" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <path d="M35.03 14.53 A16 16 0 0 1 29.18 33.10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <line x1="11" y1="32" x2="18.5" y2="8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="21.5" y1="8" x2="29" y2="32" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="14" y1="23" x2="26" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <polygon points="4,4 17,18 20,14" fill="url(#d1a)" stroke="#806020" stroke-width="0.3"/>
+                    <polygon points="36,4 20,14 23,18" fill="url(#d2a)" stroke="#806020" stroke-width="0.3"/>
+                    <polygon points="36,32 23,18 20,20" fill="url(#d3a)" stroke="#806020" stroke-width="0.3"/>
+                    <polygon points="4,32 20,20 17,18" fill="url(#d4a)" stroke="#806020" stroke-width="0.3"/>
+                    <polygon points="20,14 23,18 20,20 17,18" fill="url(#dHub)" stroke="#806020" stroke-width="0.3"/>
+                </svg>
+            </a>
+            <ul class="nav-links">
+                <li><a href="../index.html" class="nav-link">HOME</a></li>
+                <li><a href="../blog/index.html" class="nav-link">BLOG</a></li>
+                <li><a href="pong.html" class="nav-link active">LAB</a></li>
+                <li>
+                    <button class="theme-toggle" aria-label="Toggle theme">
+                        <span class="theme-toggle-icon-light">&#9728;</span>
+                        <span class="theme-toggle-slider"></span>
+                        <span class="theme-toggle-icon-dark">&#9790;</span>
+                    </button>
+                </li>
+            </ul>
+            <div class="hamburger" id="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </nav>
+    </header>
+
+    <main class="pong-main">
+        <section class="pong-hero">
+            <h1 class="pong-title">RL PONG LAB</h1>
+            <p class="pong-subtitle">Play against AI that learns in real time. Pick an algorithm and watch it improve.</p>
+        </section>
+
+        <!-- Algorithm tabs -->
+        <div class="algo-tabs" role="tablist">
+            <button class="algo-tab active" role="tab" data-algo="qlearning">Q-LEARNING</button>
+            <button class="algo-tab" role="tab" data-algo="dqn">DQN</button>
+            <button class="algo-tab" role="tab" data-algo="reinforce">REINFORCE</button>
+        </div>
+
+        <!-- Train controls -->
+        <div class="train-controls">
+            <button class="train-btn" id="train-btn">
+                <i class="fas fa-bolt"></i> AUTO-TRAIN
+            </button>
+            <select class="train-select" id="train-episodes">
+                <option value="50">50 episodes</option>
+                <option value="100" selected>100 episodes</option>
+                <option value="200">200 episodes</option>
+                <option value="500">500 episodes</option>
+            </select>
+            <span class="train-progress" id="train-progress"></span>
+        </div>
+
+        <!-- HUD bar -->
+        <div class="pong-hud">
+            <span class="hud-item"><span class="hud-label">ALGO</span> <span id="hud-algo">Q-LEARNING</span></span>
+            <span class="hud-item"><span class="hud-label">EPISODE</span> <span id="hud-episode">0</span></span>
+            <span class="hud-item"><span class="hud-label">AI WIN %</span> <span id="hud-winrate">0</span></span>
+            <span class="hud-item"><span class="hud-label">&epsilon;</span> <span id="hud-epsilon">1.00</span></span>
+            <span class="hud-item"><span class="hud-label">BOT</span> <span id="hud-bot">—</span></span>
+        </div>
+
+        <!-- Game canvas -->
+        <div class="canvas-wrap">
+            <canvas id="pong-canvas"></canvas>
+            <div class="canvas-overlay" id="canvas-overlay">
+                <p>MOVE YOUR MOUSE TO PLAY</p>
+                <p class="overlay-sub">or touch on mobile</p>
+            </div>
+        </div>
+
+        <!-- Algorithm info card -->
+        <div class="algo-info" id="algo-info">
+            <h3 class="algo-info-title" id="algo-info-title">Q-Learning</h3>
+            <p class="algo-info-text" id="algo-info-text">
+                The simplest RL algorithm here. It builds a big lookup table mapping every game state to the best action (UP / STAY / DOWN). Each frame it updates one entry in the table based on the reward it received. Early on it explores randomly (&epsilon;-greedy), but as &epsilon; decays it exploits what it's learned. You should see improvement within ~20 rounds.
+            </p>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <p class="footer-text">// built with caffeine and mass GPU hours</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="../shared.js"></script>
+    <script src="pong-engine.js"></script>
+    <script src="pong-rl.js"></script>
+    <script src="pong-ui.js"></script>
+    <script>
+        createParticles(20);
+    </script>
+</body>
+</html>
