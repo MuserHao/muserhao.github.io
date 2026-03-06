@@ -1,0 +1,102 @@
+/* ========== FUN LAB — LIVELY BACKGROUND OVERRIDES ========== */
+/* Brighter, faster, more chaotic than blog/home pages */
+
+/* Orbs: brighter, faster, bigger movement range */
+.orb {
+    opacity: 0.4;
+    filter: blur(55px);
+}
+
+.orb-cyan  { animation-duration: 12s; }
+.orb-pink  { animation-duration: 14s; }
+.orb-purple { animation-duration: 10s; }
+.orb-gold  { animation-duration: 16s; }
+.orb-teal  { animation-duration: 11s; }
+
+/* Wilder drift paths for lab */
+@keyframes orb-drift-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    20% { transform: translate(180px, 120px) scale(1.2); }
+    40% { transform: translate(-80px, -100px) scale(0.85); }
+    60% { transform: translate(100px, -50px) scale(1.15); }
+    80% { transform: translate(-120px, 80px) scale(0.9); }
+}
+
+@keyframes orb-drift-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    20% { transform: translate(-150px, -120px) scale(1.15); }
+    40% { transform: translate(100px, 90px) scale(0.88); }
+    60% { transform: translate(-70px, 60px) scale(1.2); }
+    80% { transform: translate(130px, -80px) scale(0.92); }
+}
+
+@keyframes orb-drift-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    20% { transform: translate(140px, -90px) scale(1.18); }
+    40% { transform: translate(-110px, 50px) scale(0.82); }
+    60% { transform: translate(60px, 100px) scale(1.1); }
+    80% { transform: translate(-80px, -70px) scale(0.95); }
+}
+
+@keyframes orb-drift-4 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    20% { transform: translate(100px, -140px) scale(1.12); }
+    40% { transform: translate(-90px, 70px) scale(0.9); }
+    60% { transform: translate(150px, 50px) scale(1.2); }
+    80% { transform: translate(-50px, -100px) scale(0.85); }
+}
+
+@keyframes orb-drift-5 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    20% { transform: translate(-120px, 100px) scale(1.15); }
+    40% { transform: translate(80px, -110px) scale(0.88); }
+    60% { transform: translate(-60px, -60px) scale(1.1); }
+    80% { transform: translate(110px, 70px) scale(0.92); }
+}
+
+/* Particles: faster, brighter, more visible */
+.particle {
+    box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+}
+
+@keyframes float-particle {
+    0% {
+        opacity: 0;
+        transform: translateY(0) translateX(0) scale(1);
+    }
+    10% {
+        opacity: 0.7;
+    }
+    50% {
+        transform: translateY(-50vh) translateX(40px) scale(1.5);
+        opacity: 0.5;
+    }
+    90% {
+        opacity: 0.4;
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-100vh) translateX(-30px) scale(0.5);
+    }
+}
+
+/* Grid: slightly more visible */
+.grid-bg {
+    opacity: 0.08;
+}
+
+/* Light theme adjustments */
+[data-theme="light"] .orb {
+    opacity: 0.25;
+}
+
+/* Reduced motion: tone it all down */
+@media (prefers-reduced-motion: reduce) {
+    .orb {
+        animation-duration: 60s;
+        opacity: 0.2;
+    }
+    .particle {
+        box-shadow: 0 0 6px currentColor;
+    }
+}
