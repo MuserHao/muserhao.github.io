@@ -644,10 +644,47 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
                 <p>
-                    <strong>The payoff:</strong> REINFORCE learns a stochastic policy that's harder for a
-                    human to predict. Q-Learning and DQN are deterministic (always pick the best action),
-                    so an observant human can learn their patterns. The policy gradient agent occasionally
-                    makes surprising moves that keep human opponents off-balance.
+                    <strong>The payoff — and the honest caveat.</strong> REINFORCE is the weakest performer
+                    on this problem, and that's not a bug. For Pong with 3 discrete actions and a 6D state,
+                    Q-Learning's lookup table and DQN's per-step training are simply better fits.
+                    Q-Learning updates every frame — instant feedback. DQN trains every 4 steps — thousands
+                    of gradient updates per episode. REINFORCE trains <em>once</em> at the end of each
+                    episode on a single trajectory. The sample efficiency gap is fundamental.
+                </p>
+
+                <p>
+                    So why include it? Because REINFORCE is the foundation of modern RL. PPO, A3C, SAC —
+                    every policy optimization algorithm that powers robotics, game-playing agents, and RLHF
+                    for LLMs descends from this idea. It shines in problems with continuous action spaces
+                    (where Q-tables can't enumerate actions) or high-dimensional outputs (where DQN would
+                    need an impractically large output layer). For simple Pong, it's a sledgehammer for a
+                    nail — but seeing it struggle here is itself instructive. Algorithms have niches. Matching
+                    the algorithm to the problem structure matters more than any amount of hyperparameter tuning.
+                </p>
+
+                <h3>The Scoreboard: Algorithm vs. Problem Fit</h3>
+
+                <p>
+                    After hundreds of training episodes against the same adaptive bot, the performance
+                    ranking is consistent and reveals something important about algorithm selection:
+                </p>
+
+                <ul>
+                    <li><strong>Q-Learning</strong> — fastest learner. ~50 episodes to competent. Zero
+                        approximation error, instant per-frame updates. The right tool for a small
+                        discrete state space.</li>
+                    <li><strong>DQN</strong> — close second. ~100-150 episodes. Generalizes across
+                        continuous states, handles unseen positions well. Slight overhead from neural
+                        net training but the replay buffer compensates.</li>
+                    <li><strong>REINFORCE</strong> — slowest, noisiest, ~200+ episodes. One gradient
+                        update per episode vs. thousands for DQN. High variance means inconsistent
+                        improvement. For this problem, it's fundamentally less sample-efficient.</li>
+                </ul>
+
+                <p>
+                    The lesson: the best RL algorithm depends on the problem structure, not on
+                    how modern it sounds. For 3 actions and 1,728 states, a lookup table beats
+                    a neural network.
                 </p>
 
 
