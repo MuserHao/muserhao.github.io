@@ -3,30 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RL Pong | Fun Lab | Hao Xin</title>
-    <meta name="description" content="Play Pong against 3 reinforcement learning algorithms that learn in real time. Watch Q-Learning, DQN, and REINFORCE improve before your eyes.">
+    <title>Fun Lab | Hao Xin</title>
+    <meta name="description" content="Interactive experiments in ML, RL, and creative coding. Play, tinker, and watch algorithms learn in real time.">
     <meta name="author" content="Hao Xin">
-    <link rel="canonical" href="https://muserhao.github.io/lab/pong.html">
+    <link rel="canonical" href="https://muserhao.github.io/lab/">
     <!-- Open Graph -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="RL Pong Lab | Hao Xin">
-    <meta property="og:description" content="Play Pong against 3 reinforcement learning algorithms that learn in real time.">
-    <meta property="og:url" content="https://muserhao.github.io/lab/pong.html">
+    <meta property="og:title" content="Fun Lab | Hao Xin">
+    <meta property="og:description" content="Interactive experiments in ML, RL, and creative coding.">
+    <meta property="og:url" content="https://muserhao.github.io/lab/">
     <meta property="og:site_name" content="Hao Xin">
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="RL Pong Lab | Hao Xin">
-    <meta name="twitter:description" content="Play Pong against 3 RL algorithms that learn in real time.">
+    <meta name="twitter:title" content="Fun Lab | Hao Xin">
+    <meta name="twitter:description" content="Interactive experiments in ML, RL, and creative coding.">
     <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../style.css">
-    <link rel="stylesheet" href="pong.css">
+    <link rel="stylesheet" href="../blog/blog.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <script>
         (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
     </script>
 </head>
-<body>
+<body class="blog-page">
     <!-- SVG liquid distortion filter -->
     <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
         <defs>
@@ -41,6 +41,7 @@
 
     <div class="grid-bg"></div>
 
+    <!-- Floating gradient orbs -->
     <div class="gradient-orbs" aria-hidden="true">
         <div class="orb orb-cyan"></div>
         <div class="orb orb-pink"></div>
@@ -119,58 +120,32 @@
         </nav>
     </header>
 
-    <main class="pong-main">
-        <section class="pong-hero">
-            <h1 class="pong-title">RL PONG</h1>
-            <p class="pong-subtitle">Play against AI that learns in real time. Hit AUTO-TRAIN or just start playing.</p>
+    <main class="blog-main">
+        <section class="blog-hero">
+            <h1 class="section-title"><span class="title-decoration">&lt;</span> FUN.LAB <span class="title-decoration">/&gt;</span></h1>
+            <p class="blog-hero-subtitle">// interactive experiments in ML, RL, and creative coding</p>
         </section>
 
-        <!-- Algorithm tabs -->
-        <div class="algo-tabs" role="tablist">
-            <button class="algo-tab active" role="tab" data-algo="qlearning">Q-LEARNING</button>
-            <button class="algo-tab" role="tab" data-algo="dqn">DQN</button>
-            <button class="algo-tab" role="tab" data-algo="reinforce">REINFORCE</button>
-        </div>
+        <section class="blog-list">
+            <!-- Experiment 1 -->
+            <a href="pong.html" class="blog-card neon-card">
+                <div class="blog-card-header">
+                    <time class="blog-date" datetime="2026-03-05"><i class="fas fa-clock"></i> Mar 05, 2026</time>
+                    <div class="blog-tags">
+                        <span class="blog-tag">RL</span>
+                        <span class="blog-tag">GAME</span>
+                    </div>
+                </div>
+                <h2 class="blog-card-title">RL Pong: Watch AI Learn to Play in Real Time</h2>
+                <p class="blog-card-excerpt">Play Pong against Q-Learning, DQN, and REINFORCE agents that train live in your browser. Hit AUTO-TRAIN to watch them practice at 200x speed, or jump in and play against them yourself. 323 parameters, zero GPUs.</p>
+                <div class="blog-card-footer">
+                    <span class="read-time"><i class="fas fa-gamepad"></i> Interactive</span>
+                    <span class="read-more">PLAY NOW <i class="fas fa-arrow-right"></i></span>
+                </div>
+            </a>
 
-        <!-- Train controls -->
-        <div class="train-controls">
-            <button class="train-btn" id="train-btn">
-                <i class="fas fa-bolt"></i> AUTO-TRAIN
-            </button>
-            <select class="train-select" id="train-episodes">
-                <option value="50">50 episodes</option>
-                <option value="100" selected>100 episodes</option>
-                <option value="200">200 episodes</option>
-                <option value="500">500 episodes</option>
-            </select>
-            <span class="train-progress" id="train-progress"></span>
-        </div>
-
-        <!-- HUD bar -->
-        <div class="pong-hud">
-            <span class="hud-item"><span class="hud-label">ALGO</span> <span id="hud-algo">Q-LEARNING</span></span>
-            <span class="hud-item"><span class="hud-label">EPISODE</span> <span id="hud-episode">0</span></span>
-            <span class="hud-item"><span class="hud-label">AI WIN %</span> <span id="hud-winrate">0</span></span>
-            <span class="hud-item"><span class="hud-label">&epsilon;</span> <span id="hud-epsilon">1.00</span></span>
-            <span class="hud-item"><span class="hud-label">BOT</span> <span id="hud-bot">—</span></span>
-        </div>
-
-        <!-- Game canvas -->
-        <div class="canvas-wrap">
-            <canvas id="pong-canvas"></canvas>
-            <div class="canvas-overlay" id="canvas-overlay">
-                <p>MOVE YOUR MOUSE TO PLAY</p>
-                <p class="overlay-sub">or touch on mobile</p>
-            </div>
-        </div>
-
-        <!-- Algorithm info card -->
-        <div class="algo-info" id="algo-info">
-            <h3 class="algo-info-title" id="algo-info-title">Q-Learning</h3>
-            <p class="algo-info-text" id="algo-info-text">
-                The simplest RL algorithm here. It builds a big lookup table mapping every game state to the best action (UP / STAY / DOWN). Each frame it updates one entry in the table based on the reward it received. Early on it explores randomly (&epsilon;-greedy), but as &epsilon; decays it exploits what it's learned. You should see improvement within ~20 rounds.
-            </p>
-        </div>
+            <!-- More experiments coming soon -->
+        </section>
     </main>
 
     <footer>
@@ -181,11 +156,8 @@
     </footer>
 
     <script src="../shared.js"></script>
-    <script src="pong-engine.js"></script>
-    <script src="pong-rl.js"></script>
-    <script src="pong-ui.js"></script>
     <script>
-        createParticles(20);
+        createParticles(30);
     </script>
 </body>
 </html>
