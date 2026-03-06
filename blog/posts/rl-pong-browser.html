@@ -267,7 +267,8 @@
                 <h2>02 // THE THREE ALGORITHMS</h2>
 
                 <p>
-                    We implemented three fundamentally different approaches to the same problem: move a paddle
+                    Before the war stories, here's what we're working with.
+                    We implemented three fundamentally different approaches to the same problem <a href="#ref-5">[5]</a>: move a paddle
                     up, down, or stay still to return a bouncing ball. Same game, same state, same actions --
                     different learning philosophies.
                 </p>
@@ -306,7 +307,7 @@
 Total: 6×32 + 32 + 32×3 + 3 = 323 parameters</code></pre>
 
                 <p>
-                    DQN adds two critical stabilization tricks from the DeepMind paper:
+                    DQN adds two critical stabilization tricks from the DeepMind paper <a href="#ref-2">[2]</a>:
                 </p>
 
                 <ul>
@@ -322,8 +323,8 @@ Total: 6×32 + 32 + 32×3 + 3 = 323 parameters</code></pre>
                 <h3>REINFORCE: The Policy Gradient</h3>
 
                 <p>
-                    Q-Learning and DQN learn <em>action values</em> (how good is each action in this state?).
-                    REINFORCE takes a fundamentally different approach: it directly learns a <em>policy</em> --
+                    Q-Learning <a href="#ref-1">[1]</a> and DQN learn <em>action values</em> (how good is each action in this state?).
+                    REINFORCE <a href="#ref-3">[3]</a> takes a fundamentally different approach: it directly learns a <em>policy</em> --
                     a probability distribution over actions.
                 </p>
 
@@ -352,9 +353,9 @@ Total: 6×32 + 32 + 32×3 + 3 = 323 parameters</code></pre>
                 </p>
 
                 <p>
-                    DeepMind's famous DQN paper trained on raw pixels -- 84&times;84 grayscale frames stacked
+                    DeepMind's famous DQN paper <a href="#ref-2">[2]</a> trained on raw pixels -- 84&times;84 grayscale frames stacked
                     4 deep. That's 28,224 input dimensions requiring a convolutional network, millions of
-                    frames of experience, and hours of GPU time. Karpathy's "Pong from Pixels" blog post
+                    frames of experience, and hours of GPU time. Karpathy's "Pong from Pixels" <a href="#ref-4">[4]</a> blog post
                     needed 3 days on a CPU.
                 </p>
 
@@ -653,7 +654,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
                 <p>
-                    So why include it? Because REINFORCE is the foundation of modern RL. PPO, A3C, SAC —
+                    So why include it? Because REINFORCE is the foundation of modern RL. PPO <a href="#ref-6">[6]</a>, A3C, SAC &mdash;
                     every policy optimization algorithm that powers robotics, game-playing agents, and RLHF
                     for LLMs descends from this idea. It shines in problems with continuous action spaces
                     (where Q-tables can't enumerate actions) or high-dimensional outputs (where DQN would
@@ -730,7 +731,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                     The challenge is bootstrapping: two random agents rarely score, so the reward signal
                     is sparse early on. You'd need the ball-hit reward to break the deadlock.</li>
 
-                    <li><strong>PPO instead of REINFORCE.</strong> Proximal Policy Optimization clips the
+                    <li><strong>PPO instead of REINFORCE.</strong> Proximal Policy Optimization <a href="#ref-6">[6]</a> clips the
                     policy update to prevent catastrophic changes, which would reduce the noise we see
                     in REINFORCE learning curves. But PPO is significantly more complex to implement
                     from scratch.</li>
@@ -772,15 +773,46 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
 
-                <h2>REFERENCES</h2>
+                <h2>10 // REFERENCES</h2>
 
-                <ol class="references">
-                    <li id="ref-1">Watkins, C. J. C. H., & Dayan, P. (1992). Q-Learning. <em>Machine Learning</em>, 8(3-4), 279-292.</li>
-                    <li id="ref-2">Mnih, V., et al. (2015). Human-level control through deep reinforcement learning. <em>Nature</em>, 518(7540), 529-533.</li>
-                    <li id="ref-3">Williams, R. J. (1992). Simple statistical gradient-following algorithms for connectionist reinforcement learning. <em>Machine Learning</em>, 8(3-4), 229-256.</li>
-                    <li id="ref-4">Karpathy, A. (2016). Deep Reinforcement Learning: Pong from Pixels. <em>Blog post</em>.</li>
-                    <li id="ref-5">Sutton, R. S., & Barto, A. G. (2018). <em>Reinforcement Learning: An Introduction</em>. 2nd ed. MIT Press.</li>
-                </ol>
+                <div class="references">
+                    <ol class="ref-list">
+                        <li id="ref-1">
+                            <span class="ref-authors">Watkins, C. J. C. H. &amp; Dayan, P.</span>
+                            <span class="ref-title">Q-Learning.</span>
+                            <span class="ref-venue">Machine Learning, 8(3-4), 279-292, 1992.</span>
+                        </li>
+                        <li id="ref-2">
+                            <span class="ref-authors">Mnih, V., Kavukcuoglu, K., Silver, D., et al.</span>
+                            <span class="ref-title">Human-level control through deep reinforcement learning.</span>
+                            <span class="ref-venue">Nature, 518(7540), 529-533, 2015.</span>
+                            <a href="https://doi.org/10.1038/nature14236" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-3">
+                            <span class="ref-authors">Williams, R. J.</span>
+                            <span class="ref-title">Simple statistical gradient-following algorithms for connectionist reinforcement learning.</span>
+                            <span class="ref-venue">Machine Learning, 8(3-4), 229-256, 1992.</span>
+                        </li>
+                        <li id="ref-4">
+                            <span class="ref-authors">Karpathy, A.</span>
+                            <span class="ref-title">Deep Reinforcement Learning: Pong from Pixels.</span>
+                            <span class="ref-venue">Blog post, 2016.</span>
+                            <a href="http://karpathy.github.io/2016/05/31/rl/" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-5">
+                            <span class="ref-authors">Sutton, R. S. &amp; Barto, A. G.</span>
+                            <span class="ref-title">Reinforcement Learning: An Introduction.</span>
+                            <span class="ref-venue">2nd ed. MIT Press, 2018.</span>
+                            <a href="http://incompleteideas.net/book/the-book.html" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-6">
+                            <span class="ref-authors">Schulman, J., Wolski, F., Dhariwal, P., Radford, A. &amp; Klimov, O.</span>
+                            <span class="ref-title">Proximal Policy Optimization Algorithms.</span>
+                            <span class="ref-venue">arXiv:1707.06347, 2017.</span>
+                            <a href="https://arxiv.org/abs/1707.06347" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                    </ol>
+                </div>
             </div>
         </article>
 
