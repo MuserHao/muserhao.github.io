@@ -81,6 +81,33 @@
 
 /* No light theme — Fun Lab is always dark (space) */
 
+/* Glass-transparent cards — see the stars through them */
+.lab-page .neon-card,
+.lab-page .algo-info,
+.lab-page .pong-hud,
+.lab-page .canvas-wrap {
+    background: rgba(10, 10, 20, 0.25);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+.lab-page .neon-card:hover {
+    background: rgba(10, 10, 20, 0.35);
+    border-color: rgba(0, 240, 255, 0.2);
+}
+
+/* Nav and header also transparent */
+.lab-page header {
+    background: transparent;
+}
+
+.lab-page header.scrolled {
+    background: rgba(10, 10, 20, 0.4);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
 /* Reduced motion: tone it all down */
 @media (prefers-reduced-motion: reduce) {
     .orb {
