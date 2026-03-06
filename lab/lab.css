@@ -90,15 +90,12 @@
     }
 }
 
-/* Grid: slightly more visible */
+/* Grid: dim so stars shine through */
 .grid-bg {
-    opacity: 0.08;
+    opacity: 0.04;
 }
 
-/* Light theme adjustments */
-[data-theme="light"] .orb {
-    opacity: 0.25;
-}
+/* No light theme — Fun Lab is always dark (space) */
 
 /* Reduced motion: tone it all down */
 @media (prefers-reduced-motion: reduce) {

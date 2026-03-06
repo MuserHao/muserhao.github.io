@@ -126,10 +126,6 @@
     cursor: none;
 }
 
-[data-theme="light"] #pong-canvas {
-    background: #e8e8f0;
-}
-
 /* Overlay */
 .canvas-overlay {
     position: absolute;

@@ -1,8 +1,15 @@
-// ========== STARFIELD + MILKY WAY ==========
-// Canvas-based starfield with twinkling and a nebula band for Fun Lab pages.
+// ========== STARFIELD + MILKY WAY + METEORS ==========
+// Canvas-based space background for Fun Lab pages. Always dark.
 
 (function initStarfield() {
     'use strict';
+
+    // Force dark theme on lab pages — space is dark
+    document.documentElement.setAttribute('data-theme', 'dark');
+
+    // Disable theme toggle so visitors can't switch to light
+    var toggle = document.querySelector('.theme-toggle');
+    if (toggle) toggle.style.display = 'none';
 
     var canvas = document.createElement('canvas');
     canvas.id = 'starfield';
@@ -12,8 +19,8 @@
     var ctx = canvas.getContext('2d');
     var dpr = window.devicePixelRatio || 1;
     var stars = [];
-    var shootingStars = [];
-    var STAR_COUNT = 400;
+    var meteors = [];
+    var STAR_COUNT = 500;
     var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function resize() {
@@ -23,11 +30,7 @@
         canvas.style.height = window.innerHeight + 'px';
     }
 
-    function isDark() {
-        return document.documentElement.getAttribute('data-theme') !== 'light';
-    }
-
-    // Generate star field
+    // ---- Stars ----
     function generateStars() {
         stars = [];
         var w = canvas.width, h = canvas.height;
@@ -35,39 +38,75 @@
             stars.push({
                 x: Math.random() * w,
                 y: Math.random() * h,
-                r: Math.random() * 1.5 + 0.3,           // radius 0.3-1.8
-                baseAlpha: Math.random() * 0.6 + 0.2,    // 0.2-0.8
-                twinkleSpeed: Math.random() * 2 + 0.5,   // different speeds
+                r: Math.random() * 1.8 + 0.2,
+                baseAlpha: Math.random() * 0.7 + 0.15,
+                twinkleSpeed: Math.random() * 2.5 + 0.3,
                 twinklePhase: Math.random() * Math.PI * 2,
-                // Color: mostly white, some blue/cyan/warm tint
-                hue: Math.random() < 0.7 ? 0 : (Math.random() < 0.5 ? 200 + Math.random() * 40 : 30 + Math.random() * 20),
-                sat: Math.random() < 0.7 ? 0 : Math.random() * 50 + 30
+                hue: Math.random() < 0.6 ? 0 : (Math.random() < 0.5 ? 200 + Math.random() * 40 : 25 + Math.random() * 25),
+                sat: Math.random() < 0.6 ? 0 : Math.random() * 60 + 20
             });
         }
     }
 
-    // Occasional shooting star
-    function maybeSpawnShootingStar() {
-        if (reducedMotion) return;
-        if (Math.random() > 0.003) return; // ~0.3% chance per frame
+    // ---- Meteors: spawn from any edge, any direction ----
+    function spawnMeteor() {
         var w = canvas.width, h = canvas.height;
-        shootingStars.push({
-            x: Math.random() * w * 0.8,
-            y: Math.random() * h * 0.4,
-            vx: 4 + Math.random() * 6,
-            vy: 2 + Math.random() * 3,
+        var edge = Math.floor(Math.random() * 4); // 0=top, 1=right, 2=bottom, 3=left
+        var x, y, angle;
+
+        switch (edge) {
+            case 0: // top edge — fly downward
+                x = Math.random() * w;
+                y = -10;
+                angle = Math.PI / 2 + (Math.random() - 0.5) * 1.2; // roughly downward
+                break;
+            case 1: // right edge — fly leftward
+                x = w + 10;
+                y = Math.random() * h;
+                angle = Math.PI + (Math.random() - 0.5) * 1.2;
+                break;
+            case 2: // bottom edge — fly upward
+                x = Math.random() * w;
+                y = h + 10;
+                angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
+                break;
+            case 3: // left edge — fly rightward
+                x = -10;
+                y = Math.random() * h;
+                angle = (Math.random() - 0.5) * 1.2;
+                break;
+        }
+
+        var speed = 5 + Math.random() * 8;
+        var size = Math.random();
+
+        meteors.push({
+            x: x * dpr,
+            y: y * dpr,
+            vx: Math.cos(angle) * speed * dpr,
+            vy: Math.sin(angle) * speed * dpr,
             life: 1.0,
-            decay: 0.015 + Math.random() * 0.02,
-            len: 40 + Math.random() * 60
+            decay: 0.008 + Math.random() * 0.015,
+            tailLen: 50 + Math.random() * 80,
+            width: (size < 0.7 ? 1 : (size < 0.9 ? 2 : 3)) * dpr,
+            // Color: most white-blue, rare warm/green ones
+            r: size < 0.85 ? 200 : (size < 0.95 ? 255 : 100),
+            g: size < 0.85 ? 230 : (size < 0.95 ? 200 : 255),
+            b: 255
         });
     }
 
-    // Draw milky way band (diagonal nebula)
-    function drawMilkyWay(w, h) {
-        ctx.save();
-        ctx.globalAlpha = isDark() ? 0.06 : 0.03;
+    function maybeSpawnMeteor() {
+        if (reducedMotion) return;
+        // ~1% chance per frame = roughly 1 meteor per 1.5 seconds at 60fps
+        if (Math.random() < 0.01) spawnMeteor();
+    }
 
-        // Diagonal gradient band from top-left to bottom-right
+    // ---- Milky Way band ----
+    function drawMilkyWay(w, h) {
+        // Inner bright band
+        ctx.save();
+        ctx.globalAlpha = 0.06;
         var grad = ctx.createLinearGradient(0, 0, w, h);
         grad.addColorStop(0, 'transparent');
         grad.addColorStop(0.3, 'rgba(180, 160, 255, 0.4)');
@@ -76,17 +115,15 @@
         grad.addColorStop(0.55, 'rgba(100, 200, 255, 0.6)');
         grad.addColorStop(0.7, 'rgba(180, 160, 255, 0.4)');
         grad.addColorStop(1, 'transparent');
-
-        // Rotated wide band
         ctx.translate(w / 2, h / 2);
-        ctx.rotate(-0.5); // ~30 degrees
+        ctx.rotate(-0.5);
         ctx.fillStyle = grad;
         ctx.fillRect(-w, -h * 0.12, w * 2, h * 0.24);
         ctx.restore();
 
-        // Second, softer, wider band
+        // Outer soft band
         ctx.save();
-        ctx.globalAlpha = isDark() ? 0.03 : 0.015;
+        ctx.globalAlpha = 0.03;
         ctx.translate(w / 2, h / 2);
         ctx.rotate(-0.5);
         var grad2 = ctx.createLinearGradient(-w, 0, w, 0);
@@ -100,25 +137,22 @@
         ctx.restore();
     }
 
+    // ---- Main draw ----
     function draw(t) {
         var w = canvas.width, h = canvas.height;
         ctx.clearRect(0, 0, w, h);
 
-        var dark = isDark();
-
-        // Milky way
         drawMilkyWay(w, h);
 
         // Stars
         for (var i = 0; i < stars.length; i++) {
             var s = stars[i];
             var twinkle = reducedMotion ? 1 : (0.5 + 0.5 * Math.sin(t * s.twinkleSpeed + s.twinklePhase));
-            var alpha = s.baseAlpha * twinkle * (dark ? 1 : 0.3);
+            var alpha = s.baseAlpha * twinkle;
             if (alpha < 0.02) continue;
 
             ctx.beginPath();
             ctx.arc(s.x, s.y, s.r * dpr, 0, Math.PI * 2);
-
             if (s.sat > 0) {
                 ctx.fillStyle = 'hsla(' + s.hue + ',' + s.sat + '%,80%,' + alpha + ')';
             } else {
@@ -126,8 +160,8 @@
             }
             ctx.fill();
 
-            // Bright stars get a glow
-            if (s.r > 1.2 && alpha > 0.4 && !reducedMotion) {
+            // Glow on bright stars
+            if (s.r > 1.3 && alpha > 0.4 && !reducedMotion) {
                 ctx.beginPath();
                 ctx.arc(s.x, s.y, s.r * dpr * 3, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(200,220,255,' + (alpha * 0.15) + ')';
@@ -135,50 +169,64 @@
             }
         }
 
-        // Shooting stars
-        for (var j = shootingStars.length - 1; j >= 0; j--) {
-            var ss = shootingStars[j];
-            ss.x += ss.vx * dpr;
-            ss.y += ss.vy * dpr;
-            ss.life -= ss.decay;
+        // Meteors
+        for (var j = meteors.length - 1; j >= 0; j--) {
+            var m = meteors[j];
+            m.x += m.vx;
+            m.y += m.vy;
+            m.life -= m.decay;
 
-            if (ss.life <= 0) {
-                shootingStars.splice(j, 1);
+            if (m.life <= 0) {
+                meteors.splice(j, 1);
                 continue;
             }
 
+            // Tail: line from current position back along velocity
+            var tailScale = m.tailLen / Math.sqrt(m.vx * m.vx + m.vy * m.vy);
+            var tailX = m.x - m.vx * tailScale;
+            var tailY = m.y - m.vy * tailScale;
+
             ctx.save();
-            ctx.globalAlpha = ss.life * (dark ? 0.8 : 0.3);
-            var tailX = ss.x - ss.vx * dpr * (ss.len / 6);
-            var tailY = ss.y - ss.vy * dpr * (ss.len / 6);
-            var grad = ctx.createLinearGradient(tailX, tailY, ss.x, ss.y);
+            ctx.globalAlpha = m.life * 0.85;
+
+            // Gradient tail
+            var grad = ctx.createLinearGradient(tailX, tailY, m.x, m.y);
             grad.addColorStop(0, 'transparent');
-            grad.addColorStop(1, 'rgba(200, 230, 255, 1)');
+            grad.addColorStop(0.6, 'rgba(' + m.r + ',' + m.g + ',' + m.b + ',0.3)');
+            grad.addColorStop(1, 'rgba(' + m.r + ',' + m.g + ',' + m.b + ',1)');
             ctx.strokeStyle = grad;
-            ctx.lineWidth = 1.5 * dpr;
+            ctx.lineWidth = m.width;
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(tailX, tailY);
-            ctx.lineTo(ss.x, ss.y);
+            ctx.lineTo(m.x, m.y);
             ctx.stroke();
+
+            // Bright head glow
+            if (m.width > 1.5 * dpr) {
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, m.width * 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(' + m.r + ',' + m.g + ',' + m.b + ',' + (m.life * 0.3) + ')';
+                ctx.fill();
+            }
+
             ctx.restore();
         }
 
-        maybeSpawnShootingStar();
+        maybeSpawnMeteor();
     }
 
-    // Animation loop
-    var rafId;
+    // ---- Loop ----
     function loop(t) {
-        t *= 0.001; // convert to seconds
+        t *= 0.001;
         draw(t);
-        rafId = requestAnimationFrame(loop);
+        requestAnimationFrame(loop);
     }
 
     function init() {
         resize();
         generateStars();
-        rafId = requestAnimationFrame(loop);
+        requestAnimationFrame(loop);
     }
 
     window.addEventListener('resize', function () {
