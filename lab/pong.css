@@ -150,19 +150,20 @@
 }
 
 .canvas-overlay p {
-    font-family: var(--font-display);
-    font-size: 1.4rem;
-    color: var(--neon-cyan);
-    text-shadow: 0 0 20px var(--cyan-text-glow);
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--neon-green);
+    text-shadow: 0 0 12px rgba(57, 255, 20, 0.5);
     letter-spacing: 2px;
 }
 
 .canvas-overlay .overlay-sub {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    margin-top: 0.3rem;
-    text-shadow: none;
+    font-size: 0.85rem;
+    color: var(--neon-cyan);
+    margin-top: 0.5rem;
+    text-shadow: 0 0 8px var(--cyan-text-glow);
+    letter-spacing: 3px;
 }
 
 /* Train controls */

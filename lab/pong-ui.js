@@ -23,7 +23,6 @@
     let prevAction = null;
     let gameStarted = false;
     let autoTraining = false;
-    let warmingUp = false;
     let trainTarget = 0;
     let trainStart = 0;
     let trainRafId = null;
@@ -136,7 +135,7 @@
         recentResults.push(winner === 'ai');
         if (recentResults.length > ROLLING_WINDOW) recentResults.shift();
 
-        // Save periodically (not every episode during fast/warmup training)
+        // Save periodically (not every episode during fast training)
         if (!autoTraining && !warmingUp) {
             saveAgent(currentAlgo);
             updateHUD();
@@ -303,71 +302,76 @@
     updateHUD();
     updateInfoCard();
 
-    // ---- Async warmup for fresh agents ----
-    // Uses aggressive hyperparameters so agents actually learn during warmup.
-    // Normal ε decay (0.9995) barely moves in 100 eps — warmup uses 0.97.
-    // After warmup, stats reset so the user starts fresh.
-    const WARMUP_EPISODES = { qlearning: 100, dqn: 150, reinforce: 200 };
-    const WARMUP_BUDGET_MS = 8; // max ms per chunk (half a frame)
+    // ---- Boot sequence: background training with loading screen ----
+    // First-time visitors see a cool boot animation while agents train.
+    // Returning visitors (agents in localStorage) skip straight to play.
+    var overlayMain = overlay.querySelector('p');
+    var overlaySub = overlay.querySelector('.overlay-sub');
+    var warmingUp = false;
+
+    var WARMUP_EPISODES = { qlearning: 100, dqn: 150, reinforce: 200 };
+    var WARMUP_BUDGET_MS = 8;
+
+    var bootMessages = [
+        'INITIALIZING NEURAL NETWORK...',
+        'LOADING Q-TABLE INTO MEMORY...',
+        'CALIBRATING REWARD SIGNALS...',
+        'TRAINING Q-LEARNING AGENT...',
+        'TRAINING DQN AGENT...',
+        'TRAINING REINFORCE AGENT...',
+        'OPTIMIZING POLICY GRADIENTS...',
+        'FINALIZING WEIGHT MATRICES...',
+        'AGENTS READY.'
+    ];
 
     function warmupAgentAsync(algoName) {
         return new Promise(function (resolve) {
-            const a = agents[algoName];
-            const target = WARMUP_EPISODES[algoName] || 0;
+            var a = agents[algoName];
+            var target = WARMUP_EPISODES[algoName] || 0;
             if (a.episodes >= target) { resolve(); return; }
 
-            // Switch active algo so engine callbacks route here
             currentAlgo = algoName;
             prevDiscreteState = null;
             prevState = null;
             prevAction = null;
             engine.reset();
 
-            // Save original hyperparameters, apply aggressive warmup ones
+            // Aggressive hyperparameters for fast convergence
             var origDecay, origLr;
             if (a.epsilonDecay !== undefined) {
                 origDecay = a.epsilonDecay;
-                // ε = 0.97^100 ≈ 0.048 — agent exploits well within warmup
                 a.epsilonDecay = 0.97;
             }
-            if (algoName === 'dqn') {
-                origLr = a.lr;
-                a.lr = 0.003; // faster learning during warmup
-            }
-            if (algoName === 'reinforce') {
+            if (algoName === 'dqn' || algoName === 'reinforce') {
                 origLr = a.lr;
                 a.lr = 0.003;
             }
 
-            // Progressively stronger bot: starts weak, gets tough
             function botStrength() {
-                var progress = a.episodes / target;
-                return 0.3 + progress * 0.6; // 0.3 → 0.9
+                return 0.3 + (a.episodes / target) * 0.6;
             }
 
             function chunk() {
                 var deadline = performance.now() + WARMUP_BUDGET_MS;
-
                 while (a.episodes < target && performance.now() < deadline) {
                     botMovePlayer(botStrength());
                     engine.step();
                 }
 
-                // Update overlay progress
+                // Update boot screen
                 var totalEps = WARMUP_EPISODES.qlearning + WARMUP_EPISODES.dqn + WARMUP_EPISODES.reinforce;
                 var doneEps = Math.min(agents.qlearning.episodes, WARMUP_EPISODES.qlearning)
                     + Math.min(agents.dqn.episodes, WARMUP_EPISODES.dqn)
                     + Math.min(agents.reinforce.episodes, WARMUP_EPISODES.reinforce);
                 var pct = Math.min(100, Math.round(doneEps / totalEps * 100));
-                overlayMain.textContent = 'WARMING UP AI... ' + pct + '%';
+                var msgIdx = Math.min(Math.floor(pct / 12), bootMessages.length - 1);
+                overlayMain.textContent = bootMessages[msgIdx];
+                overlaySub.textContent = '[ ' + pct + '% ]';
 
                 if (a.episodes >= target) {
-                    // Restore normal hyperparameters for interactive play
                     if (origDecay !== undefined) a.epsilonDecay = origDecay;
                     if (origLr !== undefined) a.lr = origLr;
-                    // Set ε to a sane interactive level (some exploration, mostly exploit)
                     if (a.epsilon !== undefined) a.epsilon = 0.12;
-                    // Reset stats so user starts with a clean slate
                     a.wins = 0;
                     a.totalGames = 0;
                     saveAgent(algoName);
@@ -376,39 +380,33 @@
                     setTimeout(chunk, 0);
                 }
             }
-
             chunk();
         });
     }
 
-    // Overlay elements for warmup messaging
-    var overlayMain = overlay.querySelector('p');
-    var overlaySub = overlay.querySelector('.overlay-sub');
-
-    // Check if any agent needs warmup
+    // Check if any agent needs training
     var needsWarmup = ['qlearning', 'dqn', 'reinforce'].some(function (name) {
         return agents[name].episodes < (WARMUP_EPISODES[name] || 0);
     });
 
     if (needsWarmup) {
         warmingUp = true;
-        overlayMain.textContent = 'WARMING UP AI... 0%';
-        overlaySub.textContent = 'training agents so they don\'t embarrass themselves';
+        overlayMain.textContent = bootMessages[0];
+        overlaySub.textContent = '[ 0% ]';
 
         warmupAgentAsync('qlearning')
             .then(function () { return warmupAgentAsync('dqn'); })
             .then(function () { return warmupAgentAsync('reinforce'); })
             .then(function () {
                 warmingUp = false;
-                // Restore to default algo
                 currentAlgo = 'qlearning';
                 prevDiscreteState = null;
                 prevState = null;
                 prevAction = null;
                 engine.reset();
                 updateHUD();
-                overlayMain.textContent = 'MOVE YOUR MOUSE TO PLAY';
-                overlaySub.textContent = 'or touch on mobile';
+                overlayMain.textContent = 'SYSTEM READY';
+                overlaySub.textContent = 'move mouse or touch to play';
             });
     }
 })();
