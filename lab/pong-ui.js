@@ -297,6 +297,12 @@
 
     canvas.addEventListener('mousemove', startGame, { once: true });
     canvas.addEventListener('touchstart', startGame, { once: true });
+    document.addEventListener('keydown', function onKey(e) {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'w' || e.key === 's') {
+            startGame();
+            document.removeEventListener('keydown', onKey);
+        }
+    });
 
     // Initial HUD + info
     updateHUD();

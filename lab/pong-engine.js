@@ -90,8 +90,29 @@ const PongEngine = (function () {
             handlePointer(e.touches[0].clientY);
         }, { passive: false });
 
+        // Keyboard input (arrow keys, W/S)
+        const keysDown = {};
+        const PLAYER_SPEED = 6;
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'w' || e.key === 's') {
+                e.preventDefault();
+                keysDown[e.key] = true;
+            }
+        });
+        document.addEventListener('keyup', e => { keysDown[e.key] = false; });
+
         // Physics step
         function step() {
+            // Keyboard-driven player movement
+            if (keysDown['ArrowUp'] || keysDown['w']) {
+                playerY -= PLAYER_SPEED;
+                playerY = Math.max(PAD_H / 2, Math.min(H - PAD_H / 2, playerY));
+            }
+            if (keysDown['ArrowDown'] || keysDown['s']) {
+                playerY += PLAYER_SPEED;
+                playerY = Math.max(PAD_H / 2, Math.min(H - PAD_H / 2, playerY));
+            }
+
             // Move AI paddle
             if (aiAction === 0) aiY -= AI_SPEED;
             else if (aiAction === 2) aiY += AI_SPEED;
