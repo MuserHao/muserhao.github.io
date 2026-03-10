@@ -1,3 +1,37 @@
+// ========== LOGO INJECTION ==========
+// Single source SVG injected into all pages. Preserves currentColor for theme support.
+(function initLogo() {
+    var containers = document.querySelectorAll('.logo');
+    if (!containers.length) return;
+
+    // Resolve logo.svg path by finding where shared.js was loaded from
+    // shared.js is at root or referenced as ../shared.js or ../../shared.js
+    var scripts = document.querySelectorAll('script[src*="shared.js"]');
+    var base = '';
+    if (scripts.length) {
+        var src = scripts[scripts.length - 1].getAttribute('src');
+        base = src.substring(0, src.lastIndexOf('/') + 1);
+    }
+    var logoURL = base + 'logo.svg';
+
+    fetch(logoURL).then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+    }).then(function (svg) {
+        containers.forEach(function (el) {
+            if (!el.querySelector('svg')) {
+                var temp = document.createElement('div');
+                temp.innerHTML = svg;
+                var svgEl = temp.querySelector('svg');
+                if (svgEl) {
+                    svgEl.classList.add('logo-mark');
+                    el.prepend(svgEl);
+                }
+            }
+        });
+    }).catch(function () { /* logo stays as fallback if fetch fails */ });
+})();
+
 // ========== THEME TOGGLE ==========
 (function initTheme() {
     // Theme is set early via inline script in <head> to prevent flash.
