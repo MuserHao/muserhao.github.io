@@ -646,6 +646,7 @@
             entries.forEach(entry => {
                 if (entry.isIntersecting && entry.target.classList.contains('about')) {
                     animateCounters();
+                    aboutObserver.unobserve(entry.target);
                 }
             });
         }, { threshold: 0.2 });
@@ -662,6 +663,7 @@
                 }
                 document.querySelector('.nav-links').classList.remove('active');
                 document.getElementById('hamburger').classList.remove('active');
+                document.getElementById('hamburger').setAttribute('aria-expanded', 'false');
             });
         });
 
@@ -724,8 +726,9 @@
                                 <span class="substack-badge">SUBSTACK</span>
                                 <span class="substack-date">${dateStr}</span>
                             </div>
-                            <h3 class="substack-card-title">${item.title}</h3>
+                            <h3 class="substack-card-title"></h3>
                             <p class="substack-card-excerpt">${excerpt}</p>`;
+                        card.querySelector('.substack-card-title').textContent = item.title;
                         grid.appendChild(card);
                     });
                 })

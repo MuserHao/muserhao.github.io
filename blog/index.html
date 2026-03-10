@@ -301,7 +301,7 @@
                 btn.classList.add('active');
                 const filter = btn.getAttribute('data-filter');
                 document.querySelectorAll('.blog-card').forEach(card => {
-                    if (filter === 'all' || card.getAttribute('data-tags').includes(filter)) {
+                    if (filter === 'all' || card.getAttribute('data-tags').split(' ').includes(filter)) {
                         card.style.display = '';
                     } else {
                         card.style.display = 'none';

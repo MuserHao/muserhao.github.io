@@ -111,16 +111,16 @@ const PongRL = (function () {
         // Entropy gradient: dH/dz_k = -probs_k * (log probs_k + H)
         //   where H = -Σ probs_j * log probs_j
         // Combined for gradient ASCENT, negated for w -= convention:
-        var entropy = 0;
+        let entropy = 0;
         for (let k = 0; k < nOut; k++) {
             if (probs[k] > 1e-10) entropy -= probs[k] * Math.log(probs[k]);
         }
 
         const dOut = new Float64Array(nOut);
         for (let k = 0; k < nOut; k++) {
-            var policyGrad = (k === actionIdx ? 1 : 0) - probs[k];
-            var logP = probs[k] > 1e-10 ? Math.log(probs[k]) : -20;
-            var entropyGrad = -probs[k] * (logP + entropy);
+            const policyGrad = (k === actionIdx ? 1 : 0) - probs[k];
+            const logP = probs[k] > 1e-10 ? Math.log(probs[k]) : -20;
+            const entropyGrad = -probs[k] * (logP + entropy);
             // Negate for w -= lr * dOut convention (ascent)
             dOut[k] = -(advantage * policyGrad + (entropyCoef || 0) * entropyGrad);
         }

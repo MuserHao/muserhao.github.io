@@ -17,7 +17,6 @@
     };
 
     let currentAlgo = 'qlearning';
-    let agent = agents[currentAlgo];
     let prevDiscreteState = null;
     let prevState = null;
     let prevAction = null;
@@ -59,9 +58,9 @@
         hudWinrate.textContent = wr;
         const eps = a.epsilon !== undefined ? a.epsilon.toFixed(2) : '\u2014';
         hudEpsilon.textContent = eps;
-        var hudBot = document.getElementById('hud-bot');
+        const hudBot = document.getElementById('hud-bot');
         if (autoTraining && typeof adaptiveBotStrength === 'function') {
-            var s = adaptiveBotStrength();
+            const s = adaptiveBotStrength();
             hudBot.textContent = Math.round(s * 100) + '%';
         } else if (autoTraining || warmingUp) {
             hudBot.textContent = 'BOT';
@@ -273,7 +272,6 @@
 
             // Switch
             currentAlgo = algo;
-            agent = agents[currentAlgo];
             prevDiscreteState = null;
             prevState = null;
             prevAction = null;
