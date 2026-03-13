@@ -189,11 +189,11 @@ const PongRL = (function () {
     // ========================================================
     function QLearningAgent() {
         this.Q = {};         // state -> [q0, q1, q2]
-        this.lr = 0.1;
+        this.lr = 0.15;      // slightly higher lr for faster convergence
         this.gamma = 0.99;
         this.epsilon = 1.0;
-        this.epsilonDecay = 0.9995;
-        this.epsilonMin = 0.05;
+        this.epsilonDecay = 0.9992;   // faster decay for finer state space
+        this.epsilonMin = 0.03;
         this.episodes = 0;
         this.wins = 0;
         this.totalGames = 0;
@@ -252,8 +252,8 @@ const PongRL = (function () {
     // 2. DQN AGENT
     // ========================================================
     function DQNAgent() {
-        this.net = new MiniNet(6, 32, 3);
-        this.targetNet = new MiniNet(6, 32, 3);
+        this.net = new MiniNet(8, 48, 3);
+        this.targetNet = new MiniNet(8, 48, 3);
         this.targetNet.copyFrom(this.net);
 
         this.replayBuffer = [];
@@ -262,14 +262,14 @@ const PongRL = (function () {
         this.gamma = 0.99;
         this.lr = 0.001;
         this.epsilon = 1.0;
-        this.epsilonDecay = 0.998;
+        this.epsilonDecay = 0.99997;   // per-step decay (~0.05 after 30K steps)
         this.epsilonMin = 0.05;
         this.episodes = 0;
         this.wins = 0;
         this.totalGames = 0;
         this.stepCount = 0;
-        this.targetSyncSteps = 200; // sync target net every N steps
-        this.trainEvery = 4;        // train every N steps
+        this.targetSyncSteps = 200;
+        this.trainEvery = 4;
     }
 
     DQNAgent.prototype.chooseAction = function (state) {
@@ -288,8 +288,9 @@ const PongRL = (function () {
             this.replayBuffer.shift();
         }
         this.stepCount++;
+        this.epsilon = Math.max(this.epsilonMin, this.epsilon * this.epsilonDecay);
 
-        // Train every N steps (not just at episode end)
+        // Train every N steps
         if (this.stepCount % this.trainEvery === 0) {
             this.train();
         }
@@ -304,7 +305,6 @@ const PongRL = (function () {
         this.episodes++;
         this.totalGames++;
         if (winner === 'ai') this.wins++;
-        this.epsilon = Math.max(this.epsilonMin, this.epsilon * this.epsilonDecay);
     };
 
     DQNAgent.prototype.train = function () {
@@ -314,12 +314,18 @@ const PongRL = (function () {
             const idx = Math.floor(Math.random() * this.replayBuffer.length);
             const { s, a, r, sNext, done } = this.replayBuffer[idx];
 
-            // Compute target
-            const { out: qNext } = this.targetNet.forward(sNext);
-            const maxQ = done ? 0 : Math.max(...qNext);
+            // Double DQN: online net selects action, target net evaluates
+            let maxQ = 0;
+            if (!done) {
+                const { out: qOnline } = this.net.forward(sNext);
+                let bestAction = 0;
+                for (let i = 1; i < 3; i++) if (qOnline[i] > qOnline[bestAction]) bestAction = i;
+                const { out: qTarget } = this.targetNet.forward(sNext);
+                maxQ = qTarget[bestAction];
+            }
             const target_val = r + this.gamma * maxQ;
 
-            // Current Q-values — build target array
+            // Build target array from current Q-values
             const { out: qCur } = this.net.forward(s);
             const targetArr = new Float64Array(qCur);
             targetArr[a] = target_val;
@@ -356,7 +362,7 @@ const PongRL = (function () {
     // 3. REINFORCE (Policy Gradient) AGENT
     // ========================================================
     function ReinforceAgent() {
-        this.net = new MiniNet(6, 32, 3);
+        this.net = new MiniNet(8, 48, 3);
         this.lr = 0.005;
         this.gamma = 0.99;
         this.entropyCoef = 0.02;     // entropy bonus to prevent policy collapse

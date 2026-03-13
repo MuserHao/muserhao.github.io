@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teaching Pong to Play Itself: 3 RL Algorithms in the Browser | Hao Xin</title>
-    <meta name="description" content="How we trained Q-Learning, DQN, and REINFORCE agents to play Pong in pure JavaScript -- no GPU, no Python, just 323 parameters and a lot of reward shaping. A build log of what worked, what didn't, and what the textbooks don't tell you.">
+    <meta name="description" content="How we trained Q-Learning, DQN, and REINFORCE agents to play Pong in pure JavaScript -- no GPU, no Python, just 579 parameters and a lot of reward shaping. A build log of what worked, what didn't, and what the textbooks don't tell you.">
     <meta name="author" content="Hao Xin">
     <link rel="canonical" href="https://muserhao.github.io/blog/posts/rl-pong-browser.html">
     <!-- Open Graph -->
@@ -24,7 +24,7 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Teaching Pong to Play Itself: 3 RL Algorithms in the Browser">
-    <meta name="twitter:description" content="Q-Learning, DQN, and REINFORCE in pure JS. A build log of training Pong agents with 323 parameters.">
+    <meta name="twitter:description" content="Q-Learning, DQN, and REINFORCE in pure JS. A build log of training Pong agents with 579 parameters.">
     <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
     <!-- JSON-LD Article -->
     <script type="application/ld+json">
@@ -122,7 +122,7 @@
                     <span class="blog-tag">TUTORIAL</span>
                 </div>
                 <h1 class="post-title">Teaching Pong to Play Itself: 3 RL Algorithms in the Browser</h1>
-                <p class="post-subtitle">// 323 parameters, zero GPUs, and the reward shaping tricks the textbooks leave out</p>
+                <p class="post-subtitle">// 579 parameters, zero GPUs, and the reward shaping tricks the textbooks leave out</p>
                 <div class="post-divider"></div>
             </div>
 
@@ -139,7 +139,7 @@
                 <p>
                     The result is the <a href="../../lab/pong.html">RL Pong Lab</a>: a playable Pong game
                     where you face three different RL algorithms that train in real time, right in your browser.
-                    No server. No Python. No GPU. Just pure JavaScript, a tiny neural network with 323
+                    No server. No Python. No GPU. Just pure JavaScript, a tiny neural network with 579
                     parameters, and some hard-won lessons about what actually makes RL work on a budget.
                 </p>
 
@@ -193,8 +193,8 @@
                     outputs Q-values for each action. The architecture is deliberately tiny:
                 </p>
 
-<pre><code class="language-text">Input (6) → Dense(32, ReLU) → Dense(3, linear)
-Total: 6×32 + 32 + 32×3 + 3 = 323 parameters</code></pre>
+<pre><code class="language-text">Input (8) → Dense(48, ReLU) → Dense(3, linear)
+Total: 8×48 + 48 + 48×3 + 3 = 579 parameters</code></pre>
 
                 <p>
                     DQN adds two critical stabilization tricks from the DeepMind paper <a href="#ref-2">[2]</a>:
@@ -219,7 +219,7 @@ Total: 6×32 + 32 + 32×3 + 3 = 323 parameters</code></pre>
                 </p>
 
                 <p>
-                    Same 6&rarr;32&rarr;3 network, but the output goes through a softmax to produce action
+                    Same 8&rarr;48&rarr;3 network, but the output goes through a softmax to produce action
                     probabilities. The agent samples from this distribution, plays an entire episode, then
                     updates the network to make high-reward actions more likely:
                 </p>
@@ -261,14 +261,18 @@ Total: 6×32 + 32 + 32×3 + 3 = 323 parameters</code></pre>
     ball.vx / BALL_SPEED_MAX, // Ball horizontal velocity (-1 to 1)
     ball.vy / BALL_SPEED_MAX, // Ball vertical velocity (-1 to 1)
     aiY / H,                  // AI paddle Y position (0 to 1)
-    playerY / H               // Opponent paddle Y position (0 to 1)
+    playerY / H,              // Opponent paddle Y position (0 to 1)
+    (ball.y - aiY) / H,       // Relative Y: "go up or down?"
+    ball.vx > 0 ? ball.x/W : 0 // Ball distance when approaching
 ];</code></pre>
 
                 <p>
-                    All values normalized to roughly [-1, 1]. This is critical -- neural networks train
-                    dramatically faster with normalized inputs. The velocity components are essential:
-                    without them, the agent has no idea which direction the ball is heading and can only
-                    react, never anticipate.
+                    All values normalized to roughly [-1, 1]. The last two features are derived:
+                    the relative Y distance tells the agent directly whether the ball is above or
+                    below the paddle (no need to learn subtraction from raw positions), and the
+                    approach distance is nonzero only when the ball is heading toward the AI,
+                    giving a natural urgency signal. These two features alone cut convergence
+                    time nearly in half for the neural network agents.
                 </p>
 
                 <p>
@@ -330,13 +334,18 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
     reward = -1.0;            // Lost a point
 } else {
     reward = -0.01 * dist;   // Small tracking incentive
+    // Directional bonus: reward moving toward the ball
+    if (ballApproaching &amp;&amp; movingCorrectly) reward += 0.005;
 }</code></pre>
 
                 <p>
                     The +0.3 for hitting the ball is the single highest-impact change we made. It transforms
                     the reward landscape from "long stretches of near-zero with rare spikes" to "frequent
-                    positive feedback for doing the right thing." The agent learns the chain:
-                    track ball &rarr; move to intercept &rarr; hit ball (+0.3) &rarr; maybe score (+1.0).
+                    positive feedback for doing the right thing." The directional bonus (+0.005 for
+                    moving toward the ball when it's approaching) is small but gives the agent an
+                    immediate signal about which direction is correct, even before it reaches the ball.
+                    The agent learns the chain:
+                    move toward ball (+0.005) &rarr; intercept &rarr; hit ball (+0.3) &rarr; maybe score (+1.0).
                 </p>
 
                 <p>
@@ -460,17 +469,22 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 <h3>DQN: Slow Start, Smooth Ride</h3>
 
                 <p>
-                    The critical change that made DQN work: <strong>training every 4 steps instead of once
-                    per episode</strong>.
+                    Three changes made DQN competitive:
                 </p>
 
-                <p>
-                    Our first implementation trained a batch of 32 at episode end only. An episode is
-                    ~500-1000 frames, so training happened once per ~750 steps. The network barely moved.
-                    Switching to train-every-4-steps meant 200x more gradient updates per episode.
-                    Combined with target network syncs every 200 steps, DQN starts producing reasonable
-                    play around 100-150 episodes.
-                </p>
+                <ul>
+                    <li><strong>Training every 4 steps instead of once per episode.</strong>
+                    Our first implementation trained a batch of 32 at episode end only. Switching to
+                    per-step training meant 200x more gradient updates per episode.</li>
+                    <li><strong>Per-step epsilon decay</strong> instead of per-episode. With
+                    &epsilon; decaying by 0.99997 each step (~0.05 after 30K steps), exploration
+                    transitions smoothly instead of jerking down once per episode.</li>
+                    <li><strong>Double DQN.</strong> Instead of using the target network for both
+                    action selection and evaluation, the online network selects the best action and
+                    the target network evaluates its Q-value. This reduces Q-value overestimation —
+                    a known instability in vanilla DQN where the max operator causes systematically
+                    inflated value estimates.</li>
+                </ul>
 
                 <p>
                     <strong>The advantage over Q-Learning:</strong> generalization. DQN handles the continuous
@@ -536,7 +550,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
 
                 <p>
                     <strong>The payoff — and the honest caveat.</strong> REINFORCE is the weakest performer
-                    on this problem, and that's not a bug. For Pong with 3 discrete actions and a 6D state,
+                    on this problem, and that's not a bug. For Pong with 3 discrete actions and an 8D state,
                     Q-Learning's lookup table and DQN's per-step training are simply better fits.
                     Q-Learning updates every frame — instant feedback. DQN trains every 4 steps — thousands
                     of gradient updates per episode. REINFORCE trains <em>once</em> at the end of each

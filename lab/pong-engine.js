@@ -194,24 +194,34 @@ const PongEngine = (function () {
                 }
             } else {
                 // Dense reward shaping
-                // +0.3 for successfully hitting the ball (biggest learning signal)
                 if (aiHitBall) {
+                    // +0.3 for successfully returning the ball
                     reward = 0.3;
                 } else {
-                    // Small proximity reward: encourage tracking the ball
+                    // Proximity: small penalty for being far from ball
                     const dist = Math.abs(aiY - ball.y) / H;
                     reward = -0.01 * dist;
+
+                    // Directional bonus: reward moving TOWARD the ball when it's approaching
+                    if (ball.vx > 0) {
+                        const movingCorrectly =
+                            (aiAction === 0 && ball.y < aiY) ||  // moving up when ball is above
+                            (aiAction === 2 && ball.y > aiY);    // moving down when ball is below
+                        if (movingCorrectly) reward += 0.005;
+                    }
                 }
             }
 
-            // Build state for RL
+            // Build state for RL — 8D vector with derived features
             const state = [
                 ball.x / W,
                 ball.y / H,
                 ball.vx / BALL_SPEED_MAX,
                 ball.vy / BALL_SPEED_MAX,
                 aiY / H,
-                playerY / H
+                playerY / H,
+                (ball.y - aiY) / H,            // relative Y: key signal for "go up or down"
+                ball.vx > 0 ? ball.x / W : 0   // ball distance when approaching (0 when going away)
             ];
 
             // Discrete state for Q-learning
@@ -229,13 +239,17 @@ const PongEngine = (function () {
         }
 
         // Discretize state for Q-learning
+        // 8 ball-x × 10 ball-y × 2 vx × 3 vy × 10 paddle-y × 5 relative-y = 24,000 states
         function discretize(bx, by, bvx, bvy, ay) {
             const bxBin = Math.min(Math.floor(bx / W * 8), 7);
-            const byBin = Math.min(Math.floor(by / H * 6), 5);
+            const byBin = Math.min(Math.floor(by / H * 10), 9);
             const vxBin = bvx > 0 ? 1 : 0;
             const vyBin = bvy > 0.5 ? 2 : (bvy < -0.5 ? 0 : 1);
-            const ayBin = Math.min(Math.floor(ay / H * 6), 5);
-            return bxBin * 6 * 2 * 3 * 6 + byBin * 2 * 3 * 6 + vxBin * 3 * 6 + vyBin * 6 + ayBin;
+            const ayBin = Math.min(Math.floor(ay / H * 10), 9);
+            // Relative Y: where is ball vs paddle? 5 bins from "far above" to "far below"
+            const relY = (by - ay) / H; // -1 to 1
+            const relBin = Math.min(Math.max(Math.floor((relY + 1) / 2 * 5), 0), 4);
+            return ((((bxBin * 10 + byBin) * 2 + vxBin) * 3 + vyBin) * 10 + ayBin) * 5 + relBin;
         }
 
         // Render
@@ -346,7 +360,9 @@ const PongEngine = (function () {
                 return [
                     ball.x / W, ball.y / H,
                     ball.vx / BALL_SPEED_MAX, ball.vy / BALL_SPEED_MAX,
-                    aiY / H, playerY / H
+                    aiY / H, playerY / H,
+                    (ball.y - aiY) / H,
+                    ball.vx > 0 ? ball.x / W : 0
                 ];
             }
         };
