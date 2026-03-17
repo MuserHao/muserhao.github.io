@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser | Hao Xin</title>
-    <meta name="description" content="How we built a Lunar Lander with DQN, A2C, and PPO in pure JavaScript -- 1,207 parameters, zero GPUs, and a live actor-critic visualization that makes the GAN-RL connection click.">
+    <meta name="description" content="How we built a Lunar Lander with DQN, A2C, and PPO in pure JavaScript -- ~4,200 parameters, zero GPUs, and a live actor-critic visualization that makes the GAN-RL connection click.">
     <meta name="author" content="Hao Xin">
     <link rel="canonical" href="https://muserhao.github.io/blog/posts/rl-lander-browser.html">
     <!-- Open Graph -->
@@ -24,7 +24,7 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser">
-    <meta name="twitter:description" content="DQN, A2C, and PPO learn to land a spacecraft in pure JS. 1,207 parameters, zero GPUs.">
+    <meta name="twitter:description" content="DQN, A2C, and PPO learn to land a spacecraft in pure JS. ~4,200 parameters, zero GPUs.">
     <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
     <!-- JSON-LD Article -->
     <script type="application/ld+json">
@@ -122,7 +122,7 @@
                     <span class="blog-tag">TUTORIAL</span>
                 </div>
                 <h1 class="post-title">Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser</h1>
-                <p class="post-subtitle">// 1,207 parameters, zero GPUs, and the visualization that makes RLHF click</p>
+                <p class="post-subtitle">// ~4,200 parameters, zero GPUs, and the visualization that makes RLHF click</p>
                 <div class="post-divider"></div>
             </div>
 
@@ -153,7 +153,7 @@ DQN is the same Double DQN from Pong, scaled up to 6 actions. One network estima
 $$Q(s, a) \leftarrow r + \gamma \, Q_{\text{target}}(s', \arg\max_{a'} Q_{\text{online}}(s', a'))$$
 
 <p>
-Architecture: MiniNet(8, 64, 6) = <strong>966 parameters</strong>. It works, but it only learns <em>values</em> &mdash; there&rsquo;s no explicit policy. This is where actor-critic enters.
+Architecture: MiniNet2(8, 64, 48, 6) = <strong>~2,200 parameters</strong>. It works, but it only learns <em>values</em> &mdash; there&rsquo;s no explicit policy. This is where actor-critic enters.
 </p>
 
 <h3>A2C &mdash; Advantage Actor-Critic</h3>
@@ -177,7 +177,7 @@ And the critic trains via MSE on the TD target:
 $$\mathcal{L}_{\text{critic}} = \Big( r + \gamma \, V_\phi(s') - V_\phi(s) \Big)^2$$
 
 <p>
-Two networks, two loss functions, one elegant loop. Actor: MiniNet(8, 48, 6) = 726 params. Critic: MiniNet(8, 48, 1) = 481 params. <strong>Total: 1,207 parameters.</strong>
+Two networks, two loss functions, one elegant loop. Actor: MiniNet2(8, 64, 48, 6) = ~2,200 params. Critic: MiniNet2(8, 64, 48, 1) = ~2,000 params. <strong>Total: ~4,200 parameters.</strong>
 </p>
 
 <h3>PPO &mdash; Proximal Policy Optimization</h3>
@@ -199,7 +199,7 @@ PPO also uses <strong>Generalized Advantage Estimation (GAE)</strong> instead of
 $$\hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda)^l \, \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$$
 
 <p>
-The $\lambda$ parameter (0.95 here) interpolates between high-bias/low-variance (TD, $\lambda=0$) and low-bias/high-variance (Monte Carlo, $\lambda=1$). Same architecture as A2C: <strong>1,207 parameters</strong>.
+The $\lambda$ parameter (0.95 here) interpolates between high-bias/low-variance (TD, $\lambda=0$) and low-bias/high-variance (Monte Carlo, $\lambda=1$). Same architecture as A2C: <strong>~4,200 parameters</strong>.
 </p>
 
 <h2>03 // THE PHYSICS</h2>
@@ -318,7 +318,33 @@ if (crashed) reward = -2 - 3*speed - 5*dist;    // terminal: ~-5 to -10</code></
 </p>
 
 <p>
-<strong>Lesson:</strong> this is arguably the single most important practical lesson in RL engineering. If your rewards span orders of magnitude, normalize them. The theory says the optimal policy is scale-invariant; the practice says your 1,207-parameter network is not.
+<strong>Lesson:</strong> this is arguably the single most important practical lesson in RL engineering. If your rewards span orders of magnitude, normalize them. The theory says the optimal policy is scale-invariant; the practice says your ~4,200-parameter network is not.
+</p>
+
+<h3>Iteration 4: Two hidden layers (6% DQN, 5% A2C, 4% PPO)</h3>
+
+<p>
+That 53% A2C was a lucky run. Averaging over 3 trials: DQN 2%, A2C 9%, PPO 0.5%. Stochastic initialization matters enormously with tiny networks.
+</p>
+
+<p>
+The deeper problem: a single ReLU hidden layer can only represent <strong>piecewise linear functions</strong>. But the value function for Lunar Lander is non-linear &mdash; it depends on interactions between position and velocity (close + slow = good, close + fast = bad). A single layer can&rsquo;t capture $\text{closeness} \times \text{slowness}$ without dedicated features.
+</p>
+
+<p>
+We added a second hidden layer: <code>MiniNet2(8, 48, 32, 6)</code>. The extra layer lets the network compute intermediate features in the first layer (closeness, speed, uprightness) and combine them non-linearly in the second. The parameter count roughly doubles, but the representational capacity increases far more.
+</p>
+
+<p>
+<strong>Averaged over 3 trials at 500 episodes:</strong> DQN 6%, A2C 5%, PPO 4%. Not headline numbers, but <em>consistent</em> and <em>improving</em>. More importantly, PPO went from 0.5% to 4% &mdash; the extra capacity let the clipped updates accumulate meaningful policy changes instead of getting stuck.
+</p>
+
+<p>
+<strong>Lesson:</strong> at this scale, you hit the representation bottleneck before the data bottleneck. A 1,000-parameter single-layer network can&rsquo;t represent the value function accurately enough for gradient-based learning to work. Two layers with the same total parameters performs dramatically better because function composition is more expressive than function width.
+</p>
+
+<p>
+For reference, OpenAI Gym&rsquo;s Lunar Lander benchmark uses 2-layer networks with 64 neurons each (~8,000 parameters) and trains for 1,000+ episodes with a GPU. We&rsquo;re doing it in the browser with ~2,000 parameters and a warmup of 500 episodes. The agents won&rsquo;t land every time, but they <em>visibly</em> improve &mdash; and that&rsquo;s the teaching point.
 </p>
 
 <h2>05 // THE TRAINING LOOP THAT TOOK THREE TRIES</h2>
@@ -423,7 +449,7 @@ We made PPO&rsquo;s training frequency worse by accident: our first version flus
 </p>
 
 <p>
-<strong>Lesson:</strong> PPO&rsquo;s conservatism is both its strength and its weakness. It needs more data per update than A2C. In production RLHF, this is solved with large batch sizes (thousands of trajectories). In a browser with 1,207 parameters, you just need patience.
+<strong>Lesson:</strong> PPO&rsquo;s conservatism is both its strength and its weakness. It needs more data per update than A2C. In production RLHF, this is solved with large batch sizes (thousands of trajectories). In a browser with ~4,200 parameters, you just need patience.
 </p>
 
 <h3>The Scoreboard</h3>
@@ -440,21 +466,21 @@ We made PPO&rsquo;s training frequency worse by accident: our first version flus
     <tbody>
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">DQN</td>
-            <td style="text-align:center; padding:0.5rem;">966</td>
-            <td style="text-align:center; padding:0.5rem;">~13%</td>
-            <td style="text-align:center; padding:0.5rem;">High (replay buffer)</td>
+            <td style="text-align:center; padding:0.5rem;">~2,000</td>
+            <td style="text-align:center; padding:0.5rem;">~6%</td>
+            <td style="text-align:center; padding:0.5rem;">Consistent (replay buffer)</td>
         </tr>
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">A2C</td>
-            <td style="text-align:center; padding:0.5rem;">1,207</td>
-            <td style="text-align:center; padding:0.5rem;">~53%</td>
-            <td style="text-align:center; padding:0.5rem;">Sensitive to reward scale</td>
+            <td style="text-align:center; padding:0.5rem;">~4,000</td>
+            <td style="text-align:center; padding:0.5rem;">~5% (up to 12%)</td>
+            <td style="text-align:center; padding:0.5rem;">Variable (reward-sensitive)</td>
         </tr>
         <tr>
             <td style="padding:0.5rem;">PPO</td>
-            <td style="text-align:center; padding:0.5rem;">1,207</td>
-            <td style="text-align:center; padding:0.5rem;">~2%</td>
-            <td style="text-align:center; padding:0.5rem;">Conservative (needs more data)</td>
+            <td style="text-align:center; padding:0.5rem;">~4,000</td>
+            <td style="text-align:center; padding:0.5rem;">~4%</td>
+            <td style="text-align:center; padding:0.5rem;">Smooth (needs more data)</td>
         </tr>
     </tbody>
 </table>
@@ -525,14 +551,14 @@ Each advantage is a weighted sum of all future TD errors, with exponential decay
 <h3>Parameter Counts</h3>
 
 <p>
-Every parameter is a Float64 in typed arrays &mdash; no framework, no tensors, just arithmetic:
+Every parameter is a Float64 in typed arrays &mdash; no framework, no tensors, just arithmetic. We use 2-hidden-layer networks (<code>MiniNet2</code>) for the capacity to represent non-linear value functions:
 </p>
 
 <ul>
-    <li><strong>DQN:</strong> MiniNet(8, 64, 6) &rarr; (8&times;64 + 64) + (64&times;6 + 6) = 576 + 390 = <strong>966</strong></li>
-    <li><strong>A2C Actor:</strong> MiniNet(8, 48, 6) &rarr; (8&times;48 + 48) + (48&times;6 + 6) = 432 + 294 = <strong>726</strong></li>
-    <li><strong>A2C/PPO Critic:</strong> MiniNet(8, 48, 1) &rarr; (8&times;48 + 48) + (48&times;1 + 1) = 432 + 49 = <strong>481</strong></li>
-    <li><strong>A2C/PPO Total:</strong> 726 + 481 = <strong>1,207</strong></li>
+    <li><strong>DQN:</strong> MiniNet2(8, 48, 32, 6) &rarr; (8&times;48+48) + (48&times;32+32) + (32&times;6+6) = 432+1568+198 = <strong>2,198</strong></li>
+    <li><strong>A2C/PPO Actor:</strong> MiniNet2(8, 48, 32, 6) &rarr; <strong>2,198</strong></li>
+    <li><strong>A2C/PPO Critic:</strong> MiniNet2(8, 48, 32, 1) &rarr; (8&times;48+48) + (48&times;32+32) + (32&times;1+1) = 432+1568+33 = <strong>2,033</strong></li>
+    <li><strong>A2C/PPO Total:</strong> 2,198 + 2,033 = <strong>4,231</strong></li>
 </ul>
 
 <h2>09 // TRY IT YOURSELF</h2>

@@ -244,13 +244,162 @@ const LanderRL = (function () {
         this.bO.set(other.bO);
     };
 
+    // ---- MiniNet2: 3-layer neural network (2 hidden layers) ----
+    // Architecture: inputs -> hidden1 (ReLU) -> hidden2 (ReLU) -> outputs
+    function MiniNet2(nIn, nH1, nH2, nOut) {
+        this.nIn = nIn; this.nH1 = nH1; this.nH2 = nH2; this.nOut = nOut;
+        const s1 = Math.sqrt(2.0 / nIn), s2 = Math.sqrt(2.0 / nH1), sO = Math.sqrt(2.0 / nH2);
+        this.w1 = new Float64Array(nIn * nH1);
+        this.b1 = new Float64Array(nH1);
+        this.w2 = new Float64Array(nH1 * nH2);
+        this.b2 = new Float64Array(nH2);
+        this.wO = new Float64Array(nH2 * nOut);
+        this.bO = new Float64Array(nOut);
+        for (let i = 0; i < this.w1.length; i++) this.w1[i] = randn() * s1;
+        for (let i = 0; i < this.w2.length; i++) this.w2[i] = randn() * s2;
+        for (let i = 0; i < this.wO.length; i++) this.wO[i] = randn() * sO;
+    }
+
+    MiniNet2.prototype.forward = function (input) {
+        const { nIn, nH1, nH2, nOut, w1, b1, w2, b2, wO, bO } = this;
+        const h1 = new Float64Array(nH1);
+        for (let j = 0; j < nH1; j++) {
+            let s = b1[j]; for (let i = 0; i < nIn; i++) s += input[i] * w1[i * nH1 + j]; h1[j] = s > 0 ? s : 0;
+        }
+        const h2 = new Float64Array(nH2);
+        for (let j = 0; j < nH2; j++) {
+            let s = b2[j]; for (let i = 0; i < nH1; i++) s += h1[i] * w2[i * nH2 + j]; h2[j] = s > 0 ? s : 0;
+        }
+        const out = new Float64Array(nOut);
+        for (let k = 0; k < nOut; k++) {
+            let s = bO[k]; for (let j = 0; j < nH2; j++) s += h2[j] * wO[j * nOut + k]; out[k] = s;
+        }
+        return { out, hidden: h1, hidden2: h2 };
+    };
+
+    MiniNet2.prototype.trainMSE = function (input, target, lr) {
+        const { nIn, nH1, nH2, nOut, w1, b1, w2, b2, wO, bO } = this;
+        const { out, hidden: h1, hidden2: h2 } = this.forward(input);
+        const dOut = new Float64Array(nOut);
+        for (let k = 0; k < nOut; k++) dOut[k] = out[k] - target[k];
+        const dH2 = new Float64Array(nH2);
+        for (let j = 0; j < nH2; j++) {
+            let g = 0;
+            for (let k = 0; k < nOut; k++) { g += dOut[k] * wO[j * nOut + k]; wO[j * nOut + k] -= lr * dOut[k] * h2[j]; }
+            dH2[j] = h2[j] > 0 ? g : 0;
+        }
+        const dH1 = new Float64Array(nH1);
+        for (let j = 0; j < nH1; j++) {
+            let g = 0;
+            for (let i = 0; i < nH2; i++) { g += dH2[i] * w2[j * nH2 + i]; w2[j * nH2 + i] -= lr * dH2[i] * h1[j]; }
+            dH1[j] = h1[j] > 0 ? g : 0;
+        }
+        for (let i = 0; i < nIn; i++) for (let j = 0; j < nH1; j++) w1[i * nH1 + j] -= lr * dH1[j] * input[i];
+        for (let k = 0; k < nOut; k++) bO[k] -= lr * dOut[k];
+        for (let j = 0; j < nH2; j++) b2[j] -= lr * dH2[j];
+        for (let j = 0; j < nH1; j++) b1[j] -= lr * dH1[j];
+        return out;
+    };
+
+    MiniNet2.prototype.trainValue = function (input, val, lr) { return this.trainMSE(input, new Float64Array([val]), lr); };
+
+    MiniNet2.prototype.trainPG = function (input, actionIdx, advantage, lr, ec) {
+        const { nIn, nH1, nH2, nOut, w1, b1, w2, b2, wO, bO } = this;
+        const { out, hidden: h1, hidden2: h2 } = this.forward(input);
+        const maxV = Math.max(...out); const exps = new Float64Array(nOut); let sumExp = 0;
+        for (let k = 0; k < nOut; k++) { exps[k] = Math.exp(out[k] - maxV); sumExp += exps[k]; }
+        const probs = new Float64Array(nOut);
+        for (let k = 0; k < nOut; k++) probs[k] = exps[k] / sumExp;
+        let ent = 0; for (let k = 0; k < nOut; k++) if (probs[k] > 1e-10) ent -= probs[k] * Math.log(probs[k]);
+        const dOut = new Float64Array(nOut);
+        for (let k = 0; k < nOut; k++) {
+            const pg = (k === actionIdx ? 1 : 0) - probs[k];
+            const lp = probs[k] > 1e-10 ? Math.log(probs[k]) : -20;
+            dOut[k] = -(advantage * pg + (ec || 0) * (-probs[k] * (lp + ent)));
+        }
+        const dH2 = new Float64Array(nH2);
+        for (let j = 0; j < nH2; j++) { let g = 0; for (let k = 0; k < nOut; k++) { g += dOut[k] * wO[j * nOut + k]; wO[j * nOut + k] -= lr * dOut[k] * h2[j]; } dH2[j] = h2[j] > 0 ? g : 0; }
+        const dH1 = new Float64Array(nH1);
+        for (let j = 0; j < nH1; j++) { let g = 0; for (let i = 0; i < nH2; i++) { g += dH2[i] * w2[j * nH2 + i]; w2[j * nH2 + i] -= lr * dH2[i] * h1[j]; } dH1[j] = h1[j] > 0 ? g : 0; }
+        for (let i = 0; i < nIn; i++) for (let j = 0; j < nH1; j++) w1[i * nH1 + j] -= lr * dH1[j] * input[i];
+        for (let k = 0; k < nOut; k++) bO[k] -= lr * dOut[k];
+        for (let j = 0; j < nH2; j++) b2[j] -= lr * dH2[j];
+        for (let j = 0; j < nH1; j++) b1[j] -= lr * dH1[j];
+        return probs;
+    };
+
+    MiniNet2.prototype.trainPPO = function (input, actionIdx, advantage, oldProbs, lr, clipEps, ec) {
+        const { nIn, nH1, nH2, nOut, w1, b1, w2, b2, wO, bO } = this;
+        const { out, hidden: h1, hidden2: h2 } = this.forward(input);
+        const maxV = Math.max(...out); const exps = new Float64Array(nOut); let sumExp = 0;
+        for (let k = 0; k < nOut; k++) { exps[k] = Math.exp(out[k] - maxV); sumExp += exps[k]; }
+        const probs = new Float64Array(nOut);
+        for (let k = 0; k < nOut; k++) probs[k] = exps[k] / sumExp;
+        const oldP = Math.max(oldProbs[actionIdx], 1e-8), newP = Math.max(probs[actionIdx], 1e-8);
+        const ratio = Math.min(10, newP / oldP);
+        const clipped = Math.max(1 - clipEps, Math.min(1 + clipEps, ratio));
+        const s1 = ratio * advantage, s2 = clipped * advantage;
+        const useClip = (s1 > s2) ? 1 : 0;
+        let ent = 0; for (let k = 0; k < nOut; k++) if (probs[k] > 1e-10) ent -= probs[k] * Math.log(probs[k]);
+        const dOut = new Float64Array(nOut);
+        for (let k = 0; k < nOut; k++) {
+            let pg = 0;
+            if (!useClip) pg = advantage * ratio * ((k === actionIdx ? 1 : 0) - probs[k]);
+            const lp = probs[k] > 1e-10 ? Math.log(probs[k]) : -20;
+            dOut[k] = -(pg + (ec || 0) * (-probs[k] * (lp + ent)));
+        }
+        const dH2 = new Float64Array(nH2);
+        for (let j = 0; j < nH2; j++) { let g = 0; for (let k = 0; k < nOut; k++) { g += dOut[k] * wO[j * nOut + k]; wO[j * nOut + k] -= lr * dOut[k] * h2[j]; } dH2[j] = h2[j] > 0 ? g : 0; }
+        const dH1 = new Float64Array(nH1);
+        for (let j = 0; j < nH1; j++) { let g = 0; for (let i = 0; i < nH2; i++) { g += dH2[i] * w2[j * nH2 + i]; w2[j * nH2 + i] -= lr * dH2[i] * h1[j]; } dH1[j] = h1[j] > 0 ? g : 0; }
+        for (let i = 0; i < nIn; i++) for (let j = 0; j < nH1; j++) w1[i * nH1 + j] -= lr * dH1[j] * input[i];
+        for (let k = 0; k < nOut; k++) bO[k] -= lr * dOut[k];
+        for (let j = 0; j < nH2; j++) b2[j] -= lr * dH2[j];
+        for (let j = 0; j < nH1; j++) b1[j] -= lr * dH1[j];
+        return probs;
+    };
+
+    MiniNet2.prototype.softmax = function (input) {
+        const { out } = this.forward(input); const maxV = Math.max(...out);
+        const exps = new Float64Array(out.length); let sum = 0;
+        for (let k = 0; k < out.length; k++) { exps[k] = Math.exp(out[k] - maxV); sum += exps[k]; }
+        const probs = new Float64Array(out.length);
+        for (let k = 0; k < out.length; k++) probs[k] = exps[k] / sum;
+        return probs;
+    };
+
+    MiniNet2.prototype.serialize = function () {
+        return { type: 'MiniNet2', nIn: this.nIn, nH1: this.nH1, nH2: this.nH2, nOut: this.nOut,
+            w1: Array.from(this.w1), b1: Array.from(this.b1), w2: Array.from(this.w2), b2: Array.from(this.b2),
+            wO: Array.from(this.wO), bO: Array.from(this.bO) };
+    };
+
+    MiniNet2.deserialize = function (d) {
+        const n = new MiniNet2(d.nIn, d.nH1, d.nH2, d.nOut);
+        n.w1 = new Float64Array(d.w1); n.b1 = new Float64Array(d.b1);
+        n.w2 = new Float64Array(d.w2); n.b2 = new Float64Array(d.b2);
+        n.wO = new Float64Array(d.wO); n.bO = new Float64Array(d.bO);
+        return n;
+    };
+
+    MiniNet2.prototype.copyFrom = function (o) {
+        this.w1.set(o.w1); this.b1.set(o.b1); this.w2.set(o.w2); this.b2.set(o.b2);
+        this.wO.set(o.wO); this.bO.set(o.bO);
+    };
+
+    // Helper to deserialize either MiniNet or MiniNet2
+    function deserializeNet(d) {
+        if (d.type === 'MiniNet2' || d.nH1 !== undefined) return MiniNet2.deserialize(d);
+        return MiniNet.deserialize(d);
+    }
+
     // ========================================================
     // 1. DQN AGENT — Double DQN + Replay Buffer
-    //    MiniNet(8, 64, 6) = 8×64+64 + 64×6+6 = 966 params
+    //    MiniNet2(8, 48, 32, 6) = ~2K params
     // ========================================================
     function DQNAgent() {
-        this.net = new MiniNet(8, 64, 6);
-        this.targetNet = new MiniNet(8, 64, 6);
+        this.net = new MiniNet2(8, 64, 48, 6);
+        this.targetNet = new MiniNet2(8, 64, 48, 6);
         this.targetNet.copyFrom(this.net);
 
         this.replayBuffer = [];
@@ -280,9 +429,23 @@ const LanderRL = (function () {
     };
 
     DQNAgent.prototype.storeTransition = function (s, a, r, sNext, done) {
+        const idx = this.replayBuffer.length;
         this.replayBuffer.push({ s, a, r, sNext, done });
         if (this.replayBuffer.length > this.bufferMax) {
             this.replayBuffer.shift();
+            // Reindex terminal indices
+            if (this._terminalIndices) {
+                for (let i = this._terminalIndices.length - 1; i >= 0; i--) {
+                    this._terminalIndices[i]--;
+                    if (this._terminalIndices[i] < 0) this._terminalIndices.splice(i, 1);
+                }
+            }
+        }
+        // Track terminal transitions for prioritized replay
+        if (done) {
+            if (!this._terminalIndices) this._terminalIndices = [];
+            this._terminalIndices.push(this.replayBuffer.length - 1);
+            if (this._terminalIndices.length > 200) this._terminalIndices.shift();
         }
         this.stepCount++;
         this.epsilon = Math.max(this.epsilonMin, this.epsilon * this.epsilonDecay);
@@ -303,10 +466,20 @@ const LanderRL = (function () {
 
     DQNAgent.prototype.train = function () {
         if (this.replayBuffer.length < this.batchSize) return;
+        const buf = this.replayBuffer;
+        const N = buf.length;
 
         for (let b = 0; b < this.batchSize; b++) {
-            const idx = Math.floor(Math.random() * this.replayBuffer.length);
-            const { s, a, r, sNext, done } = this.replayBuffer[idx];
+            // Prioritized sampling: terminal transitions have 5x weight
+            // This helps the agent learn from rare landing/crash events
+            let idx;
+            if (Math.random() < 0.3 && this._terminalIndices && this._terminalIndices.length > 0) {
+                idx = this._terminalIndices[Math.floor(Math.random() * this._terminalIndices.length)];
+                if (idx >= N) idx = Math.floor(Math.random() * N);
+            } else {
+                idx = Math.floor(Math.random() * N);
+            }
+            const { s, a, r, sNext, done } = buf[idx];
 
             let maxQ = 0;
             if (!done) {
@@ -363,8 +536,8 @@ const LanderRL = (function () {
 
     DQNAgent.deserialize = function (d) {
         const a = new DQNAgent();
-        if (d.net) a.net = MiniNet.deserialize(d.net);
-        if (d.targetNet) a.targetNet = MiniNet.deserialize(d.targetNet);
+        if (d.net) a.net = deserializeNet(d.net);
+        if (d.targetNet) a.targetNet = deserializeNet(d.targetNet);
         a.epsilon = d.epsilon || 1.0;
         a.episodes = d.episodes || 0;
         a.landings = d.landings || 0;
@@ -375,13 +548,11 @@ const LanderRL = (function () {
 
     // ========================================================
     // 2. A2C AGENT — Advantage Actor-Critic
-    //    Actor: MiniNet(8, 48, 6) = 8×48+48 + 48×6+6 = 726 params
-    //    Critic: MiniNet(8, 48, 1) = 8×48+48 + 48×1+1 = 481 params
-    //    Total: 1,207 params
+    //    Actor: MiniNet2(8, 48, 32, 6), Critic: MiniNet2(8, 48, 32, 1)
     // ========================================================
     function A2CAgent() {
-        this.actor = new MiniNet(8, 48, 6);
-        this.critic = new MiniNet(8, 48, 1);
+        this.actor = new MiniNet2(8, 64, 48, 6);
+        this.critic = new MiniNet2(8, 64, 48, 1);
 
         this.gamma = 0.99;
         this.actorLr = 0.003;
@@ -450,13 +621,27 @@ const LanderRL = (function () {
             }
         }
 
-        // Update actor and critic for each step
+        // Compute advantages and normalize them
+        const advantages = new Float64Array(T);
         for (let t = 0; t < T; t++) {
             const { out: vCur } = this.critic.forward(buf[t].state);
-            const advantage = Math.max(-5, Math.min(5, returns[t] - vCur[0]));
+            advantages[t] = returns[t] - vCur[0];
+        }
 
+        // Normalize advantages for stable policy gradients
+        if (T > 1) {
+            let mean = 0, std = 0;
+            for (let t = 0; t < T; t++) mean += advantages[t];
+            mean /= T;
+            for (let t = 0; t < T; t++) std += (advantages[t] - mean) ** 2;
+            std = Math.sqrt(std / T + 1e-8);
+            for (let t = 0; t < T; t++) advantages[t] = (advantages[t] - mean) / std;
+        }
+
+        // Update actor and critic for each step
+        for (let t = 0; t < T; t++) {
             this.critic.trainValue(buf[t].state, returns[t], this.criticLr);
-            this.actor.trainPG(buf[t].state, buf[t].action, advantage, this.actorLr, this.entropyCoef);
+            this.actor.trainPG(buf[t].state, buf[t].action, advantages[t], this.actorLr, this.entropyCoef);
         }
 
         this.nStepBuffer = [];
@@ -498,8 +683,8 @@ const LanderRL = (function () {
 
     A2CAgent.deserialize = function (d) {
         const a = new A2CAgent();
-        if (d.actor) a.actor = MiniNet.deserialize(d.actor);
-        if (d.critic) a.critic = MiniNet.deserialize(d.critic);
+        if (d.actor) a.actor = deserializeNet(d.actor);
+        if (d.critic) a.critic = deserializeNet(d.critic);
         a.epsilon = d.epsilon !== undefined ? d.epsilon : 0.2;
         a.episodes = d.episodes || 0;
         a.landings = d.landings || 0;
@@ -509,12 +694,11 @@ const LanderRL = (function () {
 
     // ========================================================
     // 3. PPO AGENT — Proximal Policy Optimization
-    //    Same architecture as A2C: 1,207 params
-    //    Collects trajectories, then runs mini-batch updates
+    //    Same architecture as A2C
     // ========================================================
     function PPOAgent() {
-        this.actor = new MiniNet(8, 48, 6);
-        this.critic = new MiniNet(8, 48, 1);
+        this.actor = new MiniNet2(8, 64, 48, 6);
+        this.critic = new MiniNet2(8, 64, 48, 1);
 
         this.gamma = 0.99;
         this.lam = 0.95;         // GAE lambda
@@ -660,8 +844,8 @@ const LanderRL = (function () {
 
     PPOAgent.deserialize = function (d) {
         const a = new PPOAgent();
-        if (d.actor) a.actor = MiniNet.deserialize(d.actor);
-        if (d.critic) a.critic = MiniNet.deserialize(d.critic);
+        if (d.actor) a.actor = deserializeNet(d.actor);
+        if (d.critic) a.critic = deserializeNet(d.critic);
         a.epsilon = d.epsilon !== undefined ? d.epsilon : 0.15;
         a.episodes = d.episodes || 0;
         a.landings = d.landings || 0;

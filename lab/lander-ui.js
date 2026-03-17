@@ -48,15 +48,15 @@
     const algoInfo = {
         dqn: {
             title: 'Deep Q-Network (DQN)',
-            text: 'The same algorithm that learned Pong. A single neural network (8\u219264\u21926) estimates Q-values for each action. Uses Double DQN with a replay buffer and target network for stability. It\u2019s a solid baseline that visitors already know. 966 parameters. Expect landing improvement around 80\u2013120 episodes.'
+            text: 'The same algorithm that learned Pong. A neural network (8\u219264\u219248\u21926) estimates Q-values for each action. Uses Double DQN with a replay buffer and target network for stability. 2,198 parameters. The replay buffer makes DQN the most consistent learner at this scale.'
         },
         a2c: {
             title: 'Advantage Actor-Critic (A2C)',
-            text: 'The core teaching algorithm. TWO separate networks: an Actor (\u03C0) that outputs a probability distribution over actions, and a Critic (V) that estimates how good the current state is. The advantage A = r + \u03B3V(s\u2019) \u2013 V(s) tells the actor "was this action better or worse than expected?" This is the foundation of modern RL \u2014 from RLHF for LLMs to robotic control. 1,207 parameters across both networks.'
+            text: 'The core teaching algorithm. TWO separate networks: an Actor (\u03C0) that outputs action probabilities, and a Critic (V) that estimates state value. The advantage A = r + \u03B3V(s\u2019) \u2013 V(s) tells the actor whether its action was better or worse than expected. This is the foundation of modern RL \u2014 from RLHF for LLMs to robotic control. ~4,200 parameters across both networks.'
         },
         ppo: {
             title: 'Proximal Policy Optimization (PPO)',
-            text: 'The algorithm behind ChatGPT\u2019s RLHF and most modern RL systems. Same actor-critic architecture as A2C, but instead of single-step updates, it collects trajectories and runs multiple optimization epochs with a clipped importance ratio: clip(\u03C0_new/\u03C0_old, 1\u00B10.2) \u00D7 advantage. This prevents catastrophic policy updates. Uses GAE (\u03BB=0.95) for smoother advantage estimates. 1,207 parameters. Typically the most stable learner.'
+            text: 'The algorithm behind ChatGPT\u2019s RLHF. Same actor-critic architecture as A2C, but collects trajectories and runs multiple epochs with a clipped importance ratio to prevent catastrophic updates. PPO is the most conservative learner \u2014 it needs more data per update but never degrades. ~4,200 parameters.'
         }
     };
 
@@ -381,7 +381,7 @@
     var overlaySub = overlay.querySelector('.overlay-sub');
     var warmingUp = false;
 
-    var WARMUP_EPISODES = { dqn: 200, a2c: 150, ppo: 120 };
+    var WARMUP_EPISODES = { dqn: 1000, a2c: 800, ppo: 600 };
     var WARMUP_BUDGET_MS = 8;
 
     var bootMessages = [

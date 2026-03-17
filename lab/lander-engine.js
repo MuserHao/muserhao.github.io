@@ -299,15 +299,15 @@ const LanderEngine = (function () {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (result === 'landed') {
-                // Landing bonus — scaled to match per-frame rewards
-                const uprightBonus = Math.max(0, 2 * (1 - Math.abs(lander.angle) / (20 * Math.PI / 180)));
-                const gentleBonus = Math.max(0, 2 * (1 - Math.abs(lander.vy) / 1.5));
-                reward = 10 + uprightBonus + gentleBonus;
+                // Landing bonus — clear signal but not so large it destabilizes critics
+                const uprightBonus = Math.max(0, 3 * (1 - Math.abs(lander.angle) / (20 * Math.PI / 180)));
+                const gentleBonus = Math.max(0, 3 * (1 - Math.abs(lander.vy) / 1.5));
+                reward = 20 + uprightBonus + gentleBonus;
             } else if (result === 'crash' || result === 'oob') {
-                // Graduated crash penalty — soft crashes near pad are less punishing
+                // Graduated crash penalty
                 const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
                 const distPenalty = Math.min(1, dist * 2);
-                reward = -2 - 3 * Math.min(1, speed / 4) - 5 * distPenalty;
+                reward = -3 - 4 * Math.min(1, speed / 4) - 3 * distPenalty;
             } else if (result === 'timeout') {
                 reward = -3;
             } else {
