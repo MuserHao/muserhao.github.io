@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RL Lunar Lander | Fun Lab | Hao Xin</title>
+    <meta name="description" content="Land a spacecraft using 3 RL algorithms that learn in real time: DQN, Actor-Critic (A2C), and PPO. Watch the actor-critic split in action — 807 parameters, zero GPUs.">
+    <meta name="author" content="Hao Xin">
+    <link rel="canonical" href="https://muserhao.github.io/lab/lander.html">
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="RL Lunar Lander | Hao Xin">
+    <meta property="og:description" content="Land a spacecraft using DQN, A2C, and PPO that learn in real time in your browser.">
+    <meta property="og:url" content="https://muserhao.github.io/lab/lander.html">
+    <meta property="og:site_name" content="Hao Xin">
+    <meta property="og:image" content="https://muserhao.github.io/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="RL Lunar Lander | Hao Xin">
+    <meta name="twitter:description" content="Land a spacecraft using DQN, A2C, and PPO that learn in real time.">
+    <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="lab.css">
+    <link rel="stylesheet" href="lander.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script>
+        (function(){document.documentElement.setAttribute('data-theme','dark')})();
+    </script>
+</head>
+<body class="lab-page">
+    <!-- SVG liquid distortion filter -->
+    <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
+        <defs>
+            <filter id="liquid-distort" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence id="liquid-turbulence" type="fractalNoise"
+                    baseFrequency="0.006 0.009" numOctaves="4" seed="3" result="noise"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise"
+                    scale="50" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="grid-bg"></div>
+
+    <div class="gradient-orbs" aria-hidden="true">
+        <div class="orb orb-cyan"></div>
+        <div class="orb orb-pink"></div>
+        <div class="orb orb-purple"></div>
+        <div class="orb orb-gold"></div>
+        <div class="orb orb-teal"></div>
+    </div>
+
+    <div id="particles"></div>
+
+    <header>
+        <nav>
+            <a href="../index.html" class="logo" aria-label="HAO.XIN">
+            </a>
+            <ul class="nav-links">
+                <li><a href="../index.html" class="nav-link">HOME</a></li>
+                <li><a href="../blog/index.html" class="nav-link">BLOG</a></li>
+                <li><a href="index.html" class="nav-link active">FUN LAB</a></li>
+                <li>
+                    <button class="theme-toggle" aria-label="Toggle theme">
+                        <span class="theme-toggle-icon-light">&#9728;</span>
+                        <span class="theme-toggle-slider"></span>
+                        <span class="theme-toggle-icon-dark">&#9790;</span>
+                    </button>
+                </li>
+            </ul>
+            <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </nav>
+    </header>
+
+    <main class="lander-main">
+        <section class="lander-hero">
+            <h1 class="lander-title">RL LUNAR LANDER</h1>
+            <p class="lander-subtitle">Watch Actor-Critic AI learn to land. DQN &rarr; A2C &rarr; PPO.</p>
+        </section>
+
+        <!-- Algorithm tabs -->
+        <div class="algo-tabs" role="tablist">
+            <button class="algo-tab active" role="tab" data-algo="dqn">DQN</button>
+            <button class="algo-tab" role="tab" data-algo="a2c">A2C</button>
+            <button class="algo-tab" role="tab" data-algo="ppo">PPO</button>
+        </div>
+
+        <!-- Train controls -->
+        <div class="train-controls">
+            <button class="train-btn" id="train-btn">
+                <i class="fas fa-bolt"></i> AUTO-TRAIN
+            </button>
+            <select class="train-select" id="train-episodes">
+                <option value="50">50 episodes</option>
+                <option value="100" selected>100 episodes</option>
+                <option value="200">200 episodes</option>
+                <option value="500">500 episodes</option>
+            </select>
+            <span class="train-progress" id="train-progress"></span>
+        </div>
+
+        <!-- HUD bar -->
+        <div class="lander-hud">
+            <span class="hud-item"><span class="hud-label">ALGO</span> <span id="hud-algo">DQN</span></span>
+            <span class="hud-item"><span class="hud-label">EPISODE</span> <span id="hud-episode">0</span></span>
+            <span class="hud-item"><span class="hud-label">LAND %</span> <span id="hud-landrate">0</span></span>
+            <span class="hud-item"><span class="hud-label">&epsilon;</span> <span id="hud-epsilon">1.00</span></span>
+            <span class="hud-item"><span class="hud-label">LEVEL</span> <span id="hud-level">EASY</span></span>
+        </div>
+
+        <!-- Game canvas -->
+        <div class="canvas-wrap">
+            <canvas id="lander-canvas"></canvas>
+            <div class="canvas-overlay" id="canvas-overlay">
+                <p>INITIALIZING NEURAL NETWORKS...</p>
+                <p class="overlay-sub">[ 0% ]</p>
+            </div>
+        </div>
+
+        <!-- Actor-Critic Visualization Panel -->
+        <div class="ac-panel" id="ac-panel">
+            <div class="ac-section ac-critic">
+                <h4 class="ac-heading">CRITIC: V(s)</h4>
+                <div class="critic-meter">
+                    <div class="critic-bar-bg">
+                        <div class="critic-bar" id="critic-bar"></div>
+                    </div>
+                    <span class="critic-value" id="critic-value">0.0</span>
+                </div>
+                <div class="critic-labels">
+                    <span class="critic-lo">BAD</span>
+                    <span class="critic-hi">GOOD</span>
+                </div>
+            </div>
+            <div class="ac-section ac-actor">
+                <h4 class="ac-heading">ACTOR: &pi;(a|s)</h4>
+                <div class="action-probs">
+                    <div class="action-row"><span class="action-name">NOOP</span><div class="action-bar-bg"><div class="action-bar" id="action-bar-0"></div></div></div>
+                    <div class="action-row"><span class="action-name">MAIN</span><div class="action-bar-bg"><div class="action-bar" id="action-bar-1"></div></div></div>
+                    <div class="action-row"><span class="action-name">LEFT</span><div class="action-bar-bg"><div class="action-bar" id="action-bar-2"></div></div></div>
+                    <div class="action-row"><span class="action-name">RIGHT</span><div class="action-bar-bg"><div class="action-bar" id="action-bar-3"></div></div></div>
+                    <div class="action-row"><span class="action-name">ROT L</span><div class="action-bar-bg"><div class="action-bar" id="action-bar-4"></div></div></div>
+                    <div class="action-row"><span class="action-name">ROT R</span><div class="action-bar-bg"><div class="action-bar" id="action-bar-5"></div></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Algorithm info card -->
+        <div class="algo-info" id="algo-info">
+            <h3 class="algo-info-title" id="algo-info-title">Deep Q-Network (DQN)</h3>
+            <p class="algo-info-text" id="algo-info-text">
+                The same algorithm that learned Pong. A single neural network (8&rarr;48&rarr;6) estimates Q-values for each action. Uses Double DQN with a replay buffer and target network for stability. It's a solid baseline that visitors already know. 726 parameters. Expect landing improvement around 80&ndash;120 episodes.
+            </p>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <p class="footer-text">// built with caffeine and mass GPU hours</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="../shared.js"></script>
+    <script src="stars.js"></script>
+    <script src="lander-engine.js"></script>
+    <script src="lander-rl.js"></script>
+    <script src="lander-ui.js"></script>
+    <script>
+        // No colored particles on lab pages — stars.js handles the background
+    </script>
+</body>
+</html>

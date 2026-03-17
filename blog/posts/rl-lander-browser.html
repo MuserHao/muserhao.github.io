@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser | Hao Xin</title>
+    <meta name="description" content="How we built a Lunar Lander with DQN, A2C, and PPO in pure JavaScript -- 807 parameters, zero GPUs, and a live actor-critic visualization that makes the GAN-RL connection click.">
+    <meta name="author" content="Hao Xin">
+    <link rel="canonical" href="https://muserhao.github.io/blog/posts/rl-lander-browser.html">
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser">
+    <meta property="og:description" content="DQN, A2C, and PPO learn to land a spacecraft in pure JavaScript. A build log with live actor-critic visualization.">
+    <meta property="og:url" content="https://muserhao.github.io/blog/posts/rl-lander-browser.html">
+    <meta property="og:site_name" content="Hao Xin">
+    <meta property="og:image" content="https://muserhao.github.io/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="article:published_time" content="2026-03-16">
+    <meta property="article:author" content="Hao Xin">
+    <meta property="article:tag" content="Reinforcement Learning">
+    <meta property="article:tag" content="Actor-Critic">
+    <meta property="article:tag" content="PPO">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser">
+    <meta name="twitter:description" content="DQN, A2C, and PPO learn to land a spacecraft in pure JS. 807 parameters, zero GPUs.">
+    <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
+    <!-- JSON-LD Article -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Landing the Actor-Critic: DQN, A2C & PPO in the Browser",
+        "author": {"@type": "Person", "name": "Hao Xin", "url": "https://muserhao.github.io"},
+        "datePublished": "2026-03-16",
+        "description": "How we built a Lunar Lander with DQN, A2C, and PPO in pure JavaScript. A build log with live actor-critic visualization that makes the GAN-RL connection click.",
+        "url": "https://muserhao.github.io/blog/posts/rl-lander-browser.html",
+        "keywords": ["reinforcement learning", "actor-critic", "A2C", "PPO", "DQN", "lunar lander", "JavaScript", "browser ML", "RLHF"]
+    }
+    </script>
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="../blog.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+    <!-- KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+        });"></script>
+    <script>
+        (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+</head>
+<body>
+    <!-- SVG liquid distortion filter -->
+    <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
+        <defs>
+            <filter id="liquid-distort" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence id="liquid-turbulence" type="fractalNoise"
+                    baseFrequency="0.006 0.009" numOctaves="4" seed="3" result="noise"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise"
+                    scale="50" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="grid-bg"></div>
+
+    <!-- Floating gradient orbs -->
+    <div class="gradient-orbs" aria-hidden="true">
+        <div class="orb orb-cyan"></div>
+        <div class="orb orb-pink"></div>
+        <div class="orb orb-purple"></div>
+        <div class="orb orb-gold"></div>
+        <div class="orb orb-teal"></div>
+    </div>
+
+    <div id="particles"></div>
+
+    <header>
+        <nav>
+            <a href="../../index.html" class="logo" aria-label="HAO.XIN">
+            </a>
+            <ul class="nav-links">
+                <li><a href="../../index.html" class="nav-link">HOME</a></li>
+                <li><a href="../index.html" class="nav-link active">BLOG</a></li>
+                <li><a href="../../lab/index.html" class="nav-link">FUN LAB</a></li>
+                <li>
+                    <button class="theme-toggle" aria-label="Toggle theme">
+                        <span class="theme-toggle-icon-light">&#9728;</span>
+                        <span class="theme-toggle-slider"></span>
+                        <span class="theme-toggle-icon-dark">&#9790;</span>
+                    </button>
+                </li>
+            </ul>
+            <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </nav>
+    </header>
+
+    <main class="post-main">
+        <article>
+            <div class="post-header">
+                <div class="post-meta">
+                    <time class="blog-date" datetime="2026-03-16"><i class="fas fa-clock"></i> Mar 16, 2026</time>
+                    <span class="read-time"><i class="fas fa-book-open"></i> 20 min read</span>
+                </div>
+                <div class="blog-tags" style="justify-content: center; margin-bottom: 1.5rem;">
+                    <span class="blog-tag">RL</span>
+                    <span class="blog-tag">TUTORIAL</span>
+                </div>
+                <h1 class="post-title">Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser</h1>
+                <p class="post-subtitle">// 807 parameters, zero GPUs, and the visualization that makes RLHF click</p>
+                <div class="post-divider"></div>
+            </div>
+
+            <div class="post-content">
+
+<h2>01 // THE SETUP</h2>
+
+<p>
+After <a href="rl-pong-browser.html">building RL Pong</a> with Q-Learning, DQN, and REINFORCE, the natural next step was the algorithm family that actually runs the modern world: <strong>Actor-Critic methods</strong>. A2C is how DeepMind's agents learn. PPO is how ChatGPT was aligned via RLHF. And if you read <a href="gan-meets-rl.html">When GANs Meet RL</a>, you already know the punchline &mdash; the actor is the generator, the critic is the discriminator. Same adversarial game, different costume.
+</p>
+
+<p>
+Lunar Lander was the obvious vehicle. It fits the space theme, has intuitive physics anyone can understand (gravity goes down, thrust goes up), and the 6-action space is rich enough to show real behavioral differences between algorithms. Most importantly, the actor-critic split is <em>visually demonstrable</em>: you can watch the critic&rsquo;s confidence rise as the lander approaches the pad, and the actor concentrate probability mass onto main-thrust.
+</p>
+
+<p>
+The goal: implement DQN (baseline visitors know from Pong), A2C (the core teaching algorithm), and PPO (the modern standard) &mdash; all training live in the browser with a real-time actor-critic visualization panel.
+</p>
+
+<h2>02 // THE THREE ALGORITHMS</h2>
+
+<h3>DQN &mdash; The Baseline</h3>
+
+<p>
+DQN is the same Double DQN from Pong, scaled up to 6 actions. One network estimates $Q(s, a)$ for all actions; the agent picks $\arg\max_a Q(s, a)$ (with $\epsilon$-greedy exploration). The target network stabilizes learning:
+</p>
+
+$$Q(s, a) \leftarrow r + \gamma \, Q_{\text{target}}(s', \arg\max_{a'} Q_{\text{online}}(s', a'))$$
+
+<p>
+Architecture: MiniNet(8, 48, 6) = <strong>726 parameters</strong>. It works, but it only learns <em>values</em> &mdash; there&rsquo;s no explicit policy. This is where actor-critic enters.
+</p>
+
+<h3>A2C &mdash; Advantage Actor-Critic</h3>
+
+<p>
+A2C splits the brain in two. The <strong>Actor</strong> $\pi_\theta(a|s)$ is a policy network that outputs a probability distribution over actions. The <strong>Critic</strong> $V_\phi(s)$ is a value network that estimates how good the current state is. The key insight: instead of using raw returns as in REINFORCE, we use the <strong>advantage</strong>:
+</p>
+
+$$A(s, a) = r + \gamma \, V_\phi(s') - V_\phi(s)$$
+
+<p>
+This is the TD (temporal difference) advantage &mdash; &ldquo;how much better was this outcome than what the critic expected?&rdquo; A positive advantage means &ldquo;do more of this,&rdquo; negative means &ldquo;do less.&rdquo; The actor&rsquo;s policy gradient becomes:
+</p>
+
+$$\nabla_\theta J \approx \nabla_\theta \log \pi_\theta(a|s) \cdot A(s, a)$$
+
+<p>
+And the critic trains via MSE on the TD target:
+</p>
+
+$$\mathcal{L}_{\text{critic}} = \Big( r + \gamma \, V_\phi(s') - V_\phi(s) \Big)^2$$
+
+<p>
+Two networks, two loss functions, one elegant loop. Actor: MiniNet(8, 32, 6) = 486 params. Critic: MiniNet(8, 32, 1) = 321 params. <strong>Total: 807 parameters.</strong>
+</p>
+
+<h3>PPO &mdash; Proximal Policy Optimization</h3>
+
+<p>
+PPO is A2C with guardrails. The problem with vanilla policy gradients: a single bad update can destroy a good policy. PPO&rsquo;s fix is the <strong>clipped surrogate objective</strong>:
+</p>
+
+$$L^{\text{PPO}} = \mathbb{E} \Big[ \min\!\big( r_t(\theta) \, A_t, \; \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \, A_t \big) \Big]$$
+
+<p>
+where the importance ratio $r_t(\theta) = \pi_\theta(a_t|s_t) / \pi_{\theta_{\text{old}}}(a_t|s_t)$ measures how much the policy has changed. If the ratio drifts too far from 1 (policy changed too much), the clipping kicks in and stops the gradient. This is why PPO is the algorithm of choice for RLHF &mdash; it makes large policy changes safely.
+</p>
+
+<p>
+PPO also uses <strong>Generalized Advantage Estimation (GAE)</strong> instead of single-step TD:
+</p>
+
+$$\hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda)^l \, \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$$
+
+<p>
+The $\lambda$ parameter (0.95 here) interpolates between high-bias/low-variance (TD, $\lambda=0$) and low-bias/high-variance (Monte Carlo, $\lambda=1$). Same architecture as A2C: <strong>807 parameters</strong>.
+</p>
+
+<h2>03 // THE PHYSICS</h2>
+
+<p>
+Everything runs in an 800&times;600 logical coordinate space (same as Pong). The physics are deliberately simple &mdash; just enough to make landing non-trivial:
+</p>
+
+<ul>
+    <li><strong>Gravity:</strong> 0.05 px/frame&sup2; downward (gentle moon gravity)</li>
+    <li><strong>Main thrust:</strong> 0.12 px/frame&sup2; along the lander&rsquo;s up axis</li>
+    <li><strong>Side thrusters:</strong> 0.04 px/frame&sup2; for lateral translation</li>
+    <li><strong>Rotation:</strong> &plusmn;0.04 rad/frame, with angular damping of 0.98</li>
+    <li><strong>Wind gusts:</strong> random, max 0.02 px/frame&sup2; (enabled at curriculum level 3)</li>
+</ul>
+
+<p>
+Terrain is generated via midpoint displacement &mdash; a fractal algorithm that produces realistic mountainous profiles. An 80px-wide landing pad is placed randomly in the middle third of the terrain, painted neon green with glow.
+</p>
+
+<p>
+The lander itself is a triangle with two legs, rendered in neon cyan with animated thrust flames (particle system). Landing criteria: both leg tips on pad, $|\theta| < 15°$, $|v_y| < 1.0$, $|v_x| < 0.5$.
+</p>
+
+<pre><code class="language-javascript">// 6 discrete actions
+const ACTIONS = {
+    NOOP: 0,
+    THRUST_MAIN: 1,
+    THRUST_LEFT: 2,
+    THRUST_RIGHT: 3,
+    ROTATE_LEFT: 4,
+    ROTATE_RIGHT: 5
+};</code></pre>
+
+<h2>04 // STATE AND REWARD</h2>
+
+<p>
+The state is an 8-dimensional vector, all normalized to roughly [-1, 1]:
+</p>
+
+<pre><code class="language-javascript">const state = [
+    (lander.x - padCx) / W,      // pad-relative X
+    (lander.y - padCy) / H,      // pad-relative Y
+    lander.vx / 5,                // normalized horizontal velocity
+    lander.vy / 5,                // normalized vertical velocity
+    lander.angle / Math.PI,       // normalized angle
+    lander.angVel / 0.2,          // normalized angular velocity
+    leftLegContact,               // binary: left leg on pad
+    rightLegContact               // binary: right leg on pad
+];</code></pre>
+
+<p>
+The reward function went through several iterations (sound familiar from Pong?). The final version:
+</p>
+
+<ul>
+    <li><strong>Successful landing:</strong> +100 to +140 (with bonuses for uprightness and gentleness)</li>
+    <li><strong>Crash / out of bounds:</strong> &minus;100</li>
+    <li><strong>Timeout (500 steps):</strong> &minus;50</li>
+    <li><strong>Per frame:</strong> approach-pad bonus (closer = better), angle penalty, speed penalty near ground, time penalty (&minus;0.05), thrust penalty (fuel cost)</li>
+</ul>
+
+<p>
+The per-frame reward shaping is critical. Without the approach bonus, agents have no gradient signal until they accidentally land &mdash; which in a 6-action continuous-physics environment almost never happens. The thrust penalty prevents &ldquo;hover forever&rdquo; strategies. The angle penalty biases toward upright descent.
+</p>
+
+<h2>05 // THE TRAINING LOOP</h2>
+
+<p>
+Lunar Lander is single-player, so there&rsquo;s no opponent to calibrate against. Instead, difficulty comes from <strong>curriculum learning via spawn randomization</strong>:
+</p>
+
+<ul>
+    <li><strong>Level 0 (Easy):</strong> spawn close to pad, low altitude, no wind</li>
+    <li><strong>Level 1 (Medium):</strong> wider spawn offset, higher altitude</li>
+    <li><strong>Level 2 (Hard):</strong> large offsets, high altitude, initial velocity</li>
+    <li><strong>Level 3 (Full):</strong> everything above plus wind gusts</li>
+</ul>
+
+<p>
+The level advances automatically when the rolling landing rate (last 20 episodes) exceeds 60%. This is the same principle as the adaptive bot difficulty in Pong &mdash; the agent always faces an appropriate challenge.
+</p>
+
+<p>
+Auto-train runs 200 physics steps per animation frame, with terrain regenerated each episode. The warmup boot trains DQN for 150 episodes, A2C for 100, and PPO for 80 &mdash; all in non-blocking chunks that keep the page responsive.
+</p>
+
+<h2>06 // ALGORITHM-SPECIFIC LESSONS</h2>
+
+<h3>DQN: Solid but Slow</h3>
+
+<p>
+DQN is the reliable workhorse. With 726 parameters and Double DQN, it eventually learns a decent landing strategy &mdash; but it takes 80&ndash;120 episodes to reach 50% landing rate. The replay buffer (10K transitions) and per-step $\epsilon$ decay are essential; without them, the Q-values oscillate wildly. DQN&rsquo;s biggest weakness here: it has no notion of a &ldquo;policy&rdquo; &mdash; it only knows values, so its behavior can be jerky as Q-values shift between actions.
+</p>
+
+<h3>A2C: Fastest Learner</h3>
+
+<p>
+A2C surprised us by being the fastest to learn. The per-step TD updates give it dense gradient signal &mdash; every single frame, the actor gets feedback on whether its action was better than the critic expected. The critic also learns very quickly because the value function for Lunar Lander is relatively smooth (altitude and distance to pad are strongly correlated with outcome). Typical convergence: 40&ndash;60 episodes to 50% landing rate.
+</p>
+
+<p>
+The entropy bonus ($\beta = 0.02$) is critical. Without it, A2C collapses to a deterministic policy within 20 episodes &mdash; usually one that always fires the main thruster, which is locally optimal but can&rsquo;t handle lateral corrections.
+</p>
+
+<h3>PPO: Most Stable</h3>
+
+<p>
+PPO has the smoothest learning curve. Where A2C occasionally has bad episodes that briefly tank the policy, PPO&rsquo;s clipping prevents catastrophic updates. The 128-step trajectories with 3 epochs of mini-batch updates give it excellent sample efficiency. Typical convergence: 30&ndash;50 episodes to 50% landing rate, with less variance than A2C.
+</p>
+
+<p>
+The clipping is visually observable: during early training, A2C&rsquo;s action probabilities swing wildly between frames, while PPO&rsquo;s change smoothly and gradually. This is exactly the property that makes PPO suitable for RLHF &mdash; you don&rsquo;t want your language model&rsquo;s behavior to change drastically between updates.
+</p>
+
+<h3>The Scoreboard</h3>
+
+<table style="width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:0.85rem; margin:1.5rem 0;">
+    <thead>
+        <tr style="border-bottom:2px solid var(--border-subtle);">
+            <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Algorithm</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Params</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">~Episodes to 50%</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Stability</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr style="border-bottom:1px solid var(--border-subtle);">
+            <td style="padding:0.5rem;">DQN</td>
+            <td style="text-align:center; padding:0.5rem;">726</td>
+            <td style="text-align:center; padding:0.5rem;">80&ndash;120</td>
+            <td style="text-align:center; padding:0.5rem;">Medium</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border-subtle);">
+            <td style="padding:0.5rem;">A2C</td>
+            <td style="text-align:center; padding:0.5rem;">807</td>
+            <td style="text-align:center; padding:0.5rem;">40&ndash;60</td>
+            <td style="text-align:center; padding:0.5rem;">Variable</td>
+        </tr>
+        <tr>
+            <td style="padding:0.5rem;">PPO</td>
+            <td style="text-align:center; padding:0.5rem;">807</td>
+            <td style="text-align:center; padding:0.5rem;">30&ndash;50</td>
+            <td style="text-align:center; padding:0.5rem;">High</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>07 // SEEING ACTOR-CRITIC</h2>
+
+<p>
+This is the teaching payoff. When you select A2C or PPO, a visualization panel appears below the game canvas with two components:
+</p>
+
+<p>
+<strong>The Critic Confidence Meter:</strong> a vertical bar that shows $V(s)$ in real time. It goes from red (low value &mdash; &ldquo;we&rsquo;re going to crash&rdquo;) through yellow to green (high value &mdash; &ldquo;we&rsquo;re about to land&rdquo;). Watch it during a trained agent&rsquo;s descent: it starts low, rises as the lander aligns with the pad, and spikes green right before touchdown.
+</p>
+
+<p>
+<strong>The Actor Action Probabilities:</strong> a 6-bar chart showing $\pi(a|s)$ for each action. During early training, all bars are roughly equal (random policy). As the agent learns, you see probability mass concentrate: main-thrust dominates during descent, rotation adjusts for wind, NOOP appears during stable glides. The top-probability action glows green.
+</p>
+
+<p>
+If you&rsquo;ve read the <a href="gan-meets-rl.html">GAN-RL blog post</a>, this should feel viscerally familiar. The actor is the generator &mdash; it produces actions (samples). The critic is the discriminator &mdash; it evaluates states (scores). The actor tries to take actions that the critic approves of. The critic tries to accurately predict outcomes. Same adversarial game, same convergent dynamic.
+</p>
+
+<p>
+In RLHF for LLMs, the actor is the language model (generating tokens), and the critic is the reward model (scoring responses). PPO is the training algorithm. Every piece of this visualization maps directly onto how ChatGPT was trained.
+</p>
+
+<h2>08 // TECHNICAL DETAILS</h2>
+
+<h3>trainPPO() &mdash; The New MiniNet Method</h3>
+
+<p>
+The PPO clipped objective requires a new training method on MiniNet. The key difference from <code>trainPG()</code>: we need the old policy&rsquo;s probabilities to compute the importance ratio.
+</p>
+
+<pre><code class="language-javascript">// Importance ratio for the taken action
+const ratio = newP / oldP;
+
+// Clipped surrogate
+const clipped = Math.max(1 - clipEps, Math.min(1 + clipEps, ratio));
+const surr1 = ratio * advantage;
+const surr2 = clipped * advantage;
+
+// Gradient flows through the binding term
+const useClipped = (surr1 > surr2) ? 1 : 0;</code></pre>
+
+<p>
+When the advantage is positive (action was good), the ratio is clipped from above at $1 + \epsilon$ &mdash; the policy can&rsquo;t increase the probability of this action too much. When the advantage is negative, it&rsquo;s clipped from below at $1 - \epsilon$. This creates a &ldquo;trust region&rdquo; around the old policy.
+</p>
+
+<h3>GAE Implementation</h3>
+
+<p>
+GAE computes advantages in a single backward pass over the trajectory:
+</p>
+
+<pre><code class="language-javascript">let gae = 0;
+for (let t = T - 1; t >= 0; t--) {
+    const delta = reward[t] + gamma * V(s[t+1]) - V(s[t]);
+    gae = delta + gamma * lambda * gae;
+    advantages[t] = gae;
+    returns[t] = gae + values[t];
+}</code></pre>
+
+<p>
+Each advantage is a weighted sum of all future TD errors, with exponential decay controlled by $\gamma \lambda$. At $\lambda = 0$ you get single-step TD (high bias, low variance). At $\lambda = 1$ you get Monte Carlo returns (low bias, high variance). The sweet spot at 0.95 gives smooth advantage estimates that help PPO learn stably.
+</p>
+
+<h3>Parameter Counts</h3>
+
+<p>
+Every parameter is a Float64 in typed arrays &mdash; no framework, no tensors, just arithmetic:
+</p>
+
+<ul>
+    <li><strong>DQN:</strong> MiniNet(8, 48, 6) &rarr; (8&times;48 + 48) + (48&times;6 + 6) = 384 + 48 + 288 + 6 = <strong>726</strong></li>
+    <li><strong>A2C Actor:</strong> MiniNet(8, 32, 6) &rarr; (8&times;32 + 32) + (32&times;6 + 6) = 256 + 32 + 192 + 6 = <strong>486</strong></li>
+    <li><strong>A2C/PPO Critic:</strong> MiniNet(8, 32, 1) &rarr; (8&times;32 + 32) + (32&times;1 + 1) = 256 + 32 + 32 + 1 = <strong>321</strong></li>
+    <li><strong>A2C/PPO Total:</strong> 486 + 321 = <strong>807</strong></li>
+</ul>
+
+<h2>09 // TRY IT YOURSELF</h2>
+
+<p>
+<a href="../../lab/lander.html" style="color:var(--neon-cyan); text-decoration:underline;"><strong>&rarr; Play RL Lunar Lander</strong></a>
+</p>
+
+<p>
+Start with DQN (the algorithm you know from Pong). Hit AUTO-TRAIN for 100 episodes and watch the landing rate climb. Then switch to A2C &mdash; notice how the Actor-Critic panel appears. Train it and watch the critic meter track the lander&rsquo;s altitude. Finally, try PPO and compare the learning curves. The action probability bars tell the whole story.
+</p>
+
+<p>
+All three agents persist in localStorage. Refresh the page and they keep their learned weights. Clear your browser data to start fresh.
+</p>
+
+<h2>10 // REFERENCES</h2>
+
+<div class="references">
+    <ol class="ref-list">
+        <li id="ref-1">
+            <span class="ref-authors">Mnih, V., Kavukcuoglu, K., Silver, D., et al.</span>
+            <span class="ref-title">Human-level control through deep reinforcement learning</span>
+            <span class="ref-venue">Nature, 2015</span>
+            <a href="https://doi.org/10.1038/nature14236" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+        </li>
+        <li id="ref-2">
+            <span class="ref-authors">Mnih, V., Badia, A. P., Mirza, M., et al.</span>
+            <span class="ref-title">Asynchronous Methods for Deep Reinforcement Learning (A3C)</span>
+            <span class="ref-venue">ICML, 2016</span>
+            <a href="https://doi.org/10.48550/arXiv.1602.01783" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+        </li>
+        <li id="ref-3">
+            <span class="ref-authors">Schulman, J., Wolski, F., Dhariwal, P., Radford, A., Klimov, O.</span>
+            <span class="ref-title">Proximal Policy Optimization Algorithms</span>
+            <span class="ref-venue">arXiv:1707.06347, 2017</span>
+            <a href="https://doi.org/10.48550/arXiv.1707.06347" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+        </li>
+        <li id="ref-4">
+            <span class="ref-authors">Schulman, J., Moritz, P., Levine, S., Jordan, M., Abbeel, P.</span>
+            <span class="ref-title">High-Dimensional Continuous Control Using Generalized Advantage Estimation</span>
+            <span class="ref-venue">ICLR, 2016</span>
+            <a href="https://doi.org/10.48550/arXiv.1506.02438" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+        </li>
+        <li id="ref-5">
+            <span class="ref-authors">Sutton, R. S. &amp; Barto, A. G.</span>
+            <span class="ref-title">Reinforcement Learning: An Introduction (2nd ed.)</span>
+            <span class="ref-venue">MIT Press, 2018</span>
+        </li>
+        <li id="ref-6">
+            <span class="ref-authors">Ouyang, L., Wu, J., Jiang, X., et al.</span>
+            <span class="ref-title">Training language models to follow instructions with human feedback (InstructGPT)</span>
+            <span class="ref-venue">NeurIPS, 2022</span>
+            <a href="https://doi.org/10.48550/arXiv.2203.02155" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+        </li>
+        <li id="ref-7">
+            <span class="ref-authors">Hao Xin</span>
+            <span class="ref-title">When GANs Meet RL: The Adversarial Game Behind Generative AI</span>
+            <span class="ref-venue">Blog post, 2026</span>
+            <a href="gan-meets-rl.html" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+        </li>
+    </ol>
+</div>
+
+            </div>
+        </article>
+
+        <div class="post-nav">
+            <a href="rl-pong-browser.html"><i class="fas fa-arrow-left"></i> TEACHING PONG TO PLAY ITSELF</a>
+            <a href="../index.html">BACK TO BLOG <i class="fas fa-arrow-right"></i></a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <p class="footer-text">// built with caffeine and mass GPU hours</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="../../shared.js"></script>
+    <script>
+        createParticles(30);
+
+        // ── Reading progress bar ──
+        const bar = document.createElement('div');
+        bar.id = 'reading-progress';
+        document.body.prepend(bar);
+        window.addEventListener('scroll', () => {
+            const doc = document.documentElement;
+            const pct = doc.scrollTop / (doc.scrollHeight - doc.clientHeight) * 100;
+            bar.style.width = Math.min(pct, 100) + '%';
+        }, { passive: true });
+
+        // ── Copy buttons on code blocks ──
+        document.querySelectorAll('.post-content pre').forEach(pre => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pre-wrapper';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = 'COPY';
+            btn.addEventListener('click', () => {
+                navigator.clipboard.writeText(pre.innerText).then(() => {
+                    btn.textContent = 'COPIED';
+                    btn.classList.add('copied');
+                    setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 2000);
+                });
+            });
+            wrapper.appendChild(btn);
+        });
+    </script>
+</body>
+</html>
