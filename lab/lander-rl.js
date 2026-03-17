@@ -149,9 +149,9 @@ const LanderRL = (function () {
         for (let k = 0; k < nOut; k++) probs[k] = exps[k] / sumExp;
 
         // Importance ratio for the taken action
-        const oldP = Math.max(oldProbs[actionIdx], 1e-10);
-        const newP = Math.max(probs[actionIdx], 1e-10);
-        const ratio = newP / oldP;
+        const oldP = Math.max(oldProbs[actionIdx], 1e-8);
+        const newP = Math.max(probs[actionIdx], 1e-8);
+        const ratio = Math.min(10, newP / oldP); // cap to prevent Inf
 
         // Clipped surrogate
         const clipped = Math.max(1 - clipEps, Math.min(1 + clipEps, ratio));
@@ -317,7 +317,7 @@ const LanderRL = (function () {
                 const { out: qTarget } = this.targetNet.forward(sNext);
                 maxQ = qTarget[bestAction];
             }
-            const targetVal = r + this.gamma * maxQ;
+            const targetVal = Math.max(-20, Math.min(20, r + this.gamma * maxQ));
 
             const { out: qCur } = this.net.forward(s);
             const targetArr = new Float64Array(qCur);
@@ -467,6 +467,7 @@ const LanderRL = (function () {
         if (this.nStepBuffer.length > 0) {
             this._trainBatch();
         }
+        this.nStepBuffer = []; // ensure clean slate
         this.episodes++;
         this.totalGames++;
         if (result === 'landed') this.landings++;
@@ -518,10 +519,10 @@ const LanderRL = (function () {
         this.gamma = 0.99;
         this.lam = 0.95;         // GAE lambda
         this.clipEps = 0.2;
-        this.actorLr = 0.005;
-        this.criticLr = 0.01;
+        this.actorLr = 0.003;
+        this.criticLr = 0.008;
         this.entropyCoef = 0.04;
-        this.epochs = 3;
+        this.epochs = 2;
         this.trajectoryLen = 64;
         this.epsilon = 0.15;
         this.epsilonDecay = 0.999;
@@ -626,6 +627,11 @@ const LanderRL = (function () {
     };
 
     PPOAgent.prototype.onEpisodeEnd = function (result) {
+        // Only train when trajectory has enough data for stable updates
+        // Done flags within trajectory handle episode boundaries correctly in GAE
+        if (this.trajectory.length >= this.trajectoryLen) {
+            this.trainOnTrajectory();
+        }
         this.episodes++;
         this.totalGames++;
         if (result === 'landed') this.landings++;

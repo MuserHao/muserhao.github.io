@@ -299,53 +299,56 @@ const LanderEngine = (function () {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (result === 'landed') {
-                // Landing bonus: base 100 + uprightness + gentleness
-                const uprightBonus = Math.max(0, 20 * (1 - Math.abs(lander.angle) / (20 * Math.PI / 180)));
-                const gentleBonus = Math.max(0, 20 * (1 - Math.abs(lander.vy) / 1.5));
-                reward = 100 + uprightBonus + gentleBonus;
+                // Landing bonus — scaled to match per-frame rewards
+                const uprightBonus = Math.max(0, 2 * (1 - Math.abs(lander.angle) / (20 * Math.PI / 180)));
+                const gentleBonus = Math.max(0, 2 * (1 - Math.abs(lander.vy) / 1.5));
+                reward = 10 + uprightBonus + gentleBonus;
             } else if (result === 'crash' || result === 'oob') {
                 // Graduated crash penalty — soft crashes near pad are less punishing
                 const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
-                const distPenalty = Math.min(1, dist * 2); // 0 at pad, 1 when far
-                reward = -20 - 30 * Math.min(1, speed / 4) - 50 * distPenalty;
+                const distPenalty = Math.min(1, dist * 2);
+                reward = -2 - 3 * Math.min(1, speed / 4) - 5 * distPenalty;
             } else if (result === 'timeout') {
-                reward = -30;
+                reward = -3;
             } else {
                 // Dense per-frame reward — reward controlled approach
                 const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
-                const closeness = Math.max(0, 1 - dist / 0.8); // 0 when far, 1 at pad
+                const closeness = Math.max(0, 1 - dist / 0.8);
 
-                // 1. Position reward: being close to pad (always positive near pad)
-                reward = closeness * 1.0;
+                // 1. Position reward: being close to pad
+                reward = closeness * 0.4;
 
-                // 2. CRITICAL: reward being close AND slow simultaneously
-                //    This teaches braking — you only get the big reward for controlled approach
-                const controlBonus = closeness * Math.max(0, 3 - speed) * 0.5;
-                reward += controlBonus;
+                // 2. Controlled approach: close AND slow (teaches braking)
+                reward += closeness * Math.max(0, 3 - speed) * 0.3;
 
-                // 3. Upright bonus (scaled by closeness — matters more near ground)
+                // 3. Upright bonus (matters more near ground)
                 const uprightness = 1 - Math.abs(lander.angle) / Math.PI;
-                reward += uprightness * 0.3 * (0.5 + closeness * 0.5);
+                reward += uprightness * 0.15 * (0.5 + closeness * 0.5);
 
-                // 4. Velocity toward pad when far (only helpful when not near pad)
+                // 4. Velocity toward pad when far away
                 if (closeness < 0.5) {
                     const vTowardPadX = dx !== 0 ? -Math.sign(dx) * lander.vx : 0;
                     const vTowardPadY = dy !== 0 ? -Math.sign(dy) * lander.vy : 0;
-                    reward += Math.max(0, vTowardPadX + vTowardPadY) * 0.2;
+                    reward += Math.max(0, vTowardPadX + vTowardPadY) * 0.3;
                 }
 
-                // 5. Near-pad slow bonus: huge reward for being very close and very slow
+                // 5. Near-pad slow bonus: strong reward for almost-landing state
                 if (closeness > 0.7 && speed < 2.0) {
-                    reward += 3.0;
+                    reward += 1.0;
                     if (speed < 1.0 && uprightness > 0.8) {
-                        reward += 5.0;  // almost-landing reward
+                        reward += 2.0;
                     }
                 }
 
-                // 6. Small time + fuel penalty
-                reward -= 0.02;
-                if (thrustMain) reward -= 0.02;
-                if (thrustLeft || thrustRight) reward -= 0.01;
+                // 6. Altitude penalty — discourages flying upward/away
+                if (lander.y < padCy - 100) {
+                    reward -= (padCy - 100 - lander.y) / H * 0.3;
+                }
+
+                // 7. Small time + fuel penalty
+                reward -= 0.01;
+                if (thrustMain) reward -= 0.01;
+                if (thrustLeft || thrustRight) reward -= 0.005;
             }
 
             // Build 8D state
