@@ -343,8 +343,48 @@ We added a second hidden layer: <code>MiniNet2(8, 48, 32, 6)</code>. The extra l
 <strong>Lesson:</strong> at this scale, you hit the representation bottleneck before the data bottleneck. A 1,000-parameter single-layer network can&rsquo;t represent the value function accurately enough for gradient-based learning to work. Two layers with the same total parameters performs dramatically better because function composition is more expressive than function width.
 </p>
 
+<h3>Iteration 5: Biased exploration + reward scaling (30% DQN, 18% A2C, 22% PPO)</h3>
+
 <p>
-For reference, OpenAI Gym&rsquo;s Lunar Lander benchmark uses 2-layer networks with 64 neurons each (~8,000 parameters) and trains for 1,000+ episodes with a GPU. We&rsquo;re doing it in the browser with ~2,000 parameters and a warmup of 500 episodes. The agents won&rsquo;t land every time, but they <em>visibly</em> improve &mdash; and that&rsquo;s the teaching point.
+Two final insights pushed the numbers up dramatically.
+</p>
+
+<p>
+<strong>Biased exploration.</strong> When the agent explores randomly ($\epsilon$-greedy), it picks uniformly from 6 actions. THRUST_MAIN fires 17% of the time. But hovering requires thrust 27% of the time (gravity 0.04 / thrust 0.15). <em>Random exploration is biased against the correct behavior.</em> The agent spends hundreds of episodes failing before it accidentally discovers that firing thrust is essential.
+</p>
+
+<p>
+Fix: weight THRUST_MAIN at 40% of random actions. This is <strong>not cheating</strong> &mdash; it&rsquo;s an informed prior. We know the lander needs thrust to fight gravity; we&rsquo;re just telling the exploration policy. The learned policy discovers the optimal thrust timing on its own.
+</p>
+
+<pre><code class="language-javascript">// Biased random action — THRUST_MAIN gets 40%, others 12% each
+function biasedRandomAction() {
+    var r = Math.random();
+    if (r < 0.40) return 1; // THRUST_MAIN
+    var others = [0, 2, 3, 4, 5];
+    return others[Math.floor((r - 0.40) / 0.12)];
+}</code></pre>
+
+<p>
+<strong>Reward scaling for on-policy methods.</strong> Even with normalized rewards (terminal &plusmn;20, per-frame &plusmn;3), the 7&times; ratio still caused critic oscillation in A2C and PPO. DQN was fine because the replay buffer averages over thousands of transitions. Fix: multiply rewards by 0.1 before passing to A2C/PPO critics. DQN keeps raw rewards.
+</p>
+
+<p>
+<strong>Combined effect, averaged over 3 trials at 1,000 episodes:</strong>
+</p>
+
+<ul>
+    <li><strong>DQN: 30%</strong> (range 8&ndash;52%) &mdash; replay buffer + biased exploration</li>
+    <li><strong>A2C: 18%</strong> (range 16&ndash;21%) &mdash; finally consistent</li>
+    <li><strong>PPO: 22%</strong> (range 21&ndash;23%) &mdash; <em>the most consistent algorithm</em></li>
+</ul>
+
+<p>
+PPO went from 1% to 22% and became the most reliable learner, with only 2% variance across trials. This is exactly what the theory predicts: PPO&rsquo;s clipping prevents catastrophic updates, so once it finds a decent policy, it never loses it. A2C is faster to find good policies but can lose them to a bad gradient step. DQN has the highest ceiling (52%) but the widest variance (8&ndash;52%) depending on replay buffer composition.
+</p>
+
+<p>
+For reference, OpenAI Gym&rsquo;s Lunar Lander benchmark uses 2-layer networks with 64 neurons each (~8,000 parameters) and trains for 1,000+ episodes with a GPU. We&rsquo;re doing it in the browser with ~4,200 parameters and pure JavaScript backprop. The agents land 20&ndash;30% of the time on easy difficulty &mdash; not human-level, but <em>visibly improving</em>, which is the teaching point.
 </p>
 
 <h2>05 // THE TRAINING LOOP THAT TOOK THREE TRIES</h2>
@@ -466,21 +506,21 @@ We made PPO&rsquo;s training frequency worse by accident: our first version flus
     <tbody>
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">DQN</td>
-            <td style="text-align:center; padding:0.5rem;">~2,000</td>
-            <td style="text-align:center; padding:0.5rem;">~6%</td>
-            <td style="text-align:center; padding:0.5rem;">Consistent (replay buffer)</td>
+            <td style="text-align:center; padding:0.5rem;">~2,200</td>
+            <td style="text-align:center; padding:0.5rem;">~30% (8&ndash;52%)</td>
+            <td style="text-align:center; padding:0.5rem;">High ceiling, variable</td>
         </tr>
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">A2C</td>
-            <td style="text-align:center; padding:0.5rem;">~4,000</td>
-            <td style="text-align:center; padding:0.5rem;">~5% (up to 12%)</td>
-            <td style="text-align:center; padding:0.5rem;">Variable (reward-sensitive)</td>
+            <td style="text-align:center; padding:0.5rem;">~4,200</td>
+            <td style="text-align:center; padding:0.5rem;">~18% (16&ndash;21%)</td>
+            <td style="text-align:center; padding:0.5rem;">Fast but sensitive</td>
         </tr>
         <tr>
             <td style="padding:0.5rem;">PPO</td>
-            <td style="text-align:center; padding:0.5rem;">~4,000</td>
-            <td style="text-align:center; padding:0.5rem;">~4%</td>
-            <td style="text-align:center; padding:0.5rem;">Smooth (needs more data)</td>
+            <td style="text-align:center; padding:0.5rem;">~4,200</td>
+            <td style="text-align:center; padding:0.5rem;">~22% (21&ndash;23%)</td>
+            <td style="text-align:center; padding:0.5rem;">Most consistent</td>
         </tr>
     </tbody>
 </table>
