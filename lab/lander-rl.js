@@ -244,7 +244,17 @@ const LanderRL = (function () {
         this.bO.set(other.bO);
     };
 
-    // ---- MiniNet2: 3-layer neural network (2 hidden layers) ----
+    // Biased random action — THRUST_MAIN gets 40%, others 12% each
+    // Without this, random exploration only fires thrust 17% of the time,
+    // but hovering requires 27%. The agent wastes hundreds of episodes
+    // before accidentally discovering that thrust is essential.
+    function biasedRandomAction() {
+        var r = Math.random();
+        if (r < 0.40) return 1; // THRUST_MAIN
+        var idx = Math.floor((r - 0.40) / 0.12);
+        var others = [0, 2, 3, 4, 5];
+        return others[Math.min(idx, 4)];
+    }
     // Architecture: inputs -> hidden1 (ReLU) -> hidden2 (ReLU) -> outputs
     function MiniNet2(nIn, nH1, nH2, nOut) {
         this.nIn = nIn; this.nH1 = nH1; this.nH2 = nH2; this.nOut = nOut;
@@ -420,7 +430,7 @@ const LanderRL = (function () {
 
     DQNAgent.prototype.chooseAction = function (state) {
         if (Math.random() < this.epsilon) {
-            return Math.floor(Math.random() * 6);
+            return biasedRandomAction();
         }
         const { out } = this.net.forward(state);
         let best = 0;
@@ -575,7 +585,7 @@ const LanderRL = (function () {
 
     A2CAgent.prototype.chooseAction = function (state) {
         if (Math.random() < this.epsilon) {
-            return Math.floor(Math.random() * 6);
+            return biasedRandomAction();
         }
         const probs = this.actor.softmax(state);
         const r = Math.random();
@@ -588,8 +598,9 @@ const LanderRL = (function () {
     };
 
     A2CAgent.prototype.update = function (state, action, reward, nextState, done) {
-        // Accumulate steps
-        this.nStepBuffer.push({ state: state, action: action, reward: reward, nextState: nextState, done: done });
+        // Scale rewards for critic stability (terminal rewards are 10-20x per-frame)
+        var scaledReward = reward * 0.1;
+        this.nStepBuffer.push({ state: state, action: action, reward: scaledReward, nextState: nextState, done: done });
 
         // Train when buffer is full or episode ends
         if (this.nStepBuffer.length >= this.nSteps || done) {
@@ -721,7 +732,7 @@ const LanderRL = (function () {
 
     PPOAgent.prototype.chooseAction = function (state) {
         if (Math.random() < this.epsilon) {
-            return Math.floor(Math.random() * 6);
+            return biasedRandomAction();
         }
         const probs = this.actor.softmax(state);
         const r = Math.random();
@@ -734,12 +745,14 @@ const LanderRL = (function () {
     };
 
     PPOAgent.prototype.storeStep = function (state, action, reward, done) {
+        // Scale rewards for critic stability
+        var scaledReward = reward * 0.1;
         const probs = this.actor.softmax(state);
         const { out: vOut } = this.critic.forward(state);
         this.trajectory.push({
             state: state.slice ? state.slice() : Array.from(state),
             action: action,
-            reward: reward,
+            reward: scaledReward,
             done: done,
             oldProbs: new Float64Array(probs),
             value: vOut[0]
