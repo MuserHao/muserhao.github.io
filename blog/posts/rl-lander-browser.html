@@ -209,19 +209,23 @@ Everything runs in an 800&times;600 logical coordinate space (same as Pong). The
 </p>
 
 <ul>
-    <li><strong>Gravity:</strong> 0.05 px/frame&sup2; downward (gentle moon gravity)</li>
-    <li><strong>Main thrust:</strong> 0.12 px/frame&sup2; along the lander&rsquo;s up axis</li>
-    <li><strong>Side thrusters:</strong> 0.04 px/frame&sup2; for lateral translation</li>
+    <li><strong>Gravity:</strong> 0.04 px/frame&sup2; downward (gentle moon gravity)</li>
+    <li><strong>Main thrust:</strong> 0.15 px/frame&sup2; along the lander&rsquo;s up axis</li>
+    <li><strong>Side thrusters:</strong> 0.05 px/frame&sup2; for lateral translation</li>
     <li><strong>Rotation:</strong> &plusmn;0.04 rad/frame, with angular damping of 0.98</li>
     <li><strong>Wind gusts:</strong> random, max 0.02 px/frame&sup2; (enabled at curriculum level 3)</li>
 </ul>
+
+<p>
+These values went through iteration. We originally used gravity 0.05 and thrust 0.12, giving a thrust-to-gravity ratio of 2.4&times;. The agent needed to fire thrust 42% of the time just to hover &mdash; too demanding for a random exploration policy that only picks each of 6 actions ~17% of the time. Bumping to gravity 0.04 and thrust 0.15 (ratio 3.75&times;) means hovering requires thrust only 27% of the time, giving the agent enough control authority to accidentally discover braking.
+</p>
 
 <p>
 Terrain is generated via midpoint displacement &mdash; a fractal algorithm that produces realistic mountainous profiles. An 80px-wide landing pad is placed randomly in the middle third of the terrain, painted neon green with glow.
 </p>
 
 <p>
-The lander itself is a triangle with two legs, rendered in neon cyan with animated thrust flames (particle system). Landing criteria: both leg tips on pad, $|\theta| < 15°$, $|v_y| < 1.0$, $|v_x| < 0.5$.
+The lander itself is a triangle with two legs, rendered in neon cyan with animated thrust flames (particle system). Landing criteria: both leg tips on pad, $|\theta| < 20°$, $|v_y| < 1.5$, $|v_x| < 0.8$. We relaxed these from the initial values ($15°$, $1.0$, $0.5$) after discovering that the 4-pixel landing window was too tight for small networks to hit reliably.
 </p>
 
 <pre><code class="language-javascript">// 6 discrete actions
@@ -234,7 +238,7 @@ const ACTIONS = {
     ROTATE_RIGHT: 5
 };</code></pre>
 
-<h2>04 // STATE AND REWARD</h2>
+<h2>04 // THE REWARD THAT BROKE EVERYTHING (TWICE)</h2>
 
 <p>
 The state is an 8-dimensional vector, all normalized to roughly [-1, 1]:
@@ -252,67 +256,174 @@ The state is an 8-dimensional vector, all normalized to roughly [-1, 1]:
 ];</code></pre>
 
 <p>
-The reward function went through several iterations (sound familiar from Pong?). The final version:
+The reward function went through <em>four</em> iterations. This is the part the textbooks leave out.
 </p>
 
-<ul>
-    <li><strong>Successful landing:</strong> +100 to +140 (with bonuses for uprightness and gentleness)</li>
-    <li><strong>Crash / out of bounds:</strong> &minus;100</li>
-    <li><strong>Timeout (500 steps):</strong> &minus;50</li>
-    <li><strong>Per frame:</strong> approach-pad bonus (closer = better), angle penalty, speed penalty near ground, time penalty (&minus;0.05), thrust penalty (fuel cost)</li>
-</ul>
+<h3>Iteration 1: The obvious approach (0% landing)</h3>
 
 <p>
-The per-frame reward shaping is critical. Without the approach bonus, agents have no gradient signal until they accidentally land &mdash; which in a 6-action continuous-physics environment almost never happens. The thrust penalty prevents &ldquo;hover forever&rdquo; strategies. The angle penalty biases toward upright descent.
+We started with what every RL tutorial suggests: a simple distance-based shaping reward with big terminal bonuses.
 </p>
 
-<h2>05 // THE TRAINING LOOP</h2>
+<pre><code class="language-javascript">// v1: textbook approach
+reward = -distance_to_pad * 0.5;     // per frame: ~-0.5
+reward -= Math.abs(angle) * 0.3;     // angle penalty
+if (landed) reward = +100;           // terminal: +100
+if (crashed) reward = -100;          // terminal: -100</code></pre>
+
+<p>
+<strong>Result: 0% landing after 200 episodes.</strong> The agents approached the pad (min distance ~0.02) but crashed every time. Why? The distance reward <em>increases as the lander falls</em> &mdash; gravity does the work for free. The agent gets rewarded for doing nothing. By the time it&rsquo;s near the pad, it&rsquo;s going too fast to land, and the speed penalty only activates in the last 90 pixels. Too little, too late.
+</p>
+
+<p>
+<strong>Lesson:</strong> reward shaping that correlates with natural dynamics is useless. If gravity already makes you closer to the pad, rewarding closeness teaches nothing.
+</p>
+
+<h3>Iteration 2: The dynamic range problem (14% DQN, 2% A2C/PPO)</h3>
+
+<p>
+We redesigned the reward to use a <strong>closeness &times; slowness product</strong> &mdash; you only get rewarded for being close <em>AND</em> slow simultaneously. This teaches braking. But we kept the terminal rewards at &plusmn;100.
+</p>
+
+<pre><code class="language-javascript">// v2: closeness × slowness
+reward = closeness * max(0, 3 - speed) * 0.5;  // per frame: ~+3
+if (landed) reward = +140;                       // 46x larger!
+if (crashed) reward = -100;                      // 33x larger!</code></pre>
+
+<p>
+<strong>Result: DQN hit 14%, but A2C and PPO were stuck at 2%.</strong> The problem: a 240&times; dynamic range between per-frame rewards (~1) and terminal rewards (~140). A tiny neural network trying to predict $V(s)$ with MSE loss sees gradients that vary by two orders of magnitude. The critic can&rsquo;t converge, so the advantages are noise, and the actor learns nothing.
+</p>
+
+<p>
+DQN survived because its replay buffer averages over many transitions, dampening the spikes. A2C and PPO, which train on recent experience directly, were destroyed.
+</p>
+
+<p>
+<strong>Lesson:</strong> reward scale matters as much as reward shape. If your terminal reward is 100&times; your step reward, the critic will spend all its capacity modeling the terminal transition and learn nothing about the approach.
+</p>
+
+<h3>Iteration 3: Normalized rewards (13% DQN, 53% A2C, 2% PPO)</h3>
+
+<p>
+The fix was simple: scale terminal rewards to &plusmn;10 instead of &plusmn;100, keeping them only ~3&ndash;5&times; the per-frame rewards. We also added a graduated crash penalty (soft crashes near the pad are less punishing) and an altitude penalty (discourages flying away).
+</p>
+
+<pre><code class="language-javascript">// v3: normalized scale
+reward = closeness * max(0, 3 - speed) * 0.3;  // per frame: ~+2
+if (landed) reward = +10 + bonuses;              // terminal: ~+14
+if (crashed) reward = -2 - 3*speed - 5*dist;    // terminal: ~-5 to -10</code></pre>
+
+<p>
+<strong>A2C went from 2% to 53% in one change.</strong> The critic could finally predict $V(s)$ accurately because the target values were in a consistent range. The advantages became meaningful, and the actor got clear gradient signal.
+</p>
+
+<p>
+<strong>Lesson:</strong> this is arguably the single most important practical lesson in RL engineering. If your rewards span orders of magnitude, normalize them. The theory says the optimal policy is scale-invariant; the practice says your 1,207-parameter network is not.
+</p>
+
+<h2>05 // THE TRAINING LOOP THAT TOOK THREE TRIES</h2>
 
 <p>
 Lunar Lander is single-player, so there&rsquo;s no opponent to calibrate against. Instead, difficulty comes from <strong>curriculum learning via spawn randomization</strong>:
 </p>
 
 <ul>
-    <li><strong>Level 0 (Easy):</strong> spawn close to pad, low altitude, no wind</li>
-    <li><strong>Level 1 (Medium):</strong> wider spawn offset, higher altitude</li>
-    <li><strong>Level 2 (Hard):</strong> large offsets, high altitude, initial velocity</li>
-    <li><strong>Level 3 (Full):</strong> everything above plus wind gusts</li>
+    <li><strong>Level 0 (Easy):</strong> 35&ndash;60px directly above pad, zero velocity, zero angle</li>
+    <li><strong>Level 1 (Medium):</strong> 100&ndash;180px altitude, &plusmn;40px offset, small initial velocity</li>
+    <li><strong>Level 2 (Hard):</strong> 160&ndash;300px altitude, &plusmn;100px offset, initial velocity up to 1.0</li>
+    <li><strong>Level 3 (Full):</strong> 200&ndash;400px altitude, &plusmn;150px offset, wind gusts</li>
 </ul>
 
 <p>
-The level advances automatically when the rolling landing rate (last 20 episodes) exceeds 60%. This is the same principle as the adaptive bot difficulty in Pong &mdash; the agent always faces an appropriate challenge.
+Level 0 was originally at 120&ndash;200px altitude. <strong>No agent could land</strong> &mdash; the fall was too long, the agent built too much speed, and by the time it reached the pad the crash was inevitable. Dropping level 0 to 35&ndash;60px gave agents their first landing experiences within 50 episodes, providing the positive reward signal they needed to bootstrap learning.
 </p>
 
 <p>
-Auto-train runs 200 physics steps per animation frame, with terrain regenerated each episode. The warmup boot trains DQN for 150 episodes, A2C for 100, and PPO for 80 &mdash; all in non-blocking chunks that keep the page responsive.
+The level advances automatically when the rolling landing rate (last 20 episodes) exceeds 60%. Auto-train runs 200 physics steps per animation frame.
 </p>
 
-<h2>06 // ALGORITHM-SPECIFIC LESSONS</h2>
-
-<h3>DQN: Solid but Slow</h3>
+<h3>The warmup that destroyed A2C</h3>
 
 <p>
-DQN is the reliable workhorse. With 726 parameters and Double DQN, it eventually learns a decent landing strategy &mdash; but it takes 80&ndash;120 episodes to reach 50% landing rate. The replay buffer (10K transitions) and per-step $\epsilon$ decay are essential; without them, the Q-values oscillate wildly. DQN&rsquo;s biggest weakness here: it has no notion of a &ldquo;policy&rdquo; &mdash; it only knows values, so its behavior can be jerky as Q-values shift between actions.
-</p>
-
-<h3>A2C: Fastest Learner</h3>
-
-<p>
-A2C surprised us by being the fastest to learn. The per-step TD updates give it dense gradient signal &mdash; every single frame, the actor gets feedback on whether its action was better than the critic expected. The critic also learns very quickly because the value function for Lunar Lander is relatively smooth (altitude and distance to pad are strongly correlated with outcome). Typical convergence: 40&ndash;60 episodes to 50% landing rate.
+First-time visitors see a boot animation while agents pre-train. We used &ldquo;aggressive hyperparameters&rdquo; to speed convergence: $\epsilon$ decay of 0.97 per episode (much faster than normal). Sounds reasonable.
 </p>
 
 <p>
-The entropy bonus ($\beta = 0.02$) is critical. Without it, A2C collapses to a deterministic policy within 20 episodes &mdash; usually one that always fires the main thruster, which is locally optimal but can&rsquo;t handle lateral corrections.
-</p>
-
-<h3>PPO: Most Stable</h3>
-
-<p>
-PPO has the smoothest learning curve. Where A2C occasionally has bad episodes that briefly tank the policy, PPO&rsquo;s clipping prevents catastrophic updates. The 128-step trajectories with 3 epochs of mini-batch updates give it excellent sample efficiency. Typical convergence: 30&ndash;50 episodes to 50% landing rate, with less variance than A2C.
+<strong>For A2C, this was catastrophic.</strong> With decay 0.97, exploration collapsed from 50% to 1% by episode 50. The agent locked into whatever bad policy it had discovered during random exploration &mdash; usually &ldquo;always fire main thrust&rdquo; &mdash; and trained for 50 more episodes reinforcing that bad policy. Policy gradient methods need sustained exploration because they learn <em>from the distribution they sample</em>. Kill the exploration, kill the learning.
 </p>
 
 <p>
-The clipping is visually observable: during early training, A2C&rsquo;s action probabilities swing wildly between frames, while PPO&rsquo;s change smoothly and gradually. This is exactly the property that makes PPO suitable for RLHF &mdash; you don&rsquo;t want your language model&rsquo;s behavior to change drastically between updates.
+DQN was unaffected because its $\epsilon$ decays per <em>step</em>, not per episode, and its replay buffer retains diverse experiences regardless of the current $\epsilon$. This is a fundamental advantage of off-policy methods.
+</p>
+
+<p>
+<strong>Fix:</strong> gentler warmup decay (0.995 per episode), and higher learning rates instead of lower $\epsilon$ to speed convergence without sacrificing exploration.
+</p>
+
+<h3>The epsilon that barely decayed</h3>
+
+<p>
+DQN&rsquo;s per-step $\epsilon$ decay was initially set to 0.99995. After 150 warmup episodes (~12,000 steps): $\epsilon = 1.0 \times 0.99995^{12000} \approx 0.55$. The agent was still picking random actions half the time. We changed this to 0.9997, which reaches $\epsilon \approx 0.05$ in ~10,000 steps.
+</p>
+
+<p>
+<strong>Lesson:</strong> always compute what your hyperparameters actually produce. $0.99995^{12000} = 0.55$ is not an edge case &mdash; it&rsquo;s the default behavior that you&rsquo;d ship to users.
+</p>
+
+<h2>06 // WHAT EACH ALGORITHM ACTUALLY DID</h2>
+
+<h3>DQN: The Replay Buffer Saves Everything</h3>
+
+<p>
+DQN was the most consistent performer across all our reward-function iterations: 14% with bad rewards, 13% with good rewards. It never hit 0%. Why?
+</p>
+
+<p>
+The <strong>replay buffer</strong>. DQN stores every transition it sees and trains on random mini-batches. This means: (1) gradient spikes from terminal rewards get diluted by hundreds of per-frame transitions, (2) the agent sees a diverse mix of experiences regardless of its current policy, and (3) rare events like near-landings get replayed many times.
+</p>
+
+<p>
+DQN&rsquo;s weakness: it occasionally learned to fly <em>away</em> from the pad. With the original reward function, there was no penalty for drifting upward, so Q-values for &ldquo;hover indefinitely&rdquo; and &ldquo;approach the pad&rdquo; were similar. Adding an altitude penalty ($-0.3 \times \text{excess\_height}$) fixed this: 58 out-of-bounds episodes dropped to 0.
+</p>
+
+<h3>A2C: The Critic Needs Calm</h3>
+
+<p>
+A2C was the most sensitive to reward design. It went from 0% to 2% to <strong>53%</strong> across our three iterations, purely based on reward normalization. The reason is architectural.
+</p>
+
+<p>
+A2C trains in <em>N-step batches</em> (16 steps). The critic sees recent transitions and must predict $V(s)$ from them. If the reward scale is unstable &mdash; per-frame rewards of 1 followed by a terminal reward of 140 &mdash; the critic&rsquo;s MSE loss oscillates wildly. The advantages $(R - V)$ become noise. The actor gets random gradient updates. Nothing converges.
+</p>
+
+<p>
+Once we normalized rewards to a 14&times; range instead of 240&times;, the critic could actually learn the value function. A2C became the fastest learner &mdash; its N-step returns give it multi-frame context that single-step TD (our first A2C attempt) couldn&rsquo;t provide, while being less noisy than full-episode Monte Carlo.
+</p>
+
+<p>
+<strong>The entropy bonus ($\beta = 0.04$) is critical.</strong> Without it, A2C collapses to a deterministic policy within 20 episodes. With the closeness&times;slowness reward, &ldquo;always fire main thrust&rdquo; is locally optimal &mdash; it keeps you slow &mdash; but it can&rsquo;t handle lateral corrections. The entropy bonus keeps the policy stochastic enough to discover that NOOP and rotation matter too.
+</p>
+
+<h3>PPO: Conservative to a Fault</h3>
+
+<p>
+PPO&rsquo;s story is the opposite of A2C&rsquo;s. Where A2C was too sensitive, PPO was too conservative. Its landing rate stayed at 2% even after A2C hit 53%.
+</p>
+
+<p>
+The issue: <strong>PPO needs enough data per training step to make the clipping meaningful.</strong> It collects 64-step trajectories before training. With episodes averaging 30&ndash;40 steps, each trajectory spans ~2 episodes. This is fine &mdash; GAE handles episode boundaries via done flags. But it means PPO trains <em>half as often</em> as A2C per episode. The clipping then further limits how much the policy can change per update.
+</p>
+
+<p>
+We made PPO&rsquo;s training frequency worse by accident: our first version flushed the trajectory on every episode end, training on tiny 30-step fragments with 3 epochs. That&rsquo;s 90 gradient updates on 30 data points &mdash; severe overfitting. The policy degraded: average episode length dropped from 45 to 27 steps over 500 episodes. <strong>The agent was learning to crash faster.</strong>
+</p>
+
+<p>
+<strong>Fix:</strong> let PPO accumulate across episodes (done flags handle boundaries), only train at 64 steps, reduce to 2 epochs. PPO is still the slowest learner but no longer degrades. With more training time (500+ episodes), it should show the smoothest learning curve.
+</p>
+
+<p>
+<strong>Lesson:</strong> PPO&rsquo;s conservatism is both its strength and its weakness. It needs more data per update than A2C. In production RLHF, this is solved with large batch sizes (thousands of trajectories). In a browser with 1,207 parameters, you just need patience.
 </p>
 
 <h3>The Scoreboard</h3>
@@ -322,7 +433,7 @@ The clipping is visually observable: during early training, A2C&rsquo;s action p
         <tr style="border-bottom:2px solid var(--border-subtle);">
             <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Algorithm</th>
             <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Params</th>
-            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">~Episodes to 50%</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Landing @500 eps</th>
             <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Stability</th>
         </tr>
     </thead>
@@ -330,20 +441,20 @@ The clipping is visually observable: during early training, A2C&rsquo;s action p
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">DQN</td>
             <td style="text-align:center; padding:0.5rem;">966</td>
-            <td style="text-align:center; padding:0.5rem;">80&ndash;120</td>
-            <td style="text-align:center; padding:0.5rem;">Medium</td>
+            <td style="text-align:center; padding:0.5rem;">~13%</td>
+            <td style="text-align:center; padding:0.5rem;">High (replay buffer)</td>
         </tr>
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">A2C</td>
             <td style="text-align:center; padding:0.5rem;">1,207</td>
-            <td style="text-align:center; padding:0.5rem;">40&ndash;60</td>
-            <td style="text-align:center; padding:0.5rem;">Variable</td>
+            <td style="text-align:center; padding:0.5rem;">~53%</td>
+            <td style="text-align:center; padding:0.5rem;">Sensitive to reward scale</td>
         </tr>
         <tr>
             <td style="padding:0.5rem;">PPO</td>
             <td style="text-align:center; padding:0.5rem;">1,207</td>
-            <td style="text-align:center; padding:0.5rem;">30&ndash;50</td>
-            <td style="text-align:center; padding:0.5rem;">High</td>
+            <td style="text-align:center; padding:0.5rem;">~2%</td>
+            <td style="text-align:center; padding:0.5rem;">Conservative (needs more data)</td>
         </tr>
     </tbody>
 </table>
