@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser | Hao Xin</title>
-    <meta name="description" content="How we built a Lunar Lander with DQN, A2C, and PPO in pure JavaScript -- 807 parameters, zero GPUs, and a live actor-critic visualization that makes the GAN-RL connection click.">
+    <meta name="description" content="How we built a Lunar Lander with DQN, A2C, and PPO in pure JavaScript -- 1,207 parameters, zero GPUs, and a live actor-critic visualization that makes the GAN-RL connection click.">
     <meta name="author" content="Hao Xin">
     <link rel="canonical" href="https://muserhao.github.io/blog/posts/rl-lander-browser.html">
     <!-- Open Graph -->
@@ -24,7 +24,7 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser">
-    <meta name="twitter:description" content="DQN, A2C, and PPO learn to land a spacecraft in pure JS. 807 parameters, zero GPUs.">
+    <meta name="twitter:description" content="DQN, A2C, and PPO learn to land a spacecraft in pure JS. 1,207 parameters, zero GPUs.">
     <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
     <!-- JSON-LD Article -->
     <script type="application/ld+json">
@@ -122,7 +122,7 @@
                     <span class="blog-tag">TUTORIAL</span>
                 </div>
                 <h1 class="post-title">Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser</h1>
-                <p class="post-subtitle">// 807 parameters, zero GPUs, and the visualization that makes RLHF click</p>
+                <p class="post-subtitle">// 1,207 parameters, zero GPUs, and the visualization that makes RLHF click</p>
                 <div class="post-divider"></div>
             </div>
 
@@ -153,7 +153,7 @@ DQN is the same Double DQN from Pong, scaled up to 6 actions. One network estima
 $$Q(s, a) \leftarrow r + \gamma \, Q_{\text{target}}(s', \arg\max_{a'} Q_{\text{online}}(s', a'))$$
 
 <p>
-Architecture: MiniNet(8, 48, 6) = <strong>726 parameters</strong>. It works, but it only learns <em>values</em> &mdash; there&rsquo;s no explicit policy. This is where actor-critic enters.
+Architecture: MiniNet(8, 64, 6) = <strong>966 parameters</strong>. It works, but it only learns <em>values</em> &mdash; there&rsquo;s no explicit policy. This is where actor-critic enters.
 </p>
 
 <h3>A2C &mdash; Advantage Actor-Critic</h3>
@@ -177,7 +177,7 @@ And the critic trains via MSE on the TD target:
 $$\mathcal{L}_{\text{critic}} = \Big( r + \gamma \, V_\phi(s') - V_\phi(s) \Big)^2$$
 
 <p>
-Two networks, two loss functions, one elegant loop. Actor: MiniNet(8, 32, 6) = 486 params. Critic: MiniNet(8, 32, 1) = 321 params. <strong>Total: 807 parameters.</strong>
+Two networks, two loss functions, one elegant loop. Actor: MiniNet(8, 48, 6) = 726 params. Critic: MiniNet(8, 48, 1) = 481 params. <strong>Total: 1,207 parameters.</strong>
 </p>
 
 <h3>PPO &mdash; Proximal Policy Optimization</h3>
@@ -199,7 +199,7 @@ PPO also uses <strong>Generalized Advantage Estimation (GAE)</strong> instead of
 $$\hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda)^l \, \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$$
 
 <p>
-The $\lambda$ parameter (0.95 here) interpolates between high-bias/low-variance (TD, $\lambda=0$) and low-bias/high-variance (Monte Carlo, $\lambda=1$). Same architecture as A2C: <strong>807 parameters</strong>.
+The $\lambda$ parameter (0.95 here) interpolates between high-bias/low-variance (TD, $\lambda=0$) and low-bias/high-variance (Monte Carlo, $\lambda=1$). Same architecture as A2C: <strong>1,207 parameters</strong>.
 </p>
 
 <h2>03 // THE PHYSICS</h2>
@@ -329,19 +329,19 @@ The clipping is visually observable: during early training, A2C&rsquo;s action p
     <tbody>
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">DQN</td>
-            <td style="text-align:center; padding:0.5rem;">726</td>
+            <td style="text-align:center; padding:0.5rem;">966</td>
             <td style="text-align:center; padding:0.5rem;">80&ndash;120</td>
             <td style="text-align:center; padding:0.5rem;">Medium</td>
         </tr>
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">A2C</td>
-            <td style="text-align:center; padding:0.5rem;">807</td>
+            <td style="text-align:center; padding:0.5rem;">1,207</td>
             <td style="text-align:center; padding:0.5rem;">40&ndash;60</td>
             <td style="text-align:center; padding:0.5rem;">Variable</td>
         </tr>
         <tr>
             <td style="padding:0.5rem;">PPO</td>
-            <td style="text-align:center; padding:0.5rem;">807</td>
+            <td style="text-align:center; padding:0.5rem;">1,207</td>
             <td style="text-align:center; padding:0.5rem;">30&ndash;50</td>
             <td style="text-align:center; padding:0.5rem;">High</td>
         </tr>
@@ -418,10 +418,10 @@ Every parameter is a Float64 in typed arrays &mdash; no framework, no tensors, j
 </p>
 
 <ul>
-    <li><strong>DQN:</strong> MiniNet(8, 48, 6) &rarr; (8&times;48 + 48) + (48&times;6 + 6) = 384 + 48 + 288 + 6 = <strong>726</strong></li>
-    <li><strong>A2C Actor:</strong> MiniNet(8, 32, 6) &rarr; (8&times;32 + 32) + (32&times;6 + 6) = 256 + 32 + 192 + 6 = <strong>486</strong></li>
-    <li><strong>A2C/PPO Critic:</strong> MiniNet(8, 32, 1) &rarr; (8&times;32 + 32) + (32&times;1 + 1) = 256 + 32 + 32 + 1 = <strong>321</strong></li>
-    <li><strong>A2C/PPO Total:</strong> 486 + 321 = <strong>807</strong></li>
+    <li><strong>DQN:</strong> MiniNet(8, 64, 6) &rarr; (8&times;64 + 64) + (64&times;6 + 6) = 576 + 390 = <strong>966</strong></li>
+    <li><strong>A2C Actor:</strong> MiniNet(8, 48, 6) &rarr; (8&times;48 + 48) + (48&times;6 + 6) = 432 + 294 = <strong>726</strong></li>
+    <li><strong>A2C/PPO Critic:</strong> MiniNet(8, 48, 1) &rarr; (8&times;48 + 48) + (48&times;1 + 1) = 432 + 49 = <strong>481</strong></li>
+    <li><strong>A2C/PPO Total:</strong> 726 + 481 = <strong>1,207</strong></li>
 </ul>
 
 <h2>09 // TRY IT YOURSELF</h2>

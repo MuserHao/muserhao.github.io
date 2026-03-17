@@ -246,26 +246,26 @@ const LanderRL = (function () {
 
     // ========================================================
     // 1. DQN AGENT — Double DQN + Replay Buffer
-    //    MiniNet(8, 48, 6) = 8×48+48 + 48×6+6 = 726 params
+    //    MiniNet(8, 64, 6) = 8×64+64 + 64×6+6 = 966 params
     // ========================================================
     function DQNAgent() {
-        this.net = new MiniNet(8, 48, 6);
-        this.targetNet = new MiniNet(8, 48, 6);
+        this.net = new MiniNet(8, 64, 6);
+        this.targetNet = new MiniNet(8, 64, 6);
         this.targetNet.copyFrom(this.net);
 
         this.replayBuffer = [];
         this.bufferMax = 10000;
         this.batchSize = 32;
         this.gamma = 0.99;
-        this.lr = 0.001;
+        this.lr = 0.002;
         this.epsilon = 1.0;
-        this.epsilonDecay = 0.99995;
+        this.epsilonDecay = 0.9997;  // reach ~0.05 in ~10K steps
         this.epsilonMin = 0.05;
         this.episodes = 0;
         this.landings = 0;
         this.totalGames = 0;
         this.stepCount = 0;
-        this.targetSyncSteps = 300;
+        this.targetSyncSteps = 200;
         this.trainEvery = 4;
     }
 
@@ -375,20 +375,20 @@ const LanderRL = (function () {
 
     // ========================================================
     // 2. A2C AGENT — Advantage Actor-Critic
-    //    Actor: MiniNet(8, 32, 6) = 8×32+32 + 32×6+6 = 486 params
-    //    Critic: MiniNet(8, 32, 1) = 8×32+32 + 32×1+1 = 321 params
-    //    Total: 807 params
+    //    Actor: MiniNet(8, 48, 6) = 8×48+48 + 48×6+6 = 726 params
+    //    Critic: MiniNet(8, 48, 1) = 8×48+48 + 48×1+1 = 481 params
+    //    Total: 1,207 params
     // ========================================================
     function A2CAgent() {
-        this.actor = new MiniNet(8, 32, 6);
-        this.critic = new MiniNet(8, 32, 1);
+        this.actor = new MiniNet(8, 48, 6);
+        this.critic = new MiniNet(8, 48, 1);
 
         this.gamma = 0.99;
-        this.actorLr = 0.002;
-        this.criticLr = 0.005;
-        this.entropyCoef = 0.02;
-        this.epsilon = 0.2;
-        this.epsilonDecay = 0.998;
+        this.actorLr = 0.003;
+        this.criticLr = 0.008;
+        this.entropyCoef = 0.04;
+        this.epsilon = 0.15;
+        this.epsilonDecay = 0.997;
         this.epsilonMin = 0.02;
         this.episodes = 0;
         this.landings = 0;
@@ -396,6 +396,10 @@ const LanderRL = (function () {
 
         this.prevState = null;
         this.prevAction = null;
+
+        // N-step buffer for lower variance updates
+        this.nStepBuffer = [];
+        this.nSteps = 16;
     }
 
     A2CAgent.prototype.chooseAction = function (state) {
@@ -413,25 +417,56 @@ const LanderRL = (function () {
     };
 
     A2CAgent.prototype.update = function (state, action, reward, nextState, done) {
-        // TD target for critic
-        const { out: vCur } = this.critic.forward(state);
-        const v = vCur[0];
-        let vNext = 0;
-        if (!done) {
-            const { out: vN } = this.critic.forward(nextState);
-            vNext = vN[0];
+        // Accumulate steps
+        this.nStepBuffer.push({ state: state, action: action, reward: reward, nextState: nextState, done: done });
+
+        // Train when buffer is full or episode ends
+        if (this.nStepBuffer.length >= this.nSteps || done) {
+            this._trainBatch();
         }
-        const tdTarget = reward + this.gamma * vNext;
-        const advantage = tdTarget - v;
+    };
 
-        // Update critic (MSE on TD target)
-        this.critic.trainValue(state, tdTarget, this.criticLr);
+    A2CAgent.prototype._trainBatch = function () {
+        const buf = this.nStepBuffer;
+        if (buf.length === 0) return;
 
-        // Update actor (policy gradient with advantage)
-        this.actor.trainPG(state, action, advantage, this.actorLr, this.entropyCoef);
+        // Compute N-step returns and advantages
+        const T = buf.length;
+        const lastStep = buf[T - 1];
+        let bootstrapV = 0;
+        if (!lastStep.done) {
+            const { out: vN } = this.critic.forward(lastStep.nextState);
+            bootstrapV = vN[0];
+        }
+
+        // Backward pass to compute returns
+        const returns = new Float64Array(T);
+        returns[T - 1] = buf[T - 1].reward + this.gamma * bootstrapV;
+        for (let t = T - 2; t >= 0; t--) {
+            if (buf[t].done) {
+                returns[t] = buf[t].reward;
+            } else {
+                returns[t] = buf[t].reward + this.gamma * returns[t + 1];
+            }
+        }
+
+        // Update actor and critic for each step
+        for (let t = 0; t < T; t++) {
+            const { out: vCur } = this.critic.forward(buf[t].state);
+            const advantage = Math.max(-5, Math.min(5, returns[t] - vCur[0]));
+
+            this.critic.trainValue(buf[t].state, returns[t], this.criticLr);
+            this.actor.trainPG(buf[t].state, buf[t].action, advantage, this.actorLr, this.entropyCoef);
+        }
+
+        this.nStepBuffer = [];
     };
 
     A2CAgent.prototype.onEpisodeEnd = function (result) {
+        // Flush any remaining steps in the buffer
+        if (this.nStepBuffer.length > 0) {
+            this._trainBatch();
+        }
         this.episodes++;
         this.totalGames++;
         if (result === 'landed') this.landings++;
@@ -473,21 +508,21 @@ const LanderRL = (function () {
 
     // ========================================================
     // 3. PPO AGENT — Proximal Policy Optimization
-    //    Same architecture as A2C: 807 params
+    //    Same architecture as A2C: 1,207 params
     //    Collects trajectories, then runs mini-batch updates
     // ========================================================
     function PPOAgent() {
-        this.actor = new MiniNet(8, 32, 6);
-        this.critic = new MiniNet(8, 32, 1);
+        this.actor = new MiniNet(8, 48, 6);
+        this.critic = new MiniNet(8, 48, 1);
 
         this.gamma = 0.99;
         this.lam = 0.95;         // GAE lambda
         this.clipEps = 0.2;
-        this.actorLr = 0.001;
-        this.criticLr = 0.003;
-        this.entropyCoef = 0.02;
+        this.actorLr = 0.005;
+        this.criticLr = 0.01;
+        this.entropyCoef = 0.04;
         this.epochs = 3;
-        this.trajectoryLen = 128;
+        this.trajectoryLen = 64;
         this.epsilon = 0.15;
         this.epsilonDecay = 0.999;
         this.epsilonMin = 0.01;

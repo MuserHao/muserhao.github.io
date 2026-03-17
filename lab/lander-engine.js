@@ -8,9 +8,9 @@ const LanderEngine = (function () {
     const W = 800, H = 600;
 
     // Physics constants
-    const GRAVITY = 0.05;
-    const THRUST_MAIN = 0.12;
-    const THRUST_SIDE = 0.04;
+    const GRAVITY = 0.04;
+    const THRUST_MAIN = 0.15;
+    const THRUST_SIDE = 0.05;
     const ROTATE_SPEED = 0.04;
     const ANGULAR_DAMPING = 0.98;
     const MAX_STEPS = 500;
@@ -104,16 +104,40 @@ const LanderEngine = (function () {
 
         // Spawn lander
         function spawnLander(level) {
-            // level 0=easy (near pad, low), 1-3 increasingly harder
+            // level 0=easy (directly above pad, very low), 1-3 increasingly harder
             const padCx = (padLeft + padRight) / 2;
-            const offsetRange = [30, 100, 200, 300][level] || 30;
-            const heightRange = [80, 140, 220, 300][level] || 80;
 
-            lander.x = padCx + (Math.random() - 0.5) * offsetRange;
-            lander.y = padY - 120 - Math.random() * heightRange;
-            lander.vx = (Math.random() - 0.5) * (level * 0.5);
-            lander.vy = 0;
-            lander.angle = (Math.random() - 0.5) * (level * 0.1);
+            if (level === 0) {
+                // Easy: right above the pad, low altitude, no velocity
+                // Agent just needs to brake a short fall
+                lander.x = padCx + (Math.random() - 0.5) * 15;
+                lander.y = padY - 35 - Math.random() * 25;
+                lander.vx = 0;
+                lander.vy = Math.random() * 0.3;
+                lander.angle = 0;
+            } else if (level === 1) {
+                // Medium: moderate altitude, small offset
+                lander.x = padCx + (Math.random() - 0.5) * 80;
+                lander.y = padY - 100 - Math.random() * 80;
+                lander.vx = (Math.random() - 0.5) * 0.5;
+                lander.vy = Math.random() * 0.5;
+                lander.angle = (Math.random() - 0.5) * 0.1;
+            } else if (level === 2) {
+                // Hard: high altitude, large offset
+                lander.x = padCx + (Math.random() - 0.5) * 200;
+                lander.y = padY - 160 - Math.random() * 140;
+                lander.vx = (Math.random() - 0.5) * 1.0;
+                lander.vy = Math.random() * 0.5;
+                lander.angle = (Math.random() - 0.5) * 0.2;
+            } else {
+                // Full: everything + wind
+                lander.x = padCx + (Math.random() - 0.5) * 300;
+                lander.y = padY - 200 - Math.random() * 200;
+                lander.vx = (Math.random() - 0.5) * 1.5;
+                lander.vy = Math.random() * 1.0;
+                lander.angle = (Math.random() - 0.5) * 0.3;
+            }
+
             lander.angVel = 0;
             leftContact = 0;
             rightContact = 0;
@@ -157,14 +181,14 @@ const LanderEngine = (function () {
         function checkLanding() {
             const tips = getLegTips();
 
-            // Check if legs are touching or near the pad surface (within 4px)
-            const legsTouchingGround = tips.left.y >= padY - 4 && tips.right.y >= padY - 4;
+            // Check if legs are touching or near the pad surface (within 8px)
+            const legsTouchingGround = tips.left.y >= padY - 8 && tips.right.y >= padY - 8;
 
             const onPad = legsTouchingGround &&
                           tips.left.x >= padLeft && tips.left.x <= padRight &&
                           tips.right.x >= padLeft && tips.right.x <= padRight;
-            const upright = Math.abs(lander.angle) < (15 * Math.PI / 180);
-            const slow = Math.abs(lander.vy) < 1.0 && Math.abs(lander.vx) < 0.5;
+            const upright = Math.abs(lander.angle) < (20 * Math.PI / 180);
+            const slow = Math.abs(lander.vy) < 1.5 && Math.abs(lander.vx) < 0.8;
 
             if (onPad && upright && slow) {
                 leftContact = 1;
@@ -276,34 +300,52 @@ const LanderEngine = (function () {
 
             if (result === 'landed') {
                 // Landing bonus: base 100 + uprightness + gentleness
-                const uprightBonus = Math.max(0, 20 * (1 - Math.abs(lander.angle) / (15 * Math.PI / 180)));
-                const gentleBonus = Math.max(0, 20 * (1 - Math.abs(lander.vy) / 1.0));
+                const uprightBonus = Math.max(0, 20 * (1 - Math.abs(lander.angle) / (20 * Math.PI / 180)));
+                const gentleBonus = Math.max(0, 20 * (1 - Math.abs(lander.vy) / 1.5));
                 reward = 100 + uprightBonus + gentleBonus;
             } else if (result === 'crash' || result === 'oob') {
-                reward = -100;
+                // Graduated crash penalty — soft crashes near pad are less punishing
+                const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
+                const distPenalty = Math.min(1, dist * 2); // 0 at pad, 1 when far
+                reward = -20 - 30 * Math.min(1, speed / 4) - 50 * distPenalty;
             } else if (result === 'timeout') {
-                reward = -50;
+                reward = -30;
             } else {
-                // Dense per-frame reward
-                // Approach pad bonus (closer = better)
-                reward = -dist * 0.5;
+                // Dense per-frame reward — reward controlled approach
+                const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
+                const closeness = Math.max(0, 1 - dist / 0.8); // 0 when far, 1 at pad
 
-                // Angle penalty
-                reward -= Math.abs(lander.angle) * 0.3;
+                // 1. Position reward: being close to pad (always positive near pad)
+                reward = closeness * 1.0;
 
-                // Speed penalty near ground
-                const altitude = (padCy - lander.y) / H;
-                if (altitude < 0.15) {
-                    reward -= Math.abs(lander.vy) * 0.5;
-                    reward -= Math.abs(lander.vx) * 0.3;
+                // 2. CRITICAL: reward being close AND slow simultaneously
+                //    This teaches braking — you only get the big reward for controlled approach
+                const controlBonus = closeness * Math.max(0, 3 - speed) * 0.5;
+                reward += controlBonus;
+
+                // 3. Upright bonus (scaled by closeness — matters more near ground)
+                const uprightness = 1 - Math.abs(lander.angle) / Math.PI;
+                reward += uprightness * 0.3 * (0.5 + closeness * 0.5);
+
+                // 4. Velocity toward pad when far (only helpful when not near pad)
+                if (closeness < 0.5) {
+                    const vTowardPadX = dx !== 0 ? -Math.sign(dx) * lander.vx : 0;
+                    const vTowardPadY = dy !== 0 ? -Math.sign(dy) * lander.vy : 0;
+                    reward += Math.max(0, vTowardPadX + vTowardPadY) * 0.2;
                 }
 
-                // Time penalty
-                reward -= 0.05;
+                // 5. Near-pad slow bonus: huge reward for being very close and very slow
+                if (closeness > 0.7 && speed < 2.0) {
+                    reward += 3.0;
+                    if (speed < 1.0 && uprightness > 0.8) {
+                        reward += 5.0;  // almost-landing reward
+                    }
+                }
 
-                // Thrust penalty (fuel cost)
-                if (thrustMain) reward -= 0.1;
-                if (thrustLeft || thrustRight) reward -= 0.05;
+                // 6. Small time + fuel penalty
+                reward -= 0.02;
+                if (thrustMain) reward -= 0.02;
+                if (thrustLeft || thrustRight) reward -= 0.01;
             }
 
             // Build 8D state
