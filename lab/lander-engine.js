@@ -254,9 +254,17 @@ const LanderEngine = (function () {
             }
         }
 
-        function step(action) {
-            if (action !== undefined) applyAction(action);
-            else applyAction(currentAction);
+        // Agent step: run FRAME_SKIP physics frames, fire callback once with summed reward
+        // Currently unused (frame skip hurts DQN/PPO at our episode length)
+        function stepAgent() {
+            var res = stepRaw(currentAction);
+            if (onStepDone) onStepDone(res.state, res.reward, res.done, res.result);
+            if (res.done && onEpisodeEnd) onEpisodeEnd(res.result);
+        }
+
+        // Raw physics step — no callbacks, returns state/reward/done
+        function stepRaw(action) {
+            applyAction(action);
 
             // Gravity
             lander.vy += GRAVITY;
@@ -299,56 +307,35 @@ const LanderEngine = (function () {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (result === 'landed') {
-                // Landing bonus — clear signal but not so large it destabilizes critics
                 const uprightBonus = Math.max(0, 3 * (1 - Math.abs(lander.angle) / (20 * Math.PI / 180)));
                 const gentleBonus = Math.max(0, 3 * (1 - Math.abs(lander.vy) / 1.5));
                 reward = 20 + uprightBonus + gentleBonus;
             } else if (result === 'crash' || result === 'oob') {
-                // Graduated crash penalty
                 const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
                 const distPenalty = Math.min(1, dist * 2);
                 reward = -3 - 4 * Math.min(1, speed / 4) - 3 * distPenalty;
             } else if (result === 'timeout') {
                 reward = -3;
             } else {
-                // Dense per-frame reward — reward controlled approach
+                // Dense per-frame reward — 3 smooth components + near-pad bonus
                 const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
                 const closeness = Math.max(0, 1 - dist / 0.8);
 
-                // 1. Position reward: being close to pad
-                reward = closeness * 0.4;
+                // 1. Controlled approach: close AND slow (smooth, teaches braking)
+                reward = closeness * Math.max(0, 3 - speed) * 0.5;
 
-                // 2. Controlled approach: close AND slow (teaches braking)
-                reward += closeness * Math.max(0, 3 - speed) * 0.3;
-
-                // 3. Upright bonus (matters more near ground)
+                // 2. Uprightness (always active, smooth)
                 const uprightness = 1 - Math.abs(lander.angle) / Math.PI;
-                reward += uprightness * 0.15 * (0.5 + closeness * 0.5);
+                reward += uprightness * 0.15;
 
-                // 4. Velocity toward pad when far away
-                if (closeness < 0.5) {
-                    const vTowardPadX = dx !== 0 ? -Math.sign(dx) * lander.vx : 0;
-                    const vTowardPadY = dy !== 0 ? -Math.sign(dy) * lander.vy : 0;
-                    reward += Math.max(0, vTowardPadX + vTowardPadY) * 0.3;
+                // 3. Near-pad slow bonus (smooth ramp instead of step function)
+                //    closeness^2 * (3-speed)/3 gives smooth gradient near pad
+                if (speed < 3) {
+                    reward += closeness * closeness * (3 - speed) / 3 * 1.5;
                 }
 
-                // 5. Near-pad slow bonus: strong reward for almost-landing state
-                if (closeness > 0.7 && speed < 2.0) {
-                    reward += 1.0;
-                    if (speed < 1.0 && uprightness > 0.8) {
-                        reward += 2.0;
-                    }
-                }
-
-                // 6. Altitude penalty — discourages flying upward/away
-                if (lander.y < padCy - 100) {
-                    reward -= (padCy - 100 - lander.y) / H * 0.3;
-                }
-
-                // 7. Small time + fuel penalty
+                // 4. Small time penalty
                 reward -= 0.01;
-                if (thrustMain) reward -= 0.01;
-                if (thrustLeft || thrustRight) reward -= 0.005;
             }
 
             // Build 8D state
@@ -364,18 +351,19 @@ const LanderEngine = (function () {
             ];
 
             const done = result !== null;
-            if (onStepDone) onStepDone(state, reward, done, result);
 
             // Spawn flame particles
             if (thrustMain || thrustLeft || thrustRight) {
                 spawnFlameParticles();
             }
 
-            if (done && onEpisodeEnd) {
-                onEpisodeEnd(result);
-            }
-
             return { state, reward, done, result };
+        }
+
+        // Backwards-compatible step() — single physics frame, no callbacks
+        // Game loop uses this for rendering; training uses stepAgent()
+        function step(action) {
+            return stepRaw(action !== undefined ? action : currentAction);
         }
 
         // Flame particle system
@@ -615,7 +603,7 @@ const LanderEngine = (function () {
         let currentAction = 0;
 
         function loop() {
-            step(currentAction);
+            stepAgent();
             render();
             if (running) rafId = requestAnimationFrame(loop);
         }
@@ -661,6 +649,7 @@ const LanderEngine = (function () {
             stop,
             render,
             step,
+            stepAgent,
             resetEpisode,
             generateTerrain,
             spawnLander,

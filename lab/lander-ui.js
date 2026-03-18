@@ -239,14 +239,7 @@
     function autoTrainFrame() {
         var a = agents[currentAlgo];
         for (var i = 0; i < STEPS_PER_FRAME; i++) {
-            engine.step();
-            // Check if episode ended (engine callbacks handle resets during auto-train)
-            // Auto-reset on episode end
-            var l = engine.getLander();
-            if (l.y > engine.getH() + 50 || l.x < -50 || l.x > engine.getW() + 50) {
-                // Force end if somehow stuck
-                break;
-            }
+            engine.stepAgent();
         }
         engine.render();
 
@@ -441,7 +434,7 @@
             function chunk() {
                 var deadline = performance.now() + WARMUP_BUDGET_MS;
                 while (a.episodes < target && performance.now() < deadline) {
-                    engine.step();
+                    engine.stepAgent();
                 }
 
                 var totalEps = WARMUP_EPISODES.dqn + WARMUP_EPISODES.a2c + WARMUP_EPISODES.ppo;
