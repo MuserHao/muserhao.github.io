@@ -387,6 +387,29 @@ PPO went from 1% to 22% and became the most reliable learner, with only 2% varia
 For reference, OpenAI Gym&rsquo;s Lunar Lander benchmark uses 2-layer networks with 64 neurons each (~8,000 parameters) and trains for 1,000+ episodes with a GPU. We&rsquo;re doing it in the browser with ~4,200 parameters and pure JavaScript backprop. The agents land 20&ndash;30% of the time on easy difficulty &mdash; not human-level, but <em>visibly improving</em>, which is the teaching point.
 </p>
 
+<h3>What didn&rsquo;t work (the graveyard)</h3>
+
+<p>
+Not every idea improved things. Here&rsquo;s what we tried and reverted, and why:
+</p>
+
+<ul>
+    <li><strong>Aggressive DQN training</strong> (batch 64, LR 0.003, train every 2 steps): made DQN <em>worse</em> (13%&rarr;8%). With 4K parameters, each gradient step moves weights a lot. More frequent training with bigger batches = Q-value oscillation. The replay buffer already provides diversity; training harder on it just overfits to recent transitions.</li>
+    <li><strong>Frame skipping</strong> (decide every 4 physics frames, like Atari DQN): helped A2C (+7pp) but destroyed DQN (&minus;19pp) and PPO (&minus;17pp). At Atari scale (10,000+ frames/episode), frame skip reduces redundancy. At our scale (35 frames/episode), every frame already has meaningful state change. Frame skip just reduces training data volume, which kills replay-based and trajectory-based methods.</li>
+    <li><strong>PPO per-episode trajectory flushing</strong>: theoretically correct (prevents cross-episode contamination in GAE). Practically catastrophic &mdash; training on 30-step fragments with 2 epochs is 60 gradient updates on tiny data. The agent learned to crash <em>faster</em> (avg steps 45&rarr;27). Reverted to accumulating across episodes with done-flag handling.</li>
+    <li><strong>Landing reward +30</strong>: helped DQN (replay buffer absorbs spikes) but killed A2C/PPO. The dynamic range problem returned through the critic &mdash; same bug, different door.</li>
+    <li><strong>Step-function near-pad bonus</strong> (jumps from 0 to +3 when closeness &gt; 0.7 and speed &lt; 2.0): neural networks hate discontinuities. Replaced with smooth $\text{closeness}^2 \times (3 - \text{speed})/3$ for stable gradients at all points.</li>
+    <li><strong>PPO epoch tuning</strong> (3&rarr;4&rarr;3&rarr;2): going back and forth because it was never the real bottleneck. Like adjusting the radio while the antenna is broken.</li>
+</ul>
+
+<p>
+<strong>The meta-lesson:</strong> we spent most of our debugging time tuning knobs (learning rates, batch sizes, epoch counts, trajectory lengths) when the real problems were structural (exploration bias, reward scale, network depth, spawn difficulty). Knob-turning gives the illusion of progress because every run has high variance &mdash; a lucky seed can make any configuration look good. The 53% A2C result that excited us early on was just a lucky random initialization; averaged over 3 trials it was 9%.
+</p>
+
+<p>
+The changes that actually mattered were all <em>qualitative</em>, not quantitative: biased exploration (matching the prior to the problem), reward normalization (matching the scale to the architecture), spawn altitude (matching the task to the agent&rsquo;s current ability), and network depth (matching the capacity to the function complexity). If your RL agent isn&rsquo;t learning, resist the urge to tune &mdash; look for a structural mismatch.
+</p>
+
 <h2>05 // THE TRAINING LOOP THAT TOOK THREE TRIES</h2>
 
 <p>
