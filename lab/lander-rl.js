@@ -256,6 +256,7 @@ const LanderRL = (function () {
         return others[Math.min(idx, 4)];
     }
     // Architecture: inputs -> hidden1 (ReLU) -> hidden2 (ReLU) -> outputs
+    // Uses Adam optimizer for stable RL training
     function MiniNet2(nIn, nH1, nH2, nOut) {
         this.nIn = nIn; this.nH1 = nH1; this.nH2 = nH2; this.nOut = nOut;
         const s1 = Math.sqrt(2.0 / nIn), s2 = Math.sqrt(2.0 / nH1), sO = Math.sqrt(2.0 / nH2);
@@ -268,7 +269,35 @@ const LanderRL = (function () {
         for (let i = 0; i < this.w1.length; i++) this.w1[i] = randn() * s1;
         for (let i = 0; i < this.w2.length; i++) this.w2[i] = randn() * s2;
         for (let i = 0; i < this.wO.length; i++) this.wO[i] = randn() * sO;
+
+        // Adam optimizer state
+        this._adamT = 0;
+        this._m = {}; this._v = {};
+        var names = ['w1','b1','w2','b2','wO','bO'];
+        for (var i = 0; i < names.length; i++) {
+            this._m[names[i]] = new Float64Array(this[names[i]].length);
+            this._v[names[i]] = new Float64Array(this[names[i]].length);
+        }
     }
+
+    // Adam update: applies gradients with adaptive learning rates
+    MiniNet2.prototype._adam = function (paramName, grads, lr) {
+        var params = this[paramName];
+        var m = this._m[paramName];
+        var v = this._v[paramName];
+        var beta1 = 0.9, beta2 = 0.999, eps = 1e-8;
+        // Bias correction
+        var bc1 = 1 - Math.pow(beta1, this._adamT);
+        var bc2 = 1 - Math.pow(beta2, this._adamT);
+        for (var i = 0; i < params.length; i++) {
+            m[i] = beta1 * m[i] + (1 - beta1) * grads[i];
+            v[i] = beta2 * v[i] + (1 - beta2) * grads[i] * grads[i];
+            params[i] -= lr * (m[i] / bc1) / (Math.sqrt(v[i] / bc2) + eps);
+        }
+    };
+
+    // Increment Adam step counter (call once per training step)
+    MiniNet2.prototype._adamStep = function () { this._adamT++; };
 
     MiniNet2.prototype.forward = function (input) {
         const { nIn, nH1, nH2, nOut, w1, b1, w2, b2, wO, bO } = this;
@@ -287,34 +316,65 @@ const LanderRL = (function () {
         return { out, hidden: h1, hidden2: h2 };
     };
 
-    MiniNet2.prototype.trainMSE = function (input, target, lr) {
+    // Common backprop helper: given output-layer gradients dOut, backprop through both
+    // hidden layers and apply updates via Adam (or SGD if this.useAdam === false)
+    MiniNet2.prototype._backpropAdam = function (input, h1, h2, dOut, lr) {
         const { nIn, nH1, nH2, nOut, w1, b1, w2, b2, wO, bO } = this;
-        const { out, hidden: h1, hidden2: h2 } = this.forward(input);
-        const dOut = new Float64Array(nOut);
-        for (let k = 0; k < nOut; k++) dOut[k] = out[k] - target[k];
+        // Output -> H2
+        const gWO = new Float64Array(nH2 * nOut);
+        const gBO = new Float64Array(nOut);
         const dH2 = new Float64Array(nH2);
         for (let j = 0; j < nH2; j++) {
             let g = 0;
-            for (let k = 0; k < nOut; k++) { g += dOut[k] * wO[j * nOut + k]; wO[j * nOut + k] -= lr * dOut[k] * h2[j]; }
+            for (let k = 0; k < nOut; k++) { g += dOut[k] * wO[j * nOut + k]; gWO[j * nOut + k] = dOut[k] * h2[j]; }
             dH2[j] = h2[j] > 0 ? g : 0;
         }
+        for (let k = 0; k < nOut; k++) gBO[k] = dOut[k];
+        // H2 -> H1
+        const gW2 = new Float64Array(nH1 * nH2);
+        const gB2 = new Float64Array(nH2);
         const dH1 = new Float64Array(nH1);
         for (let j = 0; j < nH1; j++) {
             let g = 0;
-            for (let i = 0; i < nH2; i++) { g += dH2[i] * w2[j * nH2 + i]; w2[j * nH2 + i] -= lr * dH2[i] * h1[j]; }
+            for (let i = 0; i < nH2; i++) { g += dH2[i] * w2[j * nH2 + i]; gW2[j * nH2 + i] = dH2[i] * h1[j]; }
             dH1[j] = h1[j] > 0 ? g : 0;
         }
-        for (let i = 0; i < nIn; i++) for (let j = 0; j < nH1; j++) w1[i * nH1 + j] -= lr * dH1[j] * input[i];
-        for (let k = 0; k < nOut; k++) bO[k] -= lr * dOut[k];
-        for (let j = 0; j < nH2; j++) b2[j] -= lr * dH2[j];
-        for (let j = 0; j < nH1; j++) b1[j] -= lr * dH1[j];
+        for (let j = 0; j < nH2; j++) gB2[j] = dH2[j];
+        // H1 -> Input
+        const gW1 = new Float64Array(nIn * nH1);
+        const gB1 = new Float64Array(nH1);
+        for (let i = 0; i < nIn; i++) for (let j = 0; j < nH1; j++) gW1[i * nH1 + j] = dH1[j] * input[i];
+        for (let j = 0; j < nH1; j++) gB1[j] = dH1[j];
+        // Apply updates
+        if (this.useAdam !== false) {
+            this._adamStep();
+            this._adam('wO', gWO, lr); this._adam('bO', gBO, lr);
+            this._adam('w2', gW2, lr); this._adam('b2', gB2, lr);
+            this._adam('w1', gW1, lr); this._adam('b1', gB1, lr);
+        } else {
+            // Vanilla SGD — better for DQN with non-stationary targets
+            for (let i = 0; i < gWO.length; i++) wO[i] -= lr * gWO[i];
+            for (let i = 0; i < gBO.length; i++) bO[i] -= lr * gBO[i];
+            for (let i = 0; i < gW2.length; i++) w2[i] -= lr * gW2[i];
+            for (let i = 0; i < gB2.length; i++) b2[i] -= lr * gB2[i];
+            for (let i = 0; i < gW1.length; i++) w1[i] -= lr * gW1[i];
+            for (let i = 0; i < gB1.length; i++) b1[i] -= lr * gB1[i];
+        }
+    };
+
+    MiniNet2.prototype.trainMSE = function (input, target, lr) {
+        const { nOut } = this;
+        const { out, hidden: h1, hidden2: h2 } = this.forward(input);
+        const dOut = new Float64Array(nOut);
+        for (let k = 0; k < nOut; k++) dOut[k] = out[k] - target[k];
+        this._backpropAdam(input, h1, h2, dOut, lr);
         return out;
     };
 
     MiniNet2.prototype.trainValue = function (input, val, lr) { return this.trainMSE(input, new Float64Array([val]), lr); };
 
     MiniNet2.prototype.trainPG = function (input, actionIdx, advantage, lr, ec) {
-        const { nIn, nH1, nH2, nOut, w1, b1, w2, b2, wO, bO } = this;
+        const { nOut } = this;
         const { out, hidden: h1, hidden2: h2 } = this.forward(input);
         const maxV = Math.max(...out); const exps = new Float64Array(nOut); let sumExp = 0;
         for (let k = 0; k < nOut; k++) { exps[k] = Math.exp(out[k] - maxV); sumExp += exps[k]; }
@@ -327,19 +387,12 @@ const LanderRL = (function () {
             const lp = probs[k] > 1e-10 ? Math.log(probs[k]) : -20;
             dOut[k] = -(advantage * pg + (ec || 0) * (-probs[k] * (lp + ent)));
         }
-        const dH2 = new Float64Array(nH2);
-        for (let j = 0; j < nH2; j++) { let g = 0; for (let k = 0; k < nOut; k++) { g += dOut[k] * wO[j * nOut + k]; wO[j * nOut + k] -= lr * dOut[k] * h2[j]; } dH2[j] = h2[j] > 0 ? g : 0; }
-        const dH1 = new Float64Array(nH1);
-        for (let j = 0; j < nH1; j++) { let g = 0; for (let i = 0; i < nH2; i++) { g += dH2[i] * w2[j * nH2 + i]; w2[j * nH2 + i] -= lr * dH2[i] * h1[j]; } dH1[j] = h1[j] > 0 ? g : 0; }
-        for (let i = 0; i < nIn; i++) for (let j = 0; j < nH1; j++) w1[i * nH1 + j] -= lr * dH1[j] * input[i];
-        for (let k = 0; k < nOut; k++) bO[k] -= lr * dOut[k];
-        for (let j = 0; j < nH2; j++) b2[j] -= lr * dH2[j];
-        for (let j = 0; j < nH1; j++) b1[j] -= lr * dH1[j];
+        this._backpropAdam(input, h1, h2, dOut, lr);
         return probs;
     };
 
     MiniNet2.prototype.trainPPO = function (input, actionIdx, advantage, oldProbs, lr, clipEps, ec) {
-        const { nIn, nH1, nH2, nOut, w1, b1, w2, b2, wO, bO } = this;
+        const { nOut } = this;
         const { out, hidden: h1, hidden2: h2 } = this.forward(input);
         const maxV = Math.max(...out); const exps = new Float64Array(nOut); let sumExp = 0;
         for (let k = 0; k < nOut; k++) { exps[k] = Math.exp(out[k] - maxV); sumExp += exps[k]; }
@@ -358,14 +411,7 @@ const LanderRL = (function () {
             const lp = probs[k] > 1e-10 ? Math.log(probs[k]) : -20;
             dOut[k] = -(pg + (ec || 0) * (-probs[k] * (lp + ent)));
         }
-        const dH2 = new Float64Array(nH2);
-        for (let j = 0; j < nH2; j++) { let g = 0; for (let k = 0; k < nOut; k++) { g += dOut[k] * wO[j * nOut + k]; wO[j * nOut + k] -= lr * dOut[k] * h2[j]; } dH2[j] = h2[j] > 0 ? g : 0; }
-        const dH1 = new Float64Array(nH1);
-        for (let j = 0; j < nH1; j++) { let g = 0; for (let i = 0; i < nH2; i++) { g += dH2[i] * w2[j * nH2 + i]; w2[j * nH2 + i] -= lr * dH2[i] * h1[j]; } dH1[j] = h1[j] > 0 ? g : 0; }
-        for (let i = 0; i < nIn; i++) for (let j = 0; j < nH1; j++) w1[i * nH1 + j] -= lr * dH1[j] * input[i];
-        for (let k = 0; k < nOut; k++) bO[k] -= lr * dOut[k];
-        for (let j = 0; j < nH2; j++) b2[j] -= lr * dH2[j];
-        for (let j = 0; j < nH1; j++) b1[j] -= lr * dH1[j];
+        this._backpropAdam(input, h1, h2, dOut, lr);
         return probs;
     };
 
@@ -381,7 +427,7 @@ const LanderRL = (function () {
     MiniNet2.prototype.serialize = function () {
         return { type: 'MiniNet2', nIn: this.nIn, nH1: this.nH1, nH2: this.nH2, nOut: this.nOut,
             w1: Array.from(this.w1), b1: Array.from(this.b1), w2: Array.from(this.w2), b2: Array.from(this.b2),
-            wO: Array.from(this.wO), bO: Array.from(this.bO) };
+            wO: Array.from(this.wO), bO: Array.from(this.bO), adamT: this._adamT };
     };
 
     MiniNet2.deserialize = function (d) {
@@ -389,6 +435,7 @@ const LanderRL = (function () {
         n.w1 = new Float64Array(d.w1); n.b1 = new Float64Array(d.b1);
         n.w2 = new Float64Array(d.w2); n.b2 = new Float64Array(d.b2);
         n.wO = new Float64Array(d.wO); n.bO = new Float64Array(d.bO);
+        if (d.adamT) n._adamT = d.adamT;
         return n;
     };
 
@@ -410,6 +457,9 @@ const LanderRL = (function () {
     function DQNAgent() {
         this.net = new MiniNet2(8, 64, 48, 6);
         this.targetNet = new MiniNet2(8, 64, 48, 6);
+        // DQN uses SGD — Adam's momentum causes instability with non-stationary Q-targets
+        this.net.useAdam = false;
+        this.targetNet.useAdam = false;
         this.targetNet.copyFrom(this.net);
 
         this.replayBuffer = [];
@@ -565,8 +615,8 @@ const LanderRL = (function () {
         this.critic = new MiniNet2(8, 64, 48, 1);
 
         this.gamma = 0.99;
-        this.actorLr = 0.003;
-        this.criticLr = 0.008;
+        this.actorLr = 0.0005;
+        this.criticLr = 0.001;
         this.entropyCoef = 0.04;
         this.epsilon = 0.15;
         this.epsilonDecay = 0.997;
@@ -710,6 +760,9 @@ const LanderRL = (function () {
     function PPOAgent() {
         this.actor = new MiniNet2(8, 64, 48, 6);
         this.critic = new MiniNet2(8, 64, 48, 1);
+        // PPO uses SGD — Adam destabilizes the clipped objective
+        this.actor.useAdam = false;
+        this.critic.useAdam = false;
 
         this.gamma = 0.99;
         this.lam = 0.95;         // GAE lambda

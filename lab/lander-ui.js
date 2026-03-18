@@ -423,12 +423,12 @@
             // Slightly higher learning rate for faster warmup convergence
             if (algoName === 'a2c') {
                 origLr = { actor: a.actorLr, critic: a.criticLr };
-                a.actorLr = 0.004;
-                a.criticLr = 0.008;
+                a.actorLr = 0.001;
+                a.criticLr = 0.002;
             } else if (algoName === 'ppo') {
                 origLr = { actor: a.actorLr, critic: a.criticLr };
-                a.actorLr = 0.002;
-                a.criticLr = 0.005;
+                a.actorLr = 0.0008;
+                a.criticLr = 0.0015;
             }
 
             function chunk() {
