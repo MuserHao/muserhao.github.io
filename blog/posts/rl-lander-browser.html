@@ -238,7 +238,7 @@ const ACTIONS = {
     ROTATE_RIGHT: 5
 };</code></pre>
 
-<h2>04 // THE REWARD THAT BROKE EVERYTHING (TWICE)</h2>
+<h2>04 // THE REWARD THAT BROKE EVERYTHING (THREE TIMES)</h2>
 
 <p>
 The state is an 8-dimensional vector, all normalized to roughly [-1, 1]:
@@ -256,263 +256,128 @@ The state is an 8-dimensional vector, all normalized to roughly [-1, 1]:
 ];</code></pre>
 
 <p>
-The reward function went through <em>four</em> iterations. This is the part the textbooks leave out.
+The reward function went through five iterations before things worked. Three of them failed for reasons the textbooks don&rsquo;t warn you about.
 </p>
 
-<h3>Iteration 1: The obvious approach (0% landing)</h3>
+<h3>Failure 1: Rewarding gravity (0% landing)</h3>
 
 <p>
-We started with what every RL tutorial suggests: a simple distance-based shaping reward with big terminal bonuses.
+The textbook approach: reward closeness to the pad, penalize crashes.
 </p>
 
-<pre><code class="language-javascript">// v1: textbook approach
-reward = -distance_to_pad * 0.5;     // per frame: ~-0.5
-reward -= Math.abs(angle) * 0.3;     // angle penalty
-if (landed) reward = +100;           // terminal: +100
-if (crashed) reward = -100;          // terminal: -100</code></pre>
+<pre><code class="language-javascript">reward = -distance_to_pad * 0.5;  // per frame
+if (landed) reward = +100;         // terminal</code></pre>
 
 <p>
-<strong>Result: 0% landing after 200 episodes.</strong> The agents approached the pad (min distance ~0.02) but crashed every time. Why? The distance reward <em>increases as the lander falls</em> &mdash; gravity does the work for free. The agent gets rewarded for doing nothing. By the time it&rsquo;s near the pad, it&rsquo;s going too fast to land, and the speed penalty only activates in the last 90 pixels. Too little, too late.
+<strong>0% landing after 200 episodes.</strong> Why? The distance reward <em>increases as the lander falls</em> &mdash; gravity does the work for free. The agent gets rewarded for doing nothing. By the time it&rsquo;s near the pad, it&rsquo;s going too fast to land.
 </p>
 
 <p>
-<strong>Lesson:</strong> reward shaping that correlates with natural dynamics is useless. If gravity already makes you closer to the pad, rewarding closeness teaches nothing.
+<strong>Lesson:</strong> reward shaping that correlates with natural dynamics is useless. If gravity already makes you closer to the pad, rewarding closeness teaches nothing. You have to reward the <em>controlled approach</em> &mdash; being close AND slow simultaneously:
 </p>
 
-<h3>Iteration 2: The dynamic range problem (14% DQN, 2% A2C/PPO)</h3>
+<pre><code class="language-javascript">// What actually works: closeness × slowness product
+reward = closeness * Math.max(0, 3 - speed) * 0.5;</code></pre>
+
+<h3>Failure 2: The 240&times; dynamic range (DQN 14%, A2C/PPO 2%)</h3>
 
 <p>
-We redesigned the reward to use a <strong>closeness &times; slowness product</strong> &mdash; you only get rewarded for being close <em>AND</em> slow simultaneously. This teaches braking. But we kept the terminal rewards at &plusmn;100.
-</p>
-
-<pre><code class="language-javascript">// v2: closeness × slowness
-reward = closeness * max(0, 3 - speed) * 0.5;  // per frame: ~+3
-if (landed) reward = +140;                       // 46x larger!
-if (crashed) reward = -100;                      // 33x larger!</code></pre>
-
-<p>
-<strong>Result: DQN hit 14%, but A2C and PPO were stuck at 2%.</strong> The problem: a 240&times; dynamic range between per-frame rewards (~1) and terminal rewards (~140). A tiny neural network trying to predict $V(s)$ with MSE loss sees gradients that vary by two orders of magnitude. The critic can&rsquo;t converge, so the advantages are noise, and the actor learns nothing.
+The closeness&times;slowness product worked &mdash; DQN hit 14%. But A2C and PPO were stuck at 2%. The problem: per-frame rewards were ~1 while terminal rewards were &plusmn;100. A 240&times; dynamic range.
 </p>
 
 <p>
-DQN survived because its replay buffer averages over many transitions, dampening the spikes. A2C and PPO, which train on recent experience directly, were destroyed.
+A tiny neural network trying to predict $V(s)$ with MSE loss sees gradients that vary by two orders of magnitude. The critic spends all its capacity modeling the rare terminal transition and learns nothing about the approach. The advantages become noise.
 </p>
 
 <p>
-<strong>Lesson:</strong> reward scale matters as much as reward shape. If your terminal reward is 100&times; your step reward, the critic will spend all its capacity modeling the terminal transition and learn nothing about the approach.
-</p>
-
-<h3>Iteration 3: Normalized rewards (13% DQN, 53% A2C, 2% PPO)</h3>
-
-<p>
-The fix was simple: scale terminal rewards to &plusmn;10 instead of &plusmn;100, keeping them only ~3&ndash;5&times; the per-frame rewards. We also added a graduated crash penalty (soft crashes near the pad are less punishing) and an altitude penalty (discourages flying away).
-</p>
-
-<pre><code class="language-javascript">// v3: normalized scale
-reward = closeness * max(0, 3 - speed) * 0.3;  // per frame: ~+2
-if (landed) reward = +10 + bonuses;              // terminal: ~+14
-if (crashed) reward = -2 - 3*speed - 5*dist;    // terminal: ~-5 to -10</code></pre>
-
-<p>
-<strong>A2C went from 2% to 53% in one change.</strong> The critic could finally predict $V(s)$ accurately because the target values were in a consistent range. The advantages became meaningful, and the actor got clear gradient signal.
+DQN survived because its replay buffer averages over thousands of transitions, dampening the spikes. A2C and PPO, which train on recent experience directly, were destroyed.
 </p>
 
 <p>
-<strong>Lesson:</strong> this is arguably the single most important practical lesson in RL engineering. If your rewards span orders of magnitude, normalize them. The theory says the optimal policy is scale-invariant; the practice says your ~4,200-parameter network is not.
+<strong>Lesson:</strong> this is arguably the single most important practical lesson in RL engineering. <em>Reward scale matters as much as reward shape.</em> If your terminal reward is 100&times; your step reward, the critic will learn nothing useful. We scaled terminal rewards to &plusmn;20 and added a separate 0.1&times; multiplier for on-policy methods. A2C jumped from 2% to ~15%.
 </p>
 
-<h3>Iteration 4: Two hidden layers (6% DQN, 5% A2C, 4% PPO)</h3>
+<h3>Failure 3: Uniform exploration fights the physics (PPO stuck at 2%)</h3>
 
 <p>
-That 53% A2C was a lucky run. Averaging over 3 trials: DQN 2%, A2C 9%, PPO 0.5%. Stochastic initialization matters enormously with tiny networks.
-</p>
-
-<p>
-The deeper problem: a single ReLU hidden layer can only represent <strong>piecewise linear functions</strong>. But the value function for Lunar Lander is non-linear &mdash; it depends on interactions between position and velocity (close + slow = good, close + fast = bad). A single layer can&rsquo;t capture $\text{closeness} \times \text{slowness}$ without dedicated features.
+Even after fixing reward scale, PPO barely learned. The answer was embarrassingly simple: $\epsilon$-greedy exploration picks uniformly from 6 actions. THRUST_MAIN fires 17% of the time. But hovering requires thrust 27% of the time (gravity / thrust = 0.04 / 0.15). <em>Random exploration was biased against the correct behavior.</em>
 </p>
 
 <p>
-We added a second hidden layer: <code>MiniNet2(8, 48, 32, 6)</code>. The extra layer lets the network compute intermediate features in the first layer (closeness, speed, uprightness) and combine them non-linearly in the second. The parameter count roughly doubles, but the representational capacity increases far more.
+Fix: weight THRUST_MAIN at 40% of random actions. This isn&rsquo;t cheating &mdash; it&rsquo;s an informed prior. We know the lander needs thrust to fight gravity; we&rsquo;re telling the exploration policy, not the learned policy.
 </p>
 
-<p>
-<strong>Averaged over 3 trials at 500 episodes:</strong> DQN 6%, A2C 5%, PPO 4%. Not headline numbers, but <em>consistent</em> and <em>improving</em>. More importantly, PPO went from 0.5% to 4% &mdash; the extra capacity let the clipped updates accumulate meaningful policy changes instead of getting stuck.
-</p>
-
-<p>
-<strong>Lesson:</strong> at this scale, you hit the representation bottleneck before the data bottleneck. A 1,000-parameter single-layer network can&rsquo;t represent the value function accurately enough for gradient-based learning to work. Two layers with the same total parameters performs dramatically better because function composition is more expressive than function width.
-</p>
-
-<h3>Iteration 5: Biased exploration + reward scaling (30% DQN, 18% A2C, 22% PPO)</h3>
-
-<p>
-Two final insights pushed the numbers up dramatically.
-</p>
-
-<p>
-<strong>Biased exploration.</strong> When the agent explores randomly ($\epsilon$-greedy), it picks uniformly from 6 actions. THRUST_MAIN fires 17% of the time. But hovering requires thrust 27% of the time (gravity 0.04 / thrust 0.15). <em>Random exploration is biased against the correct behavior.</em> The agent spends hundreds of episodes failing before it accidentally discovers that firing thrust is essential.
-</p>
-
-<p>
-Fix: weight THRUST_MAIN at 40% of random actions. This is <strong>not cheating</strong> &mdash; it&rsquo;s an informed prior. We know the lander needs thrust to fight gravity; we&rsquo;re just telling the exploration policy. The learned policy discovers the optimal thrust timing on its own.
-</p>
-
-<pre><code class="language-javascript">// Biased random action — THRUST_MAIN gets 40%, others 12% each
-function biasedRandomAction() {
-    var r = Math.random();
-    if (r < 0.40) return 1; // THRUST_MAIN
-    var others = [0, 2, 3, 4, 5];
-    return others[Math.floor((r - 0.40) / 0.12)];
+<pre><code class="language-javascript">function biasedRandomAction() {
+    if (Math.random() < 0.40) return 1; // THRUST_MAIN
+    // remaining 60% split across 5 other actions
 }</code></pre>
 
 <p>
-<strong>Reward scaling for on-policy methods.</strong> Even with normalized rewards (terminal &plusmn;20, per-frame &plusmn;3), the 7&times; ratio still caused critic oscillation in A2C and PPO. DQN was fine because the replay buffer averages over thousands of transitions. Fix: multiply rewards by 0.1 before passing to A2C/PPO critics. DQN keeps raw rewards.
+PPO went from 2% to 23%. <strong>The single biggest improvement we made.</strong>
 </p>
 
 <p>
-<strong>Combined effect, averaged over 3 trials at 1,000 episodes:</strong>
+<strong>Lesson:</strong> if your domain has a physics prior (gravity demands thrust, friction demands steering), encode it in the exploration distribution. The agent still learns <em>when</em> to thrust; you&rsquo;re just ensuring it discovers <em>that</em> thrust matters before the episode budget runs out.
+</p>
+
+<h3>What else mattered</h3>
+
+<p>
+Two more structural changes each contributed ~5 percentage points:
 </p>
 
 <ul>
-    <li><strong>DQN: 30%</strong> (range 8&ndash;52%) &mdash; replay buffer + biased exploration</li>
-    <li><strong>A2C: 18%</strong> (range 16&ndash;21%) &mdash; finally consistent</li>
-    <li><strong>PPO: 22%</strong> (range 21&ndash;23%) &mdash; <em>the most consistent algorithm</em></li>
+    <li><strong>Two hidden layers instead of one.</strong> The value function for landing depends on interactions between position and velocity (close + slow = good, close + fast = bad). A single ReLU layer produces piecewise linear functions &mdash; it can&rsquo;t represent products. Two layers can, because the first layer computes features (closeness, speed) and the second combines them non-linearly.</li>
+    <li><strong>Curriculum spawn altitude.</strong> Level 0 originally spawned at 120&ndash;200px. Free-fall from 160px builds $v_y = 3.2$ by impact &mdash; impossible to land. Dropping to 35&ndash;60px lets the agent discover braking within 50 episodes, bootstrapping the learning signal.</li>
 </ul>
 
-<p>
-PPO went from 1% to 22% and became the most reliable learner, with only 2% variance across trials. This is exactly what the theory predicts: PPO&rsquo;s clipping prevents catastrophic updates, so once it finds a decent policy, it never loses it. A2C is faster to find good policies but can lose them to a bad gradient step. DQN has the highest ceiling (52%) but the widest variance (8&ndash;52%) depending on replay buffer composition.
-</p>
+<h2>05 // THE TRAINING LOOP</h2>
 
 <p>
-For reference, OpenAI Gym&rsquo;s Lunar Lander benchmark uses 2-layer networks with 64 neurons each (~8,000 parameters) and trains for 1,000+ episodes with a GPU. We&rsquo;re doing it in the browser with ~4,200 parameters and pure JavaScript backprop. The agents land 20&ndash;30% of the time on easy difficulty &mdash; not human-level, but <em>visibly improving</em>, which is the teaching point.
-</p>
-
-<h3>What didn&rsquo;t work (the graveyard)</h3>
-
-<p>
-Not every idea improved things. Here&rsquo;s what we tried and reverted, and why:
+Lunar Lander is single-player, so difficulty comes from <strong>curriculum learning via spawn randomization</strong>:
 </p>
 
 <ul>
-    <li><strong>Aggressive DQN training</strong> (batch 64, LR 0.003, train every 2 steps): made DQN <em>worse</em> (13%&rarr;8%). With 4K parameters, each gradient step moves weights a lot. More frequent training with bigger batches = Q-value oscillation. The replay buffer already provides diversity; training harder on it just overfits to recent transitions.</li>
-    <li><strong>Frame skipping</strong> (decide every 4 physics frames, like Atari DQN): helped A2C (+7pp) but destroyed DQN (&minus;19pp) and PPO (&minus;17pp). At Atari scale (10,000+ frames/episode), frame skip reduces redundancy. At our scale (35 frames/episode), every frame already has meaningful state change. Frame skip just reduces training data volume, which kills replay-based and trajectory-based methods.</li>
-    <li><strong>PPO per-episode trajectory flushing</strong>: theoretically correct (prevents cross-episode contamination in GAE). Practically catastrophic &mdash; training on 30-step fragments with 2 epochs is 60 gradient updates on tiny data. The agent learned to crash <em>faster</em> (avg steps 45&rarr;27). Reverted to accumulating across episodes with done-flag handling.</li>
-    <li><strong>Landing reward +30</strong>: helped DQN (replay buffer absorbs spikes) but killed A2C/PPO. The dynamic range problem returned through the critic &mdash; same bug, different door.</li>
-    <li><strong>Step-function near-pad bonus</strong> (jumps from 0 to +3 when closeness &gt; 0.7 and speed &lt; 2.0): neural networks hate discontinuities. Replaced with smooth $\text{closeness}^2 \times (3 - \text{speed})/3$ for stable gradients at all points.</li>
-    <li><strong>PPO epoch tuning</strong> (3&rarr;4&rarr;3&rarr;2): going back and forth because it was never the real bottleneck. Like adjusting the radio while the antenna is broken.</li>
-</ul>
-
-<p>
-<strong>The meta-lesson:</strong> we spent most of our debugging time tuning knobs (learning rates, batch sizes, epoch counts, trajectory lengths) when the real problems were structural (exploration bias, reward scale, network depth, spawn difficulty). Knob-turning gives the illusion of progress because every run has high variance &mdash; a lucky seed can make any configuration look good. The 53% A2C result that excited us early on was just a lucky random initialization; averaged over 3 trials it was 9%.
-</p>
-
-<p>
-The changes that actually mattered were all <em>qualitative</em>, not quantitative: biased exploration (matching the prior to the problem), reward normalization (matching the scale to the architecture), spawn altitude (matching the task to the agent&rsquo;s current ability), and network depth (matching the capacity to the function complexity). If your RL agent isn&rsquo;t learning, resist the urge to tune &mdash; look for a structural mismatch.
-</p>
-
-<h2>05 // THE TRAINING LOOP THAT TOOK THREE TRIES</h2>
-
-<p>
-Lunar Lander is single-player, so there&rsquo;s no opponent to calibrate against. Instead, difficulty comes from <strong>curriculum learning via spawn randomization</strong>:
-</p>
-
-<ul>
-    <li><strong>Level 0 (Easy):</strong> 35&ndash;60px directly above pad, zero velocity, zero angle</li>
-    <li><strong>Level 1 (Medium):</strong> 100&ndash;180px altitude, &plusmn;40px offset, small initial velocity</li>
-    <li><strong>Level 2 (Hard):</strong> 160&ndash;300px altitude, &plusmn;100px offset, initial velocity up to 1.0</li>
+    <li><strong>Level 0 (Easy):</strong> 35&ndash;60px directly above pad, zero velocity</li>
+    <li><strong>Level 1 (Medium):</strong> 100&ndash;180px altitude, &plusmn;40px offset</li>
+    <li><strong>Level 2 (Hard):</strong> 160&ndash;300px altitude, &plusmn;100px offset, initial velocity</li>
     <li><strong>Level 3 (Full):</strong> 200&ndash;400px altitude, &plusmn;150px offset, wind gusts</li>
 </ul>
 
 <p>
-Level 0 was originally at 120&ndash;200px altitude. <strong>No agent could land</strong> &mdash; the fall was too long, the agent built too much speed, and by the time it reached the pad the crash was inevitable. Dropping level 0 to 35&ndash;60px gave agents their first landing experiences within 50 episodes, providing the positive reward signal they needed to bootstrap learning.
-</p>
-
-<p>
-The level advances automatically when the rolling landing rate (last 20 episodes) exceeds 60%. Auto-train runs 200 physics steps per animation frame.
-</p>
-
-<h3>The warmup that destroyed A2C</h3>
-
-<p>
-First-time visitors see a boot animation while agents pre-train. We used &ldquo;aggressive hyperparameters&rdquo; to speed convergence: $\epsilon$ decay of 0.97 per episode (much faster than normal). Sounds reasonable.
-</p>
-
-<p>
-<strong>For A2C, this was catastrophic.</strong> With decay 0.97, exploration collapsed from 50% to 1% by episode 50. The agent locked into whatever bad policy it had discovered during random exploration &mdash; usually &ldquo;always fire main thrust&rdquo; &mdash; and trained for 50 more episodes reinforcing that bad policy. Policy gradient methods need sustained exploration because they learn <em>from the distribution they sample</em>. Kill the exploration, kill the learning.
-</p>
-
-<p>
-DQN was unaffected because its $\epsilon$ decays per <em>step</em>, not per episode, and its replay buffer retains diverse experiences regardless of the current $\epsilon$. This is a fundamental advantage of off-policy methods.
-</p>
-
-<p>
-<strong>Fix:</strong> gentler warmup decay (0.995 per episode), and higher learning rates instead of lower $\epsilon$ to speed convergence without sacrificing exploration.
-</p>
-
-<h3>The epsilon that barely decayed</h3>
-
-<p>
-DQN&rsquo;s per-step $\epsilon$ decay was initially set to 0.99995. After 150 warmup episodes (~12,000 steps): $\epsilon = 1.0 \times 0.99995^{12000} \approx 0.55$. The agent was still picking random actions half the time. We changed this to 0.9997, which reaches $\epsilon \approx 0.05$ in ~10,000 steps.
-</p>
-
-<p>
-<strong>Lesson:</strong> always compute what your hyperparameters actually produce. $0.99995^{12000} = 0.55$ is not an edge case &mdash; it&rsquo;s the default behavior that you&rsquo;d ship to users.
+The level advances when the rolling landing rate (last 20 episodes) exceeds 60%. The warmup boot pre-trains each agent for 600&ndash;1,000 episodes in non-blocking chunks (~2&ndash;3 seconds on page load).
 </p>
 
 <h2>06 // WHAT EACH ALGORITHM ACTUALLY DID</h2>
 
-<h3>DQN: The Replay Buffer Saves Everything</h3>
+<h3>DQN: The Replay Buffer Wins at Small Scale</h3>
 
 <p>
-DQN was the most consistent performer across all our reward-function iterations: 14% with bad rewards, 13% with good rewards. It never hit 0%. Why?
+DQN was the most resilient performer &mdash; 14% even with bad rewards. The <strong>replay buffer</strong> is the reason: (1) gradient spikes from terminal rewards get diluted by hundreds of per-frame transitions, (2) the agent sees diverse experiences regardless of its current policy, (3) rare near-landings get replayed many times.
 </p>
 
 <p>
-The <strong>replay buffer</strong>. DQN stores every transition it sees and trains on random mini-batches. This means: (1) gradient spikes from terminal rewards get diluted by hundreds of per-frame transitions, (2) the agent sees a diverse mix of experiences regardless of its current policy, and (3) rare events like near-landings get replayed many times.
+Interestingly, Adam optimizer made DQN <em>worse</em>. Adam&rsquo;s momentum accumulates bias from non-stationary Q-targets &mdash; the target network changes every 200 steps, so the optimization landscape shifts underneath the momentum. DQN does best with plain SGD, which has no memory of stale gradients.
+</p>
+
+<h3>A2C: Fast but Fragile</h3>
+
+<p>
+A2C was the most sensitive to reward design &mdash; it went from 0% to 15% purely based on reward normalization. Without a replay buffer, the critic sees only recent transitions. If the reward scale is unstable, the critic&rsquo;s MSE loss oscillates wildly, the advantages become noise, and the actor gets random gradient updates.
 </p>
 
 <p>
-DQN&rsquo;s weakness: it occasionally learned to fly <em>away</em> from the pad. With the original reward function, there was no penalty for drifting upward, so Q-values for &ldquo;hover indefinitely&rdquo; and &ldquo;approach the pad&rdquo; were similar. Adding an altitude penalty ($-0.3 \times \text{excess\_height}$) fixed this: 58 out-of-bounds episodes dropped to 0.
+A2C benefits from Adam optimizer (unlike DQN) because policy gradients are naturally noisy and momentum smooths them. The entropy bonus ($\beta = 0.04$) is also critical &mdash; without it, A2C collapses to &ldquo;always fire main thrust,&rdquo; which is locally optimal but can&rsquo;t handle lateral corrections.
 </p>
 
-<h3>A2C: The Critic Needs Calm</h3>
+<h3>PPO: The Most Consistent Learner</h3>
 
 <p>
-A2C was the most sensitive to reward design. It went from 0% to 2% to <strong>53%</strong> across our three iterations, purely based on reward normalization. The reason is architectural.
-</p>
-
-<p>
-A2C trains in <em>N-step batches</em> (16 steps). The critic sees recent transitions and must predict $V(s)$ from them. If the reward scale is unstable &mdash; per-frame rewards of 1 followed by a terminal reward of 140 &mdash; the critic&rsquo;s MSE loss oscillates wildly. The advantages $(R - V)$ become noise. The actor gets random gradient updates. Nothing converges.
+PPO lands 22&ndash;24% across all random seeds &mdash; the <strong>tightest variance of any algorithm</strong> (2 percentage points). This is exactly what the theory predicts: clipping prevents catastrophic updates, so once PPO finds a decent policy, it never loses it. A2C can reach higher peaks but also has worse valleys.
 </p>
 
 <p>
-Once we normalized rewards to a 14&times; range instead of 240&times;, the critic could actually learn the value function. A2C became the fastest learner &mdash; its N-step returns give it multi-frame context that single-step TD (our first A2C attempt) couldn&rsquo;t provide, while being less noisy than full-episode Monte Carlo.
-</p>
-
-<p>
-<strong>The entropy bonus ($\beta = 0.04$) is critical.</strong> Without it, A2C collapses to a deterministic policy within 20 episodes. With the closeness&times;slowness reward, &ldquo;always fire main thrust&rdquo; is locally optimal &mdash; it keeps you slow &mdash; but it can&rsquo;t handle lateral corrections. The entropy bonus keeps the policy stochastic enough to discover that NOOP and rotation matter too.
-</p>
-
-<h3>PPO: Conservative to a Fault</h3>
-
-<p>
-PPO&rsquo;s story is the opposite of A2C&rsquo;s. Where A2C was too sensitive, PPO was too conservative. Its landing rate stayed at 2% even after A2C hit 53%.
-</p>
-
-<p>
-The issue: <strong>PPO needs enough data per training step to make the clipping meaningful.</strong> It collects 64-step trajectories before training. With episodes averaging 30&ndash;40 steps, each trajectory spans ~2 episodes. This is fine &mdash; GAE handles episode boundaries via done flags. But it means PPO trains <em>half as often</em> as A2C per episode. The clipping then further limits how much the policy can change per update.
-</p>
-
-<p>
-We made PPO&rsquo;s training frequency worse by accident: our first version flushed the trajectory on every episode end, training on tiny 30-step fragments with 3 epochs. That&rsquo;s 90 gradient updates on 30 data points &mdash; severe overfitting. The policy degraded: average episode length dropped from 45 to 27 steps over 500 episodes. <strong>The agent was learning to crash faster.</strong>
-</p>
-
-<p>
-<strong>Fix:</strong> let PPO accumulate across episodes (done flags handle boundaries), only train at 64 steps, reduce to 2 epochs. PPO is still the slowest learner but no longer degrades. With more training time (500+ episodes), it should show the smoothest learning curve.
-</p>
-
-<p>
-<strong>Lesson:</strong> PPO&rsquo;s conservatism is both its strength and its weakness. It needs more data per update than A2C. In production RLHF, this is solved with large batch sizes (thousands of trajectories). In a browser with ~4,200 parameters, you just need patience.
+PPO&rsquo;s weakness: it trains less frequently than A2C (every 64 steps vs every 16), and each update is clipped. In production RLHF, this is solved with large batch sizes. In a browser with 4K parameters, it just needs patience.
 </p>
 
 <h3>The Scoreboard</h3>
@@ -522,31 +387,47 @@ We made PPO&rsquo;s training frequency worse by accident: our first version flus
         <tr style="border-bottom:2px solid var(--border-subtle);">
             <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Algorithm</th>
             <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Params</th>
-            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Landing @500 eps</th>
-            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Stability</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Landing @1K eps</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Seed Variance</th>
         </tr>
     </thead>
     <tbody>
         <tr style="border-bottom:1px solid var(--border-subtle);">
-            <td style="padding:0.5rem;">DQN</td>
+            <td style="padding:0.5rem;">DQN (SGD)</td>
             <td style="text-align:center; padding:0.5rem;">~2,200</td>
-            <td style="text-align:center; padding:0.5rem;">~30% (8&ndash;52%)</td>
-            <td style="text-align:center; padding:0.5rem;">High ceiling, variable</td>
+            <td style="text-align:center; padding:0.5rem;">21%</td>
+            <td style="text-align:center; padding:0.5rem;">19&ndash;23%</td>
         </tr>
         <tr style="border-bottom:1px solid var(--border-subtle);">
-            <td style="padding:0.5rem;">A2C</td>
+            <td style="padding:0.5rem;">A2C (Adam)</td>
             <td style="text-align:center; padding:0.5rem;">~4,200</td>
-            <td style="text-align:center; padding:0.5rem;">~18% (16&ndash;21%)</td>
-            <td style="text-align:center; padding:0.5rem;">Fast but sensitive</td>
+            <td style="text-align:center; padding:0.5rem;">14%</td>
+            <td style="text-align:center; padding:0.5rem;">12&ndash;19%</td>
         </tr>
         <tr>
-            <td style="padding:0.5rem;">PPO</td>
+            <td style="padding:0.5rem;">PPO (SGD)</td>
             <td style="text-align:center; padding:0.5rem;">~4,200</td>
-            <td style="text-align:center; padding:0.5rem;">~22% (21&ndash;23%)</td>
-            <td style="text-align:center; padding:0.5rem;">Most consistent</td>
+            <td style="text-align:center; padding:0.5rem;">23%</td>
+            <td style="text-align:center; padding:0.5rem;">22&ndash;24%</td>
         </tr>
     </tbody>
 </table>
+
+<h3>What didn&rsquo;t work</h3>
+
+<p>
+Some lessons come from negative results:
+</p>
+
+<ul>
+    <li><strong>Frame skipping</strong> (decide every 4 physics frames, like Atari DQN): helped A2C but destroyed DQN and PPO. At Atari scale (10K+ frames/episode), frame skip reduces redundancy. At our scale (35 frames), it just cuts training data, starving replay-based and trajectory-based methods.</li>
+    <li><strong>Step-function rewards</strong> (bonus jumps from 0 to +3 at a threshold): neural networks hate discontinuities. Replaced with smooth $\text{closeness}^2 \times (3 - \text{speed})/3$ for stable gradients everywhere.</li>
+    <li><strong>Hyperparameter tuning</strong> (batch size, epochs, learning rate): we wasted time tuning knobs when the real problems were structural. Every run has high variance &mdash; a lucky seed makes any configuration look good.</li>
+</ul>
+
+<p>
+<strong>The meta-lesson:</strong> the changes that actually mattered were all <em>structural</em> &mdash; exploration bias, reward scale, network depth, spawn difficulty. If your RL agent isn&rsquo;t learning, resist the urge to tune. Look for a mismatch between your assumptions and your problem.
+</p>
 
 <h2>07 // SEEING ACTOR-CRITIC</h2>
 
@@ -618,10 +499,10 @@ Every parameter is a Float64 in typed arrays &mdash; no framework, no tensors, j
 </p>
 
 <ul>
-    <li><strong>DQN:</strong> MiniNet2(8, 48, 32, 6) &rarr; (8&times;48+48) + (48&times;32+32) + (32&times;6+6) = 432+1568+198 = <strong>2,198</strong></li>
-    <li><strong>A2C/PPO Actor:</strong> MiniNet2(8, 48, 32, 6) &rarr; <strong>2,198</strong></li>
-    <li><strong>A2C/PPO Critic:</strong> MiniNet2(8, 48, 32, 1) &rarr; (8&times;48+48) + (48&times;32+32) + (32&times;1+1) = 432+1568+33 = <strong>2,033</strong></li>
-    <li><strong>A2C/PPO Total:</strong> 2,198 + 2,033 = <strong>4,231</strong></li>
+    <li><strong>DQN:</strong> MiniNet2(8, 64, 48, 6) &rarr; (8&times;64+64) + (64&times;48+48) + (48&times;6+6) = 576+3120+294 = <strong>3,990</strong> &mdash; SGD optimizer</li>
+    <li><strong>A2C/PPO Actor:</strong> MiniNet2(8, 64, 48, 6) &rarr; <strong>3,990</strong></li>
+    <li><strong>A2C/PPO Critic:</strong> MiniNet2(8, 64, 48, 1) &rarr; (8&times;64+64) + (64&times;48+48) + (48&times;1+1) = 576+3120+49 = <strong>3,745</strong></li>
+    <li><strong>A2C/PPO Total:</strong> 3,990 + 3,745 = <strong>7,735</strong> &mdash; A2C uses Adam, PPO uses SGD</li>
 </ul>
 
 <h2>09 // TRY IT YOURSELF</h2>
