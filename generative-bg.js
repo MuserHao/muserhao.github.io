@@ -39,31 +39,21 @@
         );
     }
 
-    // ── Theme-aware palettes ───────────────────────────────────────────────────
-    //
-    // Dark theme: neon flow field — cyan, electric blue, purple, magenta, hot pink.
-    // Rationale: saturated hues at low opacity (~0.18) over a near-black canvas
-    // create a bioluminescent diffusion feel, echoing plasma/neural activation maps.
-    //
-    // Light theme: warm artisanal palette — coffee, mocha, dark chocolate, caramel,
-    // with one cool slate-blue accent so it doesn't feel completely monochrome.
-    // Rationale: cream background + earth tones reads like aged paper or wet ink
-    // diffusing — organic, tactile, complementary to the warm #faf8f5 site bg.
-
+    // ── Theme-aware palettes (restrained — fewer hues, lower alpha) ──────────
     const PALETTES = {
         dark: {
-            trail:  'rgba(0, 0, 0, 0.04)',        // slow black fade → deep trail depth
-            hues:   [185, 198, 220, 270, 295, 328, 340],  // cyan → indigo → purple → pink
-            sat:    '100%',
-            lit:    '65%',
-            alpha:  0.18,
+            trail:  'rgba(0, 0, 0, 0.05)',
+            hues:   [185, 195, 320, 330],       // cyan-ish + pink-ish only
+            sat:    '80%',
+            lit:    '60%',
+            alpha:  0.10,
         },
         light: {
-            trail:  'rgba(250, 248, 245, 0.06)',  // matches site light bg #faf8f5
-            hues:   [20, 25, 28, 33, 38, 210],    // espresso, coffee, mocha, caramel, tan + one slate accent
-            sat:    '58%',
-            lit:    '38%',
-            alpha:  0.28,
+            trail:  'rgba(250, 248, 245, 0.07)',
+            hues:   [20, 25, 33, 210],
+            sat:    '50%',
+            lit:    '40%',
+            alpha:  0.15,
         },
     };
 
@@ -84,9 +74,9 @@
     resize();
     window.addEventListener('resize', resize, { passive: true });
 
-    // ── Particles ─────────────────────────────────────────────────────────────
-    const NUM  = 1500;
-    const SPD  = 1.2;
+    // ── Particles (reduced count for subtlety) ───────────────────────────────
+    const NUM  = 500;
+    const SPD  = 1.0;
     const SCALE = 0.003;
 
     function randHue() {
@@ -108,11 +98,19 @@
         hue: randHue(),
     }));
 
-    // ── Theme switch: re-colour all particles immediately ──────────────────────
+    // ── Theme switch ─────────────────────────────────────────────────────────
     new MutationObserver(() => {
         currentTheme = getTheme();
         particles.forEach(p => { p.hue = randHue(); });
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    // ── Scroll-based fade: canvas fades out as user scrolls past hero ────────
+    let canvasOpacity = 1;
+    window.addEventListener('scroll', () => {
+        const scrollY = window.pageYOffset;
+        canvasOpacity = Math.max(0, 1 - scrollY / (H * 0.8));
+        canvas.style.opacity = canvasOpacity;
+    }, { passive: true });
 
     // ── Animation ─────────────────────────────────────────────────────────────
     let t = 0;
@@ -120,23 +118,20 @@
 
     function frame() {
         animId = requestAnimationFrame(frame);
-        t += 0.003;
 
+        // Skip rendering when fully scrolled past hero
+        if (canvasOpacity <= 0) return;
+
+        t += 0.003;
         const pal = PALETTES[currentTheme];
 
-        // Fade trail — exponential decay gives depth without full erase
         ctx.fillStyle = pal.trail;
         ctx.fillRect(0, 0, W, H);
 
         for (let i = 0; i < NUM; i++) {
             const p = particles[i];
-
-            // Two independent noise lookups from distant regions of the field.
-            // vx and vy are decorrelated, so no shared angular bias.
-            // Large spatial offsets (47.3, 91.7) ensure the two samples are
-            // statistically unrelated even at coarse noise scales.
-            const vx = noise2(p.x * SCALE + t * 0.9,        p.y * SCALE + 47.3);
-            const vy = noise2(p.x * SCALE + 91.7,           p.y * SCALE + t * 0.7);
+            const vx = noise2(p.x * SCALE + t * 0.9,  p.y * SCALE + 47.3);
+            const vy = noise2(p.x * SCALE + 91.7,     p.y * SCALE + t * 0.7);
 
             p.x += vx * SPD * 2;
             p.y += vy * SPD * 2;
