@@ -4,14 +4,34 @@
     if (typeof THREE === 'undefined') return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
+    // Dark-theme only — neural network doesn't belong in the atelier
+    function isDark() {
+        return document.documentElement.getAttribute('data-theme') !== 'light';
+    }
+
     const hero = document.getElementById('home');
     if (!hero) return;
 
     // ── Canvas ─────────────────────────────────────────────────────────────────
     const canvas = document.createElement('canvas');
+    canvas.classList.add('neural-net-canvas');
     canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;';
     hero.insertBefore(canvas, hero.firstChild);
+
+    // Hide/show based on theme
+    function updateVisibility() {
+        canvas.style.display = isDark() ? '' : 'none';
+    }
+    updateVisibility();
+
+    new MutationObserver(() => {
+        updateVisibility();
+        C = themeColors();
+        haloMat.blending = C.blending; haloMat.needsUpdate = true;
+        coreMat.blending = C.blending; coreMat.needsUpdate = true;
+        edgeMat.blending = C.blending; edgeMat.needsUpdate = true;
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     function dim() {
         return { w: hero.offsetWidth || window.innerWidth, h: hero.offsetHeight || window.innerHeight };
@@ -116,14 +136,6 @@
     });
     scene.add(new THREE.LineSegments(edgeGeo, edgeMat));
 
-    // ── Theme change: swap colors + blending mode ──────────────────────────────
-    new MutationObserver(() => {
-        C = themeColors();
-        haloMat.blending = C.blending; haloMat.needsUpdate = true;
-        coreMat.blending = C.blending; coreMat.needsUpdate = true;
-        edgeMat.blending = C.blending; edgeMat.needsUpdate = true;
-    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
     // ── Firing system ──────────────────────────────────────────────────────────
     // decay = 0.968 → after 1.5s (90 frames at 60fps): 0.968^90 ≈ 0.05
     // Firing is clearly visible for about 1.5 seconds before fading out.
@@ -174,6 +186,10 @@
 
     function animate() {
         requestAnimationFrame(animate);
+
+        // Skip rendering in light theme
+        if (!isDark()) return;
+
         t += 0.007;
 
         // Mouse parallax + slow auto-drift so the network is always in motion

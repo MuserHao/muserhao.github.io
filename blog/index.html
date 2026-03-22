@@ -26,35 +26,24 @@
     <link rel="stylesheet" href="blog.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Caveat:wght@400;500;600&display=swap" rel="stylesheet">
     <script>
         (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
     </script>
 </head>
 <body class="blog-page">
-    <!-- SVG liquid distortion filter -->
-    <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
-        <defs>
-            <filter id="liquid-distort" x="-20%" y="-20%" width="140%" height="140%">
-                <feTurbulence id="liquid-turbulence" type="fractalNoise"
-                    baseFrequency="0.006 0.009" numOctaves="4" seed="3" result="noise"/>
-                <feDisplacementMap in="SourceGraphic" in2="noise"
-                    scale="50" xChannelSelector="R" yChannelSelector="G"/>
-            </filter>
-        </defs>
-    </svg>
-
     <div class="grid-bg"></div>
 
-    <!-- Floating gradient orbs -->
+    <!-- Paper texture (light theme only) -->
+    <div class="paper-texture" aria-hidden="true"></div>
+
     <div class="gradient-orbs" aria-hidden="true">
         <div class="orb orb-cyan"></div>
         <div class="orb orb-pink"></div>
-        <div class="orb orb-purple"></div>
-        <div class="orb orb-gold"></div>
-        <div class="orb orb-teal"></div>
     </div>
 
-    <div id="particles"></div>
+    <!-- Dark theme vignette -->
+    <div class="vignette dark-only" aria-hidden="true"></div>
 
     <header>
         <nav>
@@ -82,8 +71,9 @@
 
     <main class="blog-main">
         <section class="blog-hero">
-            <h1 class="section-title"><span class="title-decoration">&lt;</span> BLOG.FEED <span class="title-decoration">/&gt;</span></h1>
-            <p class="blog-hero-subtitle">// dispatches from the intersection of math, ML, and madness</p>
+            <h1 class="section-title"><span class="dark-only"><span class="title-decoration">&lt;</span> BLOG.FEED <span class="title-decoration">/&gt;</span></span><span class="light-only">Writing</span></h1>
+            <p class="blog-hero-subtitle dark-only">// dispatches from the intersection of math, ML, and madness</p>
+            <p class="blog-hero-subtitle light-only">notes, reflections, and the occasional deep dive</p>
         </section>
 
         <section class="blog-filter">
@@ -190,17 +180,24 @@
     </main>
 
     <footer>
+        <div class="footer-gradient"></div>
         <div class="footer-content">
-            <p class="footer-text">// built with caffeine and mass GPU hours</p>
-            <p class="footer-copy">&copy; 2026 Hao Xin. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="https://github.com/MuserHao" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://www.linkedin.com/in/hao9xin/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                <a href="https://scholar.google.com/citations?hl=en&user=6y09MRIAAAAJ" target="_blank" rel="noopener noreferrer">Scholar</a>
+                <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>
+            </div>
+            <p class="footer-text dark-only">// built with caffeine and mass GPU hours</p>
+            <p class="footer-text light-only">made with curiosity and care</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin</p>
         </div>
     </footer>
 
     <script src="../shared.js"></script>
     <script src="blog-bg.js"></script>
     <script>
-        // Page-specific: particles + filter
-        createParticles(30);
+        // Page-specific: filter
 
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', () => {

@@ -50,22 +50,41 @@
     opacity: 1;
 }
 
-/* ── Background: suppress heavy neon decorations for readability ── */
-/* Orbs: dial back to barely-there — they were designed for the hero's dark stage,
-   not a text-reading context. Bloom + blur still present, just very faint. */
+/* ── Background: subtle for readability ── */
 .blog-page .gradient-orbs .orb {
     opacity: 0.06 !important;
     filter: blur(110px) !important;
 }
 
-/* Grid lines: 40% of normal opacity — structural texture without visual noise */
 .blog-page .grid-bg {
     opacity: 0.2 !important;
 }
 
-/* Floating sparkle particles: already 30 on blog, but dim them further */
-.blog-page #particles .particle {
-    opacity: 0.25 !important;
+/* ── Light theme blog: warm, clean reading experience ── */
+[data-theme="light"] .blog-page .gradient-orbs .orb {
+    opacity: 0.05 !important;
+    filter: blur(150px) !important;
+}
+
+[data-theme="light"] .blog-hero-subtitle {
+    font-family: var(--font-body);
+    font-style: italic;
+}
+
+[data-theme="light"] .blog-card {
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.03);
+}
+
+[data-theme="light"] .blog-card::before,
+[data-theme="light"] .blog-card::after {
+    display: none;
+}
+
+[data-theme="light"] .filter-btn {
+    font-family: var(--font-body);
+    text-transform: none;
+    letter-spacing: 0.5px;
 }
 
 /* ── Blog Hero ── */
