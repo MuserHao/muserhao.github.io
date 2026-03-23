@@ -40,12 +40,12 @@
 
     // ── Palettes ─────────────────────────────────────────────────────────────
     const DARK = {
-        trail:     'rgba(10, 12, 20, 0.025)',
+        trail:     'rgba(10, 12, 20, 0.04)',
         hues:      [195, 205, 215, 340],
         sats:      [50,  50,  50,  40],
         lits:      [62,  62,  62,  58],
-        dotAlpha:  0.45,
-        lineAlpha: 0.10,
+        dotAlpha:  0.5,
+        lineAlpha: 0.15,
         linkDist:  150,
         num:       200,
         speed:     0.8,
@@ -58,8 +58,8 @@
         sats:      [52, 55, 48, 45,  42,  38,  32],
         lits:      [45, 48, 55, 42,  46,  52,  48],
         num:       80,
-        speed:     0.5,
-        scale:     0.0015,
+        speed:     0.2,                             // very slow — contemplative, unhurried
+        scale:     0.001,                            // large noise → sweeping gentle arcs
         baseAlpha: 0.15,          // bold strokes — colors clearly distinguishable
         maxWidth:  6,
     };
@@ -233,8 +233,8 @@
             p.px = p.x;   p.py = p.y;
 
             // Use very slow noise at different scales for organic flow
-            const n1 = noise2(p.x * pal.scale + t * 0.5, p.y * pal.scale + 47.3 + i * 0.1);
-            const n2 = noise2(p.x * pal.scale + 91.7,    p.y * pal.scale + t * 0.3 + i * 0.1);
+            const n1 = noise2(p.x * pal.scale + t * 0.25, p.y * pal.scale + 47.3 + i * 0.1);
+            const n2 = noise2(p.x * pal.scale + 91.7,    p.y * pal.scale + t * 0.15 + i * 0.1);
 
             p.x += n1 * pal.speed * 2;
             p.y += n2 * pal.speed * 2;

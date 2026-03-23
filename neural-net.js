@@ -56,9 +56,9 @@
     function themeColors() {
         const light = document.documentElement.getAttribute('data-theme') === 'light';
         return {
-            nodeBase: light ? new THREE.Color(0x4a9ab0) : new THREE.Color(0x0d2a40),
+            nodeBase: light ? new THREE.Color(0x4a9ab0) : new THREE.Color(0x1a4a60),
             nodeGlow: light ? new THREE.Color(0x00c8d8) : new THREE.Color(0x00f0ff),
-            edgeBase: light ? new THREE.Color(0x3a7a90) : new THREE.Color(0x071c30),
+            edgeBase: light ? new THREE.Color(0x3a7a90) : new THREE.Color(0x0d3a50),
             edgeGlow: light ? new THREE.Color(0x00a0b8) : new THREE.Color(0x00b8e0),
             blending: light ? THREE.NormalBlending : THREE.AdditiveBlending,
         };
