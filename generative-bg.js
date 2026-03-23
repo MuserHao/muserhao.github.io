@@ -53,21 +53,14 @@
     };
 
     const LIGHT = {
-        trail:     'rgba(245, 240, 232, 0.005)',  // very slow → colors linger much longer
-        hues:      [14, 25, 42, 355, 220, 200, 140],
-        sats:      [52, 55, 48, 45,  42,  38,  32],
-        lits:      [45, 48, 55, 42,  46,  52,  48],
-        num:       80,
-        speed:     0.2,                             // very slow — contemplative, unhurried
-        scale:     0.001,                            // large noise → sweeping gentle arcs
-        baseAlpha: 0.15,          // bold strokes — colors clearly distinguishable
-        maxWidth:  6,
+        hues:  [14, 25, 42, 355, 220, 200, 140],
+        sats:  [52, 55, 48, 45,  42,  38,  32],
+        lits:  [45, 48, 55, 42,  46,  52,  48],
     };
 
     function getTheme() {
         return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
     }
-
     let currentTheme = getTheme();
 
     // ── Canvas & resize ──────────────────────────────────────────────────────
@@ -79,16 +72,16 @@
         canvas.height = H;
     }
     resize();
-    window.addEventListener('resize', resize, { passive: true });
+    window.addEventListener('resize', () => {
+        resize();
+        // Repaint light theme on resize
+        if (currentTheme === 'light') { lightPainted = false; paintLight(); }
+    }, { passive: true });
 
-    // ── Particles — separate pools per theme ─────────────────────────────────
+    // ── Particles (dark theme only) ──────────────────────────────────────────
     function randHue(pal) {
         const idx = Math.floor(Math.random() * pal.hues.length);
-        return {
-            h: pal.hues[idx],
-            s: pal.sats ? pal.sats[idx] : parseInt(pal.sat),
-            l: pal.lits ? pal.lits[idx] : parseInt(pal.lit),
-        };
+        return { h: pal.hues[idx], s: pal.sats[idx], l: pal.lits[idx] };
     }
 
     function randEdge() {
@@ -99,36 +92,18 @@
         return { x: 0, y: Math.random() * H };
     }
 
-    function createParticles(pal) {
-        return Array.from({ length: pal.num }, () => {
-            const x = Math.random() * W;
-            const y = Math.random() * H;
-            const c = randHue(pal);
-            return {
-                x, y,
-                px: x, py: y,
-                ppx: x, ppy: y,
-                hue: c.h, sat: c.s, lit: c.l,
-                life: Math.random(),
-            };
-        });
-    }
-
-    let darkParticles = createParticles(DARK);
-    let lightParticles = createParticles(LIGHT);
+    const darkParticles = Array.from({ length: DARK.num }, () => {
+        const x = Math.random() * W, y = Math.random() * H;
+        const c = randHue(DARK);
+        return { x, y, px: x, py: y, hue: c.h, sat: c.s, lit: c.l };
+    });
 
     // ── Theme switch ─────────────────────────────────────────────────────────
     new MutationObserver(() => {
         currentTheme = getTheme();
-        const pal = currentTheme === 'dark' ? DARK : LIGHT;
-        (currentTheme === 'dark' ? darkParticles : lightParticles).forEach(p => {
-            const c = randHue(pal); p.hue = c.h; p.sat = c.s; p.lit = c.l;
-        });
         ctx.clearRect(0, 0, W, H);
+        if (currentTheme === 'light') { lightPainted = false; paintLight(); }
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
-    // ── Canvas always visible — both themes are full-page ─────────────────────
-    let canvasOpacity = 1;
 
     // ── Spatial grid (dark mode) ─────────────────────────────────────────────
     let grid = {};
@@ -151,22 +126,10 @@
         return result;
     }
 
-    // ── Animation ────────────────────────────────────────────────────────────
+    // ── Dark: constellation mesh (continuous animation) ──────────────────────
     let t = 0;
     let animId = null;
 
-    function frame() {
-        animId = requestAnimationFrame(frame);
-        t += 0.002;
-
-        if (currentTheme === 'dark') {
-            frameDark();
-        } else {
-            frameLight();
-        }
-    }
-
-    // ── Dark: constellation mesh ─────────────────────────────────────────────
     function frameDark() {
         const pal = DARK;
         const pts = darkParticles;
@@ -214,79 +177,117 @@
         }
     }
 
-    // ── Light: ink wash / watercolor ─────────────────────────────────────────
-    function frameLight() {
-        const pal = LIGHT;
-        const pts = lightParticles;
+    // ── Light: generative color field painting ─────────────────────────────
+    let lightPainted = false;
 
-        ctx.fillStyle = pal.trail;
-        ctx.fillRect(0, 0, W, H);
+    function paintLight() {
+        if (lightPainted) return;
+        lightPainted = true;
 
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        ctx.clearRect(0, 0, W, H);
 
-        for (let i = 0; i < pts.length; i++) {
-            const p = pts[i];
+        const palette = [
+            { h: 18,  s: 55, l: 68 },   // warm sienna — deeper, more pigmented
+            { h: 355, s: 42, l: 66 },   // dusty rose
+            { h: 38,  s: 48, l: 72 },   // golden amber
+            { h: 215, s: 40, l: 70 },   // ultramarine accent
+            { h: 160, s: 28, l: 72 },   // cool sage
+            { h: 8,   s: 50, l: 62 },   // deep terra cotta
+        ];
 
-            // Save two-step history for bezier control points
-            p.ppx = p.px; p.ppy = p.py;
-            p.px = p.x;   p.py = p.y;
-
-            // Use very slow noise at different scales for organic flow
-            const n1 = noise2(p.x * pal.scale + t * 0.25, p.y * pal.scale + 47.3 + i * 0.1);
-            const n2 = noise2(p.x * pal.scale + 91.7,    p.y * pal.scale + t * 0.15 + i * 0.1);
-
-            p.x += n1 * pal.speed * 2;
-            p.y += n2 * pal.speed * 2;
-
-            if (p.x < -20 || p.x > W+20 || p.y < -20 || p.y > H+20) {
-                const e = randEdge();
-                p.x = e.x; p.y = e.y;
-                p.px = p.x; p.py = p.y;
-                p.ppx = p.x; p.ppy = p.y;
-                const c = randHue(pal);
-                p.hue = c.h; p.sat = c.s; p.lit = c.l;
-                p.life = Math.random();
-                continue;
+        // Balanced pick — warm and cool roughly equal presence
+        const weights = [2, 2, 2, 2, 1, 1];
+        const totalWeight = weights.reduce((s, w) => s + w, 0);
+        function pick() {
+            let r = Math.random() * totalWeight;
+            for (let i = 0; i < palette.length; i++) {
+                r -= weights[i];
+                if (r <= 0) return palette[i];
             }
-
-            const dx = p.x - p.px;
-            const dy = p.y - p.py;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < 0.2) continue;
-
-            const cpx = p.px + (p.px - p.ppx) * 0.3;
-            const cpy = p.py + (p.py - p.ppy) * 0.3;
-
-            const width = pal.maxWidth * Math.max(0.4, Math.min(1.0, 0.8 / (dist + 0.3)));
-            ctx.lineWidth = width;
-
-            const alpha = pal.baseAlpha * (0.6 + 0.4 * Math.sin(p.life * 6.28 + t * 2));
-            ctx.strokeStyle = `hsla(${p.hue}, ${p.sat}%, ${p.lit}%, ${alpha})`;
-
-            ctx.beginPath();
-            ctx.moveTo(p.ppx, p.ppy);
-            ctx.quadraticCurveTo(cpx, cpy, p.x, p.y);
-            ctx.stroke();
-
-            // Occasional "bloom"
-            if (Math.random() < 0.008) {
-                const r = 12 + Math.random() * 30;
-                const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-                grad.addColorStop(0, `hsla(${p.hue}, ${p.sat}%, ${p.lit}%, 0.08)`);
-                grad.addColorStop(0.5, `hsla(${p.hue}, ${p.sat}%, ${p.lit}%, 0.03)`);
-                grad.addColorStop(1, `hsla(${p.hue}, ${p.sat}%, ${p.lit}%, 0)`);
-                ctx.fillStyle = grad;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            return palette[0];
         }
+
+        // Layer 1: large flowing color fields (multiply blend)
+        // Frankenthaler style — big, bold, overlapping, organic
+        ctx.globalCompositeOperation = 'multiply';
+        const count = 5 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < count; i++) {
+            const c = pick();
+            const cx = (0.05 + Math.random() * 0.9) * W;
+            const cy = (0.05 + Math.random() * 0.9) * H;
+            const baseR = (0.2 + Math.random() * 0.3) * Math.max(W, H);
+            const seed = Math.random() * 100;
+
+            // Organic shape — noise-perturbed but LARGE and SMOOTH
+            ctx.beginPath();
+            const segments = 80;
+            for (let s = 0; s <= segments; s++) {
+                const angle = (s / segments) * Math.PI * 2;
+                // Low frequency noise → smooth, flowing edges (not lumpy)
+                const n = noise2(
+                    Math.cos(angle) * 1.2 + seed,
+                    Math.sin(angle) * 1.2 + seed
+                );
+                const stretch = 0.6 + Math.abs(Math.sin(angle * 0.5 + seed)) * 0.5;
+                const r = baseR * (0.7 + n * 0.35) * stretch;
+                const x = cx + Math.cos(angle) * r;
+                const y = cy + Math.sin(angle) * r * 0.7; // flatten slightly
+                if (s === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+
+            // Each wash has a random edge character — some soak soft, some stop hard
+            const edgeHardness = Math.random();
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR);
+
+            if (edgeHardness < 0.4) {
+                // Soft soak — paint bleeds gradually into paper
+                grad.addColorStop(0,    `hsl(${c.h}, ${c.s}%, ${c.l}%)`);
+                grad.addColorStop(0.4,  `hsla(${c.h}, ${c.s}%, ${c.l + 2}%, 0.7)`);
+                grad.addColorStop(0.8,  `hsla(${c.h}, ${c.s - 5}%, ${c.l + 5}%, 0.2)`);
+                grad.addColorStop(1,    `hsla(${c.h}, ${c.s}%, ${c.l + 8}%, 0)`);
+            } else if (edgeHardness < 0.75) {
+                // Hard edge — paint stops where paper resists
+                grad.addColorStop(0,    `hsl(${c.h}, ${c.s}%, ${c.l}%)`);
+                grad.addColorStop(0.55, `hsla(${c.h}, ${c.s}%, ${c.l + 1}%, 0.65)`);
+                grad.addColorStop(0.7,  `hsla(${c.h}, ${c.s}%, ${c.l + 3}%, 0.15)`);
+                grad.addColorStop(0.78, `hsla(${c.h}, ${c.s}%, ${c.l + 5}%, 0)`);
+                grad.addColorStop(1,    `hsla(${c.h}, ${c.s}%, ${c.l + 5}%, 0)`);
+            } else {
+                // Feathered — pigment spreads thin at edge like wet-on-wet
+                grad.addColorStop(0,    `hsl(${c.h}, ${c.s}%, ${c.l}%)`);
+                grad.addColorStop(0.3,  `hsla(${c.h}, ${c.s + 5}%, ${c.l - 2}%, 0.8)`);
+                grad.addColorStop(0.6,  `hsla(${c.h}, ${c.s}%, ${c.l + 3}%, 0.35)`);
+                grad.addColorStop(1,    `hsla(${c.h}, ${c.s - 8}%, ${c.l + 8}%, 0.05)`);
+            }
+
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // ── Main loop ────────────────────────────────────────────────────────────
+    function frame() {
+        animId = requestAnimationFrame(frame);
+        t += 0.002;
+
+        if (currentTheme === 'dark') {
+            frameDark();
+        }
+        // Light mode: painting is static, no per-frame work needed
     }
 
     function start() {
+        if (currentTheme === 'light') {
+            paintLight();
+        }
         frame();
+        // Force canvas visible
         canvas.style.opacity = '1';
+        canvas.style.display = 'block';
     }
 
     if (document.readyState === 'loading') {
