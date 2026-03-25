@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-GPU Training Pitfalls | Hao Xin</title>
+    <meta name="description" content="A war story about parallelizing PyTorch model training across multiple GPUs -- from threading deadlocks to GIL contention to the subprocess pattern that finally worked.">
+    <meta name="author" content="Hao Xin">
+    <link rel="canonical" href="https://muserhao.github.io/blog/posts/multi-gpu-training-pitfalls.html">
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="The Multi-GPU Training Gauntlet: Threads, Processes, and the GIL">
+    <meta property="og:description" content="A war story about parallelizing PyTorch training across GPUs. Threading deadlocks, GIL contention, torch.compile explosions, and the subprocess pattern that finally worked.">
+    <meta property="og:url" content="https://muserhao.github.io/blog/posts/multi-gpu-training-pitfalls.html">
+    <meta property="og:site_name" content="Hao Xin">
+    <meta property="og:image" content="https://muserhao.github.io/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="article:published_time" content="2026-03-25">
+    <meta property="article:author" content="Hao Xin">
+    <meta property="article:tag" content="PyTorch">
+    <meta property="article:tag" content="Multi-GPU">
+    <meta property="article:tag" content="Systems">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="The Multi-GPU Training Gauntlet: Threads, Processes, and the GIL">
+    <meta name="twitter:description" content="Threading deadlocks, GIL contention, and the subprocess pattern that finally worked.">
+    <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
+    <!-- JSON-LD Article -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "The Multi-GPU Training Gauntlet: Threads, Processes, and the GIL",
+        "author": {"@type": "Person", "name": "Hao Xin", "url": "https://muserhao.github.io"},
+        "datePublished": "2026-03-25",
+        "description": "A war story about parallelizing PyTorch training across multiple GPUs.",
+        "url": "https://muserhao.github.io/blog/posts/multi-gpu-training-pitfalls.html",
+        "keywords": ["PyTorch", "multi-GPU", "distributed training", "GIL", "multiprocessing", "systems"]
+    }
+    </script>
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="../blog.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+        });"></script>
+    <script>
+        (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+</head>
+<body>
+    <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
+        <defs>
+            <filter id="liquid-distort" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence id="liquid-turbulence" type="fractalNoise"
+                    baseFrequency="0.006 0.009" numOctaves="4" seed="3" result="noise"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise"
+                    scale="50" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="grid-bg"></div>
+
+    <div class="gradient-orbs" aria-hidden="true">
+        <div class="orb orb-cyan"></div>
+        <div class="orb orb-pink"></div>
+        <div class="orb orb-purple"></div>
+        <div class="orb orb-gold"></div>
+        <div class="orb orb-teal"></div>
+    </div>
+
+    <div id="particles"></div>
+
+    <header>
+        <nav>
+            <a href="../../index.html" class="logo" aria-label="HAO.XIN">
+            </a>
+            <ul class="nav-links">
+                <li><a href="../../index.html" class="nav-link">HOME</a></li>
+                <li><a href="../index.html" class="nav-link active">BLOG</a></li>
+                <li><a href="../../lab/index.html" class="nav-link">FUN LAB</a></li>
+                <li>
+                    <button class="theme-toggle" aria-label="Toggle theme">
+                        <span class="theme-toggle-icon-light">&#9728;</span>
+                        <span class="theme-toggle-slider"></span>
+                        <span class="theme-toggle-icon-dark">&#9790;</span>
+                    </button>
+                </li>
+            </ul>
+            <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </nav>
+    </header>
+
+    <main class="post-main">
+        <article>
+            <div class="post-header">
+                <div class="post-meta">
+                    <time class="blog-date" datetime="2026-03-25"><i class="fas fa-clock"></i> Mar 25, 2026</time>
+                    <span class="read-time"><i class="fas fa-book-open"></i> 12 min read</span>
+                </div>
+                <div class="blog-tags" style="justify-content: center; margin-bottom: 1.5rem;">
+                    <span class="blog-tag">SYSTEMS</span>
+                    <span class="blog-tag">TUTORIAL</span>
+                </div>
+                <h1 class="post-title">The Multi-GPU Training Gauntlet: Threads, Processes, and the GIL</h1>
+                <p class="post-subtitle">// four attempts to parallelize PyTorch training, and why only the last one worked</p>
+                <div class="post-divider"></div>
+            </div>
+
+            <div class="post-content">
+                <h2>01 // THE PROBLEM</h2>
+
+                <p>
+                    You have 8 GPUs and 13 independent models to train. Each model takes ~1 hour on a single GPU.
+                    Sequentially, that's 13 hours. With 8 GPUs in parallel, it should be ~2 hours.
+                    Simple, right?
+                </p>
+
+                <p>
+                    It took four increasingly desperate attempts before we got a solution that actually worked.
+                    This post documents each attempt, why it failed, and the fundamental lesson:
+                    <strong>PyTorch multi-GPU parallelism must use OS processes, not Python threads.</strong>
+                </p>
+
+                <blockquote>
+                    <p>"Everything that can go wrong with threading will go wrong with threading." &mdash; every systems engineer, eventually</p>
+                </blockquote>
+
+                <p>
+                    Note: this is <em>not</em> about data-parallel training (one model across multiple GPUs, like <code>torchrun</code> / DDP).
+                    This is about running <strong>many independent models</strong>, one per GPU &mdash; an embarrassingly parallel workload that turns out to be not so embarrassing.
+                </p>
+
+
+                <h2>02 // ATTEMPT 1: ThreadPoolExecutor</h2>
+
+                <p>The simplest approach. Python's <code>concurrent.futures.ThreadPoolExecutor</code> with one thread per GPU:</p>
+
+<pre><code class="language-python">from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def train_on_gpu(config, gpu_id):
+    device = torch.device(f'cuda:{gpu_id}')
+    model = MyModel().to(device)
+    loader = DataLoader(dataset, batch_size=256, num_workers=2)
+    # ... training loop ...
+    return model.state_dict()
+
+with ThreadPoolExecutor(max_workers=8) as pool:
+    futures = {}
+    for i, cfg in enumerate(configs):
+        f = pool.submit(train_on_gpu, cfg, gpu_id=i % 8)
+        futures[f] = cfg['name']
+
+    for f in as_completed(futures):
+        result = f.result()  # blocks until done
+</code></pre>
+
+                <p><strong>What happened:</strong> the program hung after computing FID scores. GPU utilization dropped to 0%. Classic deadlock.</p>
+
+                <p><strong>Root cause:</strong> the FID computation library (clean-fid) internally loads an InceptionV3 model and is <strong>not thread-safe</strong>.
+                Multiple threads calling it simultaneously caused resource contention and eventual deadlock.</p>
+
+                <p><strong>Lesson:</strong> third-party libraries are often not thread-safe, and there's no way to know without testing or reading their source code.</p>
+
+
+                <h2>03 // ATTEMPT 2: Threading + Lock</h2>
+
+                <p>We added a <code>threading.Lock</code> to serialize the FID calls:</p>
+
+<pre><code class="language-python">import threading
+fid_lock = threading.Lock()
+
+def compute_fid(samples):
+    with fid_lock:
+        return clean_fid.compute_fid(real_dir, gen_dir)
+</code></pre>
+
+                <p><strong>What happened:</strong> GPU utilization was erratic &mdash; jumping between 0% and ~30%, with some GPUs completely idle.
+                Training that should take 1 hour per model was barely progressing.</p>
+
+                <p><strong>Root cause:</strong> the <strong>Global Interpreter Lock (GIL)</strong>. This is the fundamental issue with Python threading for CPU-bound work:</p>
+
+                <ul>
+                    <li>Python's GIL allows only <strong>one thread to execute Python bytecode at a time</strong></li>
+                    <li>PyTorch releases the GIL during CUDA kernel execution, but <strong>not</strong> during: DataLoader iteration, optimizer.step(), loss.backward() Python overhead, or any pure-Python code</li>
+                    <li>With 8 threads competing for the GIL, each thread gets ~1/8 of the CPU time to feed its GPU</li>
+                    <li>Result: GPUs starve waiting for data, utilization crashes</li>
+                </ul>
+
+                <p><strong>Lesson:</strong> Python threads are <em>concurrent</em> but not <em>parallel</em> for CPU-bound work. The GIL serializes all Python execution.</p>
+
+
+                <h2>04 // ATTEMPT 3: torch.multiprocessing</h2>
+
+                <p>Since threads don't work, use <code>torch.multiprocessing</code> with <code>spawn</code> context. Each GPU gets its own process with its own GIL:</p>
+
+<pre><code class="language-python">import torch.multiprocessing as mp
+
+def train_worker(gpu_id, task_queue, save_dir):
+    device = torch.device(f'cuda:{gpu_id}')
+    torch.cuda.set_device(device)
+    dataset = load_dataset()  # each process loads its own copy
+    while not task_queue.empty():
+        config = task_queue.get(timeout=2)
+        model = train(config, device, dataset)
+        torch.save(model, f'{save_dir}/{config["name"]}.pt')
+
+ctx = mp.get_context('spawn')
+task_queue = ctx.Queue()
+for cfg in configs:
+    task_queue.put(cfg)
+
+processes = []
+for gpu_id in range(8):
+    p = ctx.Process(target=train_worker, args=(gpu_id, task_queue, save_dir))
+    p.start()
+    processes.append(p)
+
+for p in processes:
+    p.join()
+</code></pre>
+
+                <p><strong>What happened:</strong> the program hung during model initialization. Some GPU processes never started training.</p>
+
+                <p><strong>Root cause:</strong> two issues compounded:</p>
+
+                <ol>
+                    <li><strong><code>torch.compile</code> + multi-process:</strong> we were using <code>torch.compile(model)</code> in each worker process. The dynamo compiler performs extensive Python-level analysis during the first forward pass. With <code>spawn</code>, each process imports the module fresh and triggers compilation &mdash; this compilation is CPU-heavy, and when 8 processes compile simultaneously, they saturate CPU cores and thrash the cache, causing extreme slowdown or apparent hangs.</li>
+                    <li><strong>Pickling closures:</strong> the training step functions were closures that captured <code>sigma_min</code>, <code>sigma_max</code>, etc. Closures can't be pickled, and <code>spawn</code> requires all arguments to be picklable (since it starts a fresh Python interpreter). We had to refactor to pass serializable config dicts instead.</li>
+                </ol>
+
+                <p><strong>Lesson:</strong> <code>torch.compile</code> adds significant hidden complexity. Disable it when running multiple processes. And <code>spawn</code> requires everything to be serializable &mdash; no closures, no lambda functions, no complex objects.</p>
+
+
+                <h2>05 // ATTEMPT 4: subprocess.Popen (SUCCESS)</h2>
+
+                <p>The solution that finally worked is the simplest conceptually: launch each training job as a <strong>completely independent OS process</strong> using <code>subprocess.Popen</code>.</p>
+
+<pre><code class="language-python">import subprocess, json, sys
+
+def run_experiment():
+    # ... setup, warmup, define configs ...
+    save_dir = '/tmp/models'
+    this_script = os.path.abspath(__file__)
+    gpu_procs = {}  # gpu_id -> (Popen, name)
+    pending = list(configs)
+
+    while pending or gpu_procs:
+        # Launch on free GPUs
+        for gpu_id in range(n_gpus):
+            if gpu_id not in gpu_procs and pending:
+                cfg = pending.pop(0)
+                env = {**os.environ, 'CUDA_VISIBLE_DEVICES': str(gpu_id)}
+                p = subprocess.Popen(
+                    [sys.executable, this_script,
+                     '--train-single', json.dumps(cfg),
+                     '--gpu', str(gpu_id),
+                     '--save-dir', save_dir],
+                    env=env, stdout=sys.stdout, stderr=sys.stderr
+                )
+                gpu_procs[gpu_id] = (p, cfg['name'])
+
+        # Poll for completion
+        time.sleep(5)
+        for gpu_id in list(gpu_procs):
+            p, name = gpu_procs[gpu_id]
+            if p.poll() is not None:
+                print(f'{name} done (exit {p.returncode})')
+                del gpu_procs[gpu_id]
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train-single', type=str, default=None)
+    parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--save-dir', type=str, default='/tmp')
+    args = parser.parse_args()
+
+    if args.train_single:
+        # Worker mode: train one model
+        cfg = json.loads(args.train_single)
+        train_single_model(cfg, args.gpu, args.save_dir)
+    else:
+        # Main mode: orchestrate all training
+        run_experiment()
+</code></pre>
+
+                <p><strong>Why this works:</strong></p>
+
+                <ul>
+                    <li>Each subprocess is a <strong>fresh Python interpreter</strong> with its own GIL, memory space, and CUDA context</li>
+                    <li><code>CUDA_VISIBLE_DEVICES</code> ensures each process sees only one GPU (as <code>cuda:0</code>), eliminating cross-GPU conflicts</li>
+                    <li>Config is passed as a JSON string &mdash; trivially serializable, no pickling issues</li>
+                    <li>Models are saved to disk as <code>.pt</code> files &mdash; no inter-process communication needed</li>
+                    <li>The main process just polls <code>p.poll()</code> every few seconds &mdash; negligible overhead</li>
+                    <li><strong>Cannot deadlock</strong> because there is zero shared state between processes</li>
+                </ul>
+
+                <p>This is essentially what <code>submitit</code> (from FAIR) does for SLURM clusters, and what you'd do manually by opening 8 terminal windows. The pattern is ancient and battle-tested.</p>
+
+
+                <h2>06 // THE ARCHITECTURE</h2>
+
+                <p>The final system has two phases:</p>
+
+<pre><code class="language-text">Main Process
+  |
+  |-- Phase 1: Training (parallel)
+  |     |-- subprocess GPU 0: python script.py --train-single '{"name":"model_a",...}' --gpu 0
+  |     |-- subprocess GPU 1: python script.py --train-single '{"name":"model_b",...}' --gpu 1
+  |     |-- ...
+  |     |-- subprocess GPU 7: python script.py --train-single '{"name":"model_h",...}' --gpu 7
+  |     |   (when one finishes, next model starts on that GPU)
+  |     |
+  |     `-- All 13 .pt files saved to disk
+  |
+  `-- Phase 2: Evaluation (sequential)
+        |-- Load each .pt, generate samples, compute FID
+        `-- (sequential because FID library is not thread-safe)
+</code></pre>
+
+                <p>With 8 GPUs and 13 models:</p>
+                <ul>
+                    <li>First batch: 8 models train in parallel (~1h each)</li>
+                    <li>As each finishes, the next model from the queue starts on the freed GPU</li>
+                    <li>Total training time: ~2h (vs 13h sequential)</li>
+                    <li>Evaluation: ~3h sequential on 1 GPU</li>
+                    <li><strong>Total: ~5h vs ~16h</strong> &mdash; a 3x speedup</li>
+                </ul>
+
+
+                <h2>07 // KEY DESIGN DECISIONS</h2>
+
+                <p><strong>Use <code>CUDA_VISIBLE_DEVICES</code> per subprocess, not <code>torch.device('cuda:N')</code>.</strong>
+                Setting <code>CUDA_VISIBLE_DEVICES=3</code> makes the process see only GPU 3 as <code>cuda:0</code>.
+                This is safer than addressing GPUs by index within a single process, because libraries like <code>torch.compile</code> and InceptionV3 often default to <code>cuda:0</code> and would conflict.</p>
+
+                <p><strong>Save models to disk, not shared memory.</strong>
+                A 2M-parameter model's state dict is ~8MB. Saving 13 of them to an SSD takes milliseconds.
+                This is far simpler and more reliable than <code>mp.Queue</code>, shared memory, or pipe-based IPC.</p>
+
+                <p><strong>Pass config as JSON strings, not Python objects.</strong>
+                Training step functions are closures that capture hyperparameters. Closures can't be pickled.
+                Instead, pass a serializable dict like <code>{"type": "edm", "sigma_min": 0.01, ...}</code> and reconstruct the function inside each subprocess.</p>
+
+                <p><strong>Separate training from evaluation.</strong>
+                If your evaluation code has threading issues (as ours did with clean-fid), don't try to fix it &mdash; just run it sequentially after all training is complete. The evaluation is typically much faster than training anyway.</p>
+
+                <p><strong>Don't use <code>torch.compile</code> in parallel settings.</strong>
+                <code>torch.compile</code> with dynamo does heavy Python-level analysis on the first forward pass. In multi-process settings, 8 simultaneous compilations can saturate your CPU.
+                For small models where compile overhead exceeds training time savings, skip it entirely.</p>
+
+                <p><strong>Add <code>flush=True</code> to all print statements.</strong>
+                Python buffers stdout by default. In multi-process settings, you won't see output until the buffer fills.
+                Always use <code>print(..., flush=True)</code> so you can monitor progress in real time.</p>
+
+
+                <h2>08 // DECISION TREE</h2>
+
+                <p>When you need to run multiple PyTorch jobs on multiple GPUs, here's how to choose:</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Scenario</th>
+                            <th>Solution</th>
+                            <th>Why</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>One model, multiple GPUs</td>
+                            <td><code>torchrun</code> / DDP</td>
+                            <td>Standard data parallelism</td>
+                        </tr>
+                        <tr>
+                            <td>Many models, SLURM cluster</td>
+                            <td><code>submitit</code></td>
+                            <td>Job array with proper scheduling</td>
+                        </tr>
+                        <tr>
+                            <td>Many models, single machine</td>
+                            <td><code>subprocess.Popen</code></td>
+                            <td>Zero shared state, cannot deadlock</td>
+                        </tr>
+                        <tr>
+                            <td>Many models, need IPC</td>
+                            <td><code>mp.Process</code> with <code>spawn</code></td>
+                            <td>Only if you need shared queues</td>
+                        </tr>
+                        <tr>
+                            <td style="text-decoration: line-through;">Any GPU workload</td>
+                            <td style="text-decoration: line-through;"><code>ThreadPoolExecutor</code></td>
+                            <td><strong>Never.</strong> GIL kills performance.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+
+                <h2>09 // THE TAKEAWAY</h2>
+
+                <p>
+                    The fundamental lesson: <strong>Python threads do not provide parallelism for CPU-bound code.</strong>
+                    PyTorch training has significant CPU-bound components (data loading, gradient computation orchestration, optimizer steps),
+                    so threading gives you concurrency without parallelism &mdash; the worst of both worlds, because you pay the complexity cost
+                    of thread safety without the performance benefit.
+                </p>
+
+                <p>
+                    The subprocess approach is unglamorous. It feels like "cheating" compared to elegant shared-memory designs.
+                    But it works on the first try, every time, because OS process isolation eliminates entire classes of bugs
+                    (GIL contention, thread-unsafe libraries, CUDA context conflicts, pickle failures).
+                </p>
+
+                <p>
+                    In distributed systems, the safest abstraction is <strong>no shared state</strong>.
+                    When your parallel tasks are independent (as they often are in hyperparameter sweeps, ablation studies, and method comparisons),
+                    embrace the simplicity: separate processes, config as JSON, results on disk.
+                </p>
+
+                <blockquote>
+                    <p>"Make it work, make it right, make it fast. Most parallelism bugs happen because people skip step one." &mdash; Kent Beck (paraphrased)</p>
+                </blockquote>
+
+            </div>
+        </article>
+
+        <div class="post-nav" style="display:flex;justify-content:space-between;max-width:48rem;margin:3rem auto;padding:0 1rem;">
+            <a href="../index.html" class="read-more" style="text-decoration:none;"><i class="fas fa-arrow-left"></i> BACK TO BLOG</a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-gradient"></div>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="https://github.com/MuserHao" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://www.linkedin.com/in/hao9xin/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                <a href="https://scholar.google.com/citations?hl=en&user=6y09MRIAAAAJ" target="_blank" rel="noopener noreferrer">Scholar</a>
+                <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>
+            </div>
+            <p class="footer-text dark-only">// built with caffeine and mass GPU hours</p>
+            <p class="footer-text light-only">made with curiosity and care</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="../../shared.js"></script>
+    <script>
+        createParticles(30);
+
+        // Reading progress bar
+        const bar = document.createElement('div');
+        bar.id = 'reading-progress';
+        document.body.prepend(bar);
+        window.addEventListener('scroll', () => {
+            const doc = document.documentElement;
+            const pct = doc.scrollTop / (doc.scrollHeight - doc.clientHeight) * 100;
+            bar.style.width = Math.min(pct, 100) + '%';
+        }, { passive: true });
+
+        // Copy buttons on code blocks
+        document.querySelectorAll('.post-content pre').forEach(pre => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pre-wrapper';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = 'COPY';
+            btn.addEventListener('click', () => {
+                navigator.clipboard.writeText(pre.innerText).then(() => {
+                    btn.textContent = 'COPIED';
+                    btn.classList.add('copied');
+                    setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 2000);
+                });
+            });
+            wrapper.appendChild(btn);
+        });
+    </script>
+</body>
+</html>
