@@ -383,10 +383,6 @@
 
 /* Hero title: handled in typography section above */
 
-[data-theme="light"] .apple-logo {
-    opacity: 0.5;
-}
-
 /* Contact item: paper card */
 [data-theme="light"] .contact-item {
     backdrop-filter: none;
@@ -957,14 +953,6 @@ nav {
     letter-spacing: 2px;
 }
 
-.apple-logo {
-    display: inline-block;
-    width: 0.85em;
-    height: 0.85em;
-    vertical-align: -0.05em;
-    fill: currentColor;
-}
-
 .hero-tagline {
     font-family: var(--font-mono);
     font-size: var(--text-sm);
@@ -1090,6 +1078,7 @@ section.visible .timeline-item:nth-child(3),
 section.visible .stat-card:nth-child(3),
 section.visible .pub-card:nth-child(3) { transition-delay: 0.3s; }
 
+section.visible .timeline-item:nth-child(4),
 section.visible .stat-card:nth-child(4) { transition-delay: 0.4s; }
 
 .section-title {
