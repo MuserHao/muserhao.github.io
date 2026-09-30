@@ -2,7 +2,7 @@
 
 ## Overview
 
-The mark is one glyph that reads as both letters: an **H** whose two legs lean toward a shared vanishing point, with an **X** where the crossbar would be. It sits inside a ring broken into three symmetric strokes; the top break, where the legs point, is mended in gold.
+The mark is one glyph that reads as both letters: an **H** whose two legs lean toward a shared vanishing point, with an **X** where the crossbar would be. It sits inside a ring of three brush strokes, turned off-axis; the upper-right break is mended in gold.
 
 ```
     viewBox: 0 0 40 40
@@ -14,8 +14,8 @@ The mark is one glyph that reads as both letters: an **H** whose two legs lean t
 
 | Element | Geometry | Meaning |
 |---|---|---|
-| Ring | three equal brush strokes around r=16, each swelling in the middle and tapering at both ends; breaks centered at 270° (top), 30° and 150° (SVG angles), 22° wide | Three-fold symmetry; the circle is held together by its breaks |
-| Gold seam | a thin gold arc (stroke 0.9) in the top break only | Kintsugi on the break the two legs point at: the horizon they never reach is the part mended in gold |
+| Ring | three equal brush strokes around r=16, each swelling in the middle and tapering at both ends; breaks 120° apart, centered at 315°, 75° and 195° (SVG angles), 22° wide | Three-fold rhythm, turned 45° off the vertical so the ring reads as turning rather than static |
+| Gold seam | a thin gold arc (stroke 0.9) in the upper-right break only | Kintsugi: one break is mended in gold, not hidden |
 | H legs | filled, tapering from 3.0 wide at the base (y=30.25) to 1.7 at the top (y=9.75); centerlines (12.75,30.25) to (16.15,9.75), mirrored | Two paths narrowing toward a horizon they never reach. Both tops are cut on one horizontal line: the horizon |
 | X | gold, stroke 1.7, from y=16.75 to y=24.25, drawn under the legs so its ends tuck behind them | The crossbar that holds the H together is the X |
 
