@@ -115,3 +115,8 @@
         opacity: 0.1;
     }
 }
+
+/* Experiment cards are standalone cards, not a divided list like the blog index */
+.blog-list {
+    gap: var(--space-5);
+}
