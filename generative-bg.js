@@ -1,61 +1,22 @@
 (function () {
     'use strict';
 
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const canvas = document.getElementById('gen-art-canvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // ── Perlin noise ─────────────────────────────────────────────────────────
-    const PERM_SIZE = 256;
-    const perm = new Uint8Array(PERM_SIZE * 2);
-    (function seedPerm() {
-        const arr = new Uint8Array(PERM_SIZE);
-        for (let i = 0; i < PERM_SIZE; i++) arr[i] = i;
-        for (let i = PERM_SIZE - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        for (let i = 0; i < PERM_SIZE * 2; i++) perm[i] = arr[i % PERM_SIZE];
-    })();
-
-    const GRAD2 = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
-    function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-    function lerp(a, b, t) { return a + t * (b - a); }
-    function dot2(g, x, y) { return g[0] * x + g[1] * y; }
-
-    function noise2(x, y) {
-        const X = Math.floor(x) & 255, Y = Math.floor(y) & 255;
-        const xf = x - Math.floor(x), yf = y - Math.floor(y);
-        const u = fade(xf), v = fade(yf);
-        const aa = perm[perm[X] + Y],   ab = perm[perm[X] + Y + 1];
-        const ba = perm[perm[X+1] + Y], bb = perm[perm[X+1] + Y + 1];
-        return lerp(
-            lerp(dot2(GRAD2[aa&7], xf, yf),     dot2(GRAD2[ba&7], xf-1, yf),   u),
-            lerp(dot2(GRAD2[ab&7], xf, yf-1),   dot2(GRAD2[bb&7], xf-1, yf-1), u),
-            v
-        );
-    }
-
-    // ── Palettes ─────────────────────────────────────────────────────────────
+    // ── Dark: one sample from a diffusion model ─────────────────────────────
+    // Every particle starts as Gaussian noise and is carried along the straight
+    // noise-to-data path x_t = (1 - t)·x0 + t·z (rectified flow) until the cloud
+    // settles into an open ring: order out of noise. The loop then just breathes.
     const DARK = {
-        trail:     'rgba(10, 12, 20, 0.04)',
-        hues:      [195, 205, 215, 340],
-        sats:      [50,  50,  50,  40],
-        lits:      [62,  62,  62,  58],
-        dotAlpha:  0.5,
-        lineAlpha: 0.15,
-        linkDist:  150,
-        num:       200,
-        speed:     0.8,
-        scale:     0.0025,
-    };
-
-    const LIGHT = {
-        hues:  [14, 25, 42, 355, 220, 200, 140],
-        sats:  [52, 55, 48, 45,  42,  38,  32],
-        lits:  [45, 48, 55, 42,  46,  52,  48],
+        bg:    'rgba(8, 10, 16, 0.22)',
+        hues:  [190, 195, 205, 215, 340],
+        num:   1500,
+        steps: 1000,           // shown as the timestep counter
+        dur:   9000,           // ms from pure noise to the sample
     };
 
     function getTheme() {
@@ -72,110 +33,100 @@
         canvas.height = H;
     }
     resize();
-    window.addEventListener('resize', () => {
-        resize();
-        // Repaint light theme on resize
-        if (currentTheme === 'light') { lightPainted = false; paintLight(); }
-    }, { passive: true });
 
-    // ── Particles (dark theme only) ──────────────────────────────────────────
-    function randHue(pal) {
-        const idx = Math.floor(Math.random() * pal.hues.length);
-        return { h: pal.hues[idx], s: pal.sats[idx], l: pal.lits[idx] };
+    function gauss() {
+        let u = 0, v = 0;
+        while (u === 0) u = Math.random();
+        while (v === 0) v = Math.random();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
     }
 
-    function randEdge() {
-        const side = Math.floor(Math.random() * 4);
-        if (side === 0) return { x: Math.random() * W, y: 0 };
-        if (side === 1) return { x: W, y: Math.random() * H };
-        if (side === 2) return { x: Math.random() * W, y: H };
-        return { x: 0, y: Math.random() * H };
+    // Data distribution: a ring with a brushed width and one open gap (an ensō,
+    // the same mark the light theme draws in ink).
+    const GAP = -Math.PI * 0.32, GAP_W = 0.42;
+    function sampleData() {
+        let a;
+        do { a = Math.random() * Math.PI * 2; }
+        while (Math.abs(Math.atan2(Math.sin(a - GAP), Math.cos(a - GAP))) < GAP_W * Math.random() + 0.08);
+        const from = ((a - GAP - GAP_W) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
+        const width = 0.012 + 0.05 * Math.sin(Math.min(1, from * 1.4) * Math.PI * 0.5) * (1 - from * 0.7);
+        return { a, dr: gauss() * width };
     }
 
-    const darkParticles = Array.from({ length: DARK.num }, () => {
-        const x = Math.random() * W, y = Math.random() * H;
-        const c = randHue(DARK);
-        return { x, y, px: x, py: y, hue: c.h, sat: c.s, lit: c.l };
-    });
+    let particles = [];
+    function seed() {
+        particles = Array.from({ length: DARK.num }, () => {
+            const d = sampleData();
+            const h = DARK.hues[Math.random() < 0.12 ? 4 : Math.floor(Math.random() * 4)];
+            return { a: d.a, dr: d.dr, zx: gauss(), zy: gauss(), spin: (Math.random() - 0.5) * 0.00004,
+                     hue: h, lit: 55 + Math.random() * 20, size: 0.6 + Math.random() * 0.9 };
+        });
+    }
+    seed();
+
+    function geometry() {
+        const hero = document.querySelector('.hero-content h1');
+        const r = hero && hero.getBoundingClientRect();
+        const cy = r && r.height ? r.top + r.height / 2 + H * 0.08 : H * 0.42;
+        return { cx: W / 2, cy, R: Math.min(W * 0.42, H * 0.36), S: Math.max(W, H) * 0.42 };
+    }
+    let G = geometry();
+    window.addEventListener('resize', () => { resize(); G = geometry(); }, { passive: true });
+
+    // Timestep counter in the hero, dark only.
+    const counter = document.getElementById('diffusion-t');
+    let t0 = null;
+    function restart() {
+        t0 = null; seed(); ctx.clearRect(0, 0, W, H);
+        if (still && currentTheme === 'dark') for (let i = 0; i < 12; i++) frameDark(performance.now());
+    }
+    if (counter) counter.addEventListener('click', restart);
 
     // ── Theme switch ─────────────────────────────────────────────────────────
     new MutationObserver(() => {
         currentTheme = getTheme();
         ctx.clearRect(0, 0, W, H);
         if (currentTheme === 'light') { lightPainted = false; paintLight(); }
+        else restart();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-    // ── Spatial grid (dark mode) ─────────────────────────────────────────────
-    let grid = {};
-    const CELL = 130;
-    function buildGrid(pts) {
-        grid = {};
-        for (let i = 0; i < pts.length; i++) {
-            const key = Math.floor(pts[i].x / CELL) + ',' + Math.floor(pts[i].y / CELL);
-            if (!grid[key]) grid[key] = [];
-            grid[key].push(i);
+    const ease = (x) => 1 - Math.pow(1 - x, 3);
+
+    function frameDark(now) {
+        if (t0 === null) t0 = now;
+        const p = still ? 1 : Math.min(1, (now - t0) / DARK.dur);
+        const t = 1 - ease(p);                    // 1 = pure noise, 0 = sample
+        const { cx, cy, R, S } = G;
+        const breathe = now * 0.001;
+
+        // Motion trails while sampling; a clean clear once the sample has
+        // settled, so no faint streaks are left behind.
+        if (p < 1) { ctx.fillStyle = DARK.bg; ctx.fillRect(0, 0, W, H); }
+        else ctx.clearRect(0, 0, W, H);
+
+        for (let i = 0; i < particles.length; i++) {
+            const q = particles[i];
+            q.a += q.spin * (1 - t) * 16;
+            const r = R * (1 + q.dr + 0.004 * Math.sin(breathe + q.a * 3));
+            const x0 = cx + Math.cos(q.a) * r, y0 = cy + Math.sin(q.a) * r;
+            const x = (1 - t) * x0 + t * (cx + q.zx * S);
+            const y = (1 - t) * y0 + t * (cy + q.zy * S);
+            ctx.fillStyle = `hsla(${q.hue},60%,${q.lit}%,${0.35 + 0.45 * (1 - t)})`;
+            ctx.fillRect(x, y, q.size, q.size);
+        }
+
+        if (counter) {
+            const step = Math.round(t * DARK.steps);
+            counter.textContent = step > 0 ? `sampling · t = ${String(step).padStart(4, '0')}` : 'sampled · t = 0000 · resample';
         }
     }
-    function getNeighborCells(cx, cy) {
-        const result = [];
-        for (let dx = -1; dx <= 1; dx++)
-            for (let dy = -1; dy <= 1; dy++) {
-                const cell = grid[(cx + dx) + ',' + (cy + dy)];
-                if (cell) result.push(cell);
-            }
-        return result;
+
+    // Fade the field once the reader scrolls past the hero.
+    function onScroll() {
+        if (currentTheme !== 'dark') return;
+        canvas.style.opacity = String(Math.max(0.12, 1 - window.scrollY / (H * 0.9)));
     }
-
-    // ── Dark: constellation mesh (continuous animation) ──────────────────────
-    let t = 0;
-    let animId = null;
-
-    function frameDark() {
-        const pal = DARK;
-        const pts = darkParticles;
-
-        ctx.fillStyle = pal.trail;
-        ctx.fillRect(0, 0, W, H);
-
-        for (let i = 0; i < pts.length; i++) {
-            const p = pts[i];
-            p.px = p.x; p.py = p.y;
-            const vx = noise2(p.x * pal.scale + t * 0.8, p.y * pal.scale + 47.3);
-            const vy = noise2(p.x * pal.scale + 91.7,    p.y * pal.scale + t * 0.6);
-            p.x += vx * pal.speed * 2;
-            p.y += vy * pal.speed * 2;
-            if (p.x < -10 || p.x > W+10 || p.y < -10 || p.y > H+10) {
-                const e = randEdge(); p.x = e.x; p.y = e.y; p.px = p.x; p.py = p.y;
-                const c = randHue(pal); p.hue = c.h; p.sat = c.s; p.lit = c.l;
-            }
-        }
-
-        buildGrid(pts);
-        const ld = pal.linkDist, ld2 = ld * ld;
-        ctx.lineWidth = 0.5;
-        for (let i = 0; i < pts.length; i++) {
-            const p = pts[i];
-            const neighbors = getNeighborCells(Math.floor(p.x/CELL), Math.floor(p.y/CELL));
-            for (const cell of neighbors) {
-                for (const j of cell) {
-                    if (j <= i) continue;
-                    const q = pts[j];
-                    const dx = p.x-q.x, dy = p.y-q.y, d2 = dx*dx+dy*dy;
-                    if (d2 < ld2) {
-                        const alpha = pal.lineAlpha * (1 - Math.sqrt(d2)/ld);
-                        ctx.strokeStyle = `hsla(${p.hue},${p.sat}%,${p.lit}%,${alpha})`;
-                        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
-                    }
-                }
-            }
-        }
-        for (let i = 0; i < pts.length; i++) {
-            const p = pts[i];
-            ctx.beginPath(); ctx.arc(p.x, p.y, 1.2, 0, Math.PI*2);
-            ctx.fillStyle = `hsla(${p.hue},${p.sat}%,${p.lit}%,${pal.dotAlpha})`;
-            ctx.fill();
-        }
-    }
+    window.addEventListener('scroll', onScroll, { passive: true });
 
     // ── Light: plain washi ─────────────────────────────────────────────────
     // The light theme draws a single ensō instead (zen.js); keep the canvas clear.
@@ -188,24 +139,23 @@
     }
 
     // ── Main loop ────────────────────────────────────────────────────────────
-    function frame() {
+    let animId = null;
+    function frame(now) {
         animId = requestAnimationFrame(frame);
-        t += 0.002;
-
-        if (currentTheme === 'dark') {
-            frameDark();
-        }
-        // Light mode: painting is static, no per-frame work needed
+        if (currentTheme === 'dark') frameDark(now);
     }
 
     function start() {
-        if (currentTheme === 'light') {
-            paintLight();
-        }
-        frame();
-        // Force canvas visible
+        G = geometry();
+        if (currentTheme === 'light') paintLight();
         canvas.style.opacity = '1';
         canvas.style.display = 'block';
+        if (still) {
+            // Reduced motion: draw the finished sample once, no animation.
+            for (let i = 0; i < 12; i++) frameDark(performance.now());
+            return;
+        }
+        animId = requestAnimationFrame(frame);
     }
 
     if (document.readyState === 'loading') {
@@ -215,10 +165,11 @@
     }
 
     document.addEventListener('visibilitychange', () => {
+        if (still) return;
         if (document.hidden) {
             if (animId) { cancelAnimationFrame(animId); animId = null; }
-        } else {
-            if (!animId) frame();
+        } else if (!animId) {
+            animId = requestAnimationFrame(frame);
         }
     });
 })();

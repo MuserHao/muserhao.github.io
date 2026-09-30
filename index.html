@@ -54,11 +54,6 @@
     <!-- Paper texture (light theme only) -->
     <div class="paper-texture" aria-hidden="true"></div>
 
-    <!-- Floating gradient orbs -->
-    <div class="gradient-orbs" aria-hidden="true">
-        <div class="orb orb-cyan"></div>
-        <div class="orb orb-pink"></div>
-    </div>
 
     <!-- Dark theme: vignette for depth (hidden in light) -->
     <div class="vignette dark-only" aria-hidden="true"></div>
@@ -104,7 +99,6 @@
                     <span class="cursor">_</span>
                 </div>
                 <p class="hero-subtitle">Senior Machine Learning Engineer @ Zoox</p>
-                <p class="hero-tagline dark-only">// teaching machines to see, think, and occasionally hallucinate</p>
                 <p class="hero-tagline light-only">Building models that see, reason, and act in the physical world.</p>
                 <div class="hero-buttons">
                     <a href="#about" class="btn neon-btn">EXPLORE</a>
@@ -116,6 +110,7 @@
                     </div>
                 </div>
             </div>
+            <button type="button" id="diffusion-t" class="diffusion-t dark-only" aria-label="Resample the background">sampling · t = 1000</button>
         </section>
 
         <!-- About Section -->
@@ -418,8 +413,6 @@
     <script src="shared.js"></script>
     <script src="generative-bg.js"></script>
     <script src="zen.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-    <script defer src="neural-net.js"></script>
     <script>
         // ========== TYPEWRITER ==========
         const darkPhrases = [

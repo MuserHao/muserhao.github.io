@@ -19,8 +19,7 @@ style.css           # Global styles and theme tokens (dark components)
 zen.css             # Light theme components, loaded after style.css and blog.css
 zen.js              # Light theme ensō on the homepage
 shared.js           # Theme toggle, nav, and shared page behavior
-generative-bg.js    # Hero generative flow-field background
-neural-net.js       # Three.js neural-net visual
+generative-bg.js    # Dark hero: noise-to-ring diffusion sampler
 blog/
   index.html        # Blog listing page with tag filters
   blog.css          # Blog-specific styles

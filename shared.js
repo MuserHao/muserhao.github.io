@@ -76,31 +76,6 @@ const sharedObserver = new IntersectionObserver((entries) => {
 }, { threshold: 0.1 });
 document.querySelectorAll('section').forEach(s => sharedObserver.observe(s));
 
-// ========== CURSOR GLOW ==========
-(function initCursorGlow() {
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    const glow = document.createElement('div');
-    glow.classList.add('cursor-glow');
-    document.body.appendChild(glow);
-
-    let mx = -500, my = -500, cx = -500, cy = -500;
-
-    document.addEventListener('mousemove', (e) => {
-        mx = e.clientX;
-        my = e.clientY;
-    });
-
-    (function animate() {
-        cx += (mx - cx) * 0.15;
-        cy += (my - cy) * 0.15;
-        glow.style.left = cx + 'px';
-        glow.style.top = cy + 'px';
-        requestAnimationFrame(animate);
-    })();
-})();
-
 // ========== CLICK RIPPLE ON NEON BUTTONS ==========
 document.addEventListener('click', (e) => {
     const btn = e.target.closest('.neon-btn');
