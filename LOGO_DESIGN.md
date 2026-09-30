@@ -14,11 +14,12 @@ The mark is one glyph that reads as both letters: an **H** whose two legs lean t
 
 | Element | Geometry | Meaning |
 |---|---|---|
-| Ring | arc from 290° to 340° is gold, the rest `currentColor` | Kintsugi: the break is kept and mended in gold, not hidden |
-| H legs | (12.75,30.25) to (16.15,9.75) and (23.85,9.75) to (27.25,30.25), stroke 2.3 | Two paths converging on a horizon they never reach |
-| X | crosses between the legs from y=16.75 to y=24.25, stroke 2.0, gold | The crossbar that holds the H together is the X |
+| Ring | a filled brush stroke around r=16 that starts heavy and thins toward both ends of the break | The same open circle as the light theme's ensō and the dark hero's diffusion sample |
+| Gold seam | a thin gold arc (stroke 0.9) across the break, from 292° to 338° | Kintsugi: the break is mended in gold, not hidden |
+| H legs | filled, tapering from 3.0 wide at the base (y=30.25) to 1.7 at the top (y=9.75); centerlines (12.75,30.25) to (16.15,9.75), mirrored | Two paths narrowing toward a horizon they never reach. Both tops are cut on one horizontal line: the horizon |
+| X | gold, stroke 1.7, from y=16.75 to y=24.25, drawn under the legs so its ends tuck behind them | The crossbar that holds the H together is the X |
 
-The legs converge gently (top gap 7.7 units, base gap 14.5), halfway between a stronger perspective and near-parallel legs. Earlier versions converged so hard that the H read as an A.
+The legs converge gently (top gap about 7.7 units, base gap about 14.5). Earlier versions converged so hard that the H read as an A.
 
 ## Color
 
@@ -27,4 +28,4 @@ The legs converge gently (top gap 7.7 units, base gap 14.5), halfway between a s
 
 ## Favicon
 
-`favicon.svg` drops the ring, which disappears at 16 px, and thickens the glyph on a dark rounded tile.
+`favicon.svg` drops the ring, which disappears at 16 px, and draws a heavier version of the glyph on a dark rounded tile.
