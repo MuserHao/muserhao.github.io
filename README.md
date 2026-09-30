@@ -9,13 +9,15 @@ Personal website and tech blog for Hao Xin -- Senior Machine Learning Engineer a
 - **Portfolio** -- About, journey (experience + education), research, and contact
 - **Blog** -- Tech blog with KaTeX math rendering, tag filtering, and code highlighting
 - **Fun Lab** -- In-browser RL experiments (Pong, Lunar Lander) you can watch learn in real time
-- **Two themes** -- Dark "Observatory" and light "Atelier", toggled from the nav and remembered per visitor
+- **Two themes** -- Dark "Observatory" (terminal) and light "Ma" (Japanese minimalism, one sumi-e ensō), toggled from the nav and remembered per visitor
 
 ## Structure
 
 ```
 index.html          # Main portfolio page
-style.css           # Global styles, both themes
+style.css           # Global styles and theme tokens (dark components)
+zen.css             # Light theme components, loaded after style.css and blog.css
+zen.js              # Light theme ensō on the homepage
 shared.js           # Theme toggle, nav, and shared page behavior
 generative-bg.js    # Hero generative flow-field background
 neural-net.js       # Three.js neural-net visual

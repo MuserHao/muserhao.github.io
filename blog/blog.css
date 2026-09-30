@@ -322,14 +322,14 @@
 [data-theme="light"] .blog-card-title {
     grid-column: 1;
     grid-row: 1;
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-display);
     font-size: 1.35rem;
     font-weight: 600;
     margin-bottom: 0;
 }
 
 [data-theme="light"] .blog-date {
-    font-family: 'Lora', serif;
+    font-family: var(--font-body);
     font-style: italic;
     font-size: 0.85rem;
     color: var(--text-secondary);
@@ -343,7 +343,7 @@
 
 /* ── Filter buttons — Light: serif, underline active ── */
 [data-theme="light"] .filter-btn {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-display);
     font-size: 0.95rem;
     letter-spacing: 0.5px;
     text-transform: none;

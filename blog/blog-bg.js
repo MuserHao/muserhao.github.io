@@ -6,6 +6,7 @@
 
     // ── Canvas ─────────────────────────────────────────────────────────────────
     const canvas = document.createElement('canvas');
+    canvas.className = 'blog-bg-canvas';
     canvas.setAttribute('aria-hidden', 'true');
     canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0;transition:opacity 3s ease;';
     document.body.insertBefore(canvas, document.body.firstChild);

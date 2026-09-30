@@ -94,502 +94,56 @@
     --theme-transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
-/* ========== LIGHT THEME ========== */
+/* ========== LIGHT THEME — "MA" (間) ==========
+   Japanese-minimalist personality: washi paper, sumi ink, one aizome indigo
+   accent, generous whitespace. Tokens only here; component rules live in
+   zen.css, loaded after style.css and blog.css on every page. */
 [data-theme="light"] {
-    /* Accent colors — warm earth tones, no blue at all */
-    --neon-pink: #c2785a;
-    --neon-cyan: #8b6d5c;
-    --neon-green: #7a8b5c;
+    --neon-pink: #2e4868;          /* aizome indigo, the only accent */
+    --neon-cyan: #5f5d58;
+    --neon-green: #5f5d58;
 
-    /* Warm parchment backgrounds */
-    --bg-dark: #f5f0e8;
-    --bg-card: rgba(245, 238, 225, 0.95);
-    --bg-terminal: rgba(240, 234, 220, 0.98);
-    --bg-terminal-header: rgba(228, 220, 205, 0.95);
+    --bg-dark: #f1f0ec;            /* washi */
+    --bg-card: transparent;
+    --bg-terminal: transparent;
+    --bg-terminal-header: transparent;
 
-    /* Rich dark text */
-    --text-primary: #3d3328;
-    --text-secondary: #7a6e60;
-    --text-heading: #2a1f14;
-    --text-faint: rgba(0, 0, 0, 0.08);
+    --text-primary: #1d1d1b;       /* sumi */
+    --text-secondary: #5f5d58;
+    --text-heading: #1d1d1b;
+    --text-faint: #8f8c85;
 
-    /* Borders — warm, subtle */
-    --border-subtle: rgba(139, 109, 92, 0.12);
-    --border-hover: rgba(139, 109, 92, 0.25);
-    --cyan-glow-sm: rgba(139, 109, 92, 0.04);
-    --cyan-glow-fill: rgba(139, 109, 92, 0.04);
-    --cyan-glow-fill-hover: rgba(139, 109, 92, 0.08);
-    --cyan-glow-md: rgba(139, 109, 92, 0.10);
-    --pink-glow-md: rgba(194, 120, 90, 0.08);
-    --pink-glow-sm: rgba(194, 120, 90, 0.04);
-    --pink-border: rgba(194, 120, 90, 0.15);
-    --grid-line: rgba(0, 0, 0, 0.03);
-    --nav-bg: rgba(245, 240, 232, 0.95);
-    --nav-mobile-bg: rgba(245, 240, 232, 0.98);
-    --shadow-dark: rgba(0, 0, 0, 0.04);
-    --bar-bg: rgba(0, 0, 0, 0.04);
+    --border-subtle: #d8d5ce;
+    --border-hover: #b9b5ad;
+    --cyan-glow-sm: transparent;
+    --cyan-glow-fill: transparent;
+    --cyan-glow-fill-hover: transparent;
+    --cyan-glow-md: transparent;
+    --pink-glow-md: transparent;
+    --pink-glow-sm: transparent;
+    --pink-border: #d8d5ce;
+    --grid-line: transparent;
+    --nav-bg: rgba(241, 240, 236, 0.94);
+    --nav-mobile-bg: rgba(241, 240, 236, 0.98);
+    --shadow-dark: transparent;
+    --bar-bg: rgba(29, 29, 27, 0.05);
 
     --cursor-blend: multiply;
 
-    /* Terminal dots — muted earth */
-    --dot-red: #c27856;
-    --dot-yellow: #b89a5a;
-    --dot-green: #7a9464;
+    --dot-red: #b9b5ad;
+    --dot-yellow: #b9b5ad;
+    --dot-green: #b9b5ad;
 
-    /* Glass → Paper: opaque, no blur, shadow-based depth */
-    --glass-bg: rgba(245, 238, 225, 0.85);
-    --glass-border: rgba(0, 0, 0, 0.04);
-    --glass-border-hover: rgba(0, 0, 0, 0.08);
+    --glass-bg: transparent;
+    --glass-border: transparent;
+    --glass-border-hover: transparent;
     --glass-blur: 0px;
-    --glass-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.03);
+    --glass-shadow: none;
     --glass-highlight: none;
-}
 
-/* ========== LIGHT THEME OVERRIDES — "ATELIER" PERSONALITY ========== */
-
-/* ── LIGHT THEME: COMPLETE TYPOGRAPHY SYSTEM ──
-   Pinyon Script  → signature (hero name)
-   Cormorant Garamond → headings, nav, section titles
-   Caveat         → handwritten accents (tagline, footer note)
-   Lora           → body, journal, timeline, publications
-*/
-
-/* Typography: completely different font family — humanist, literary */
-[data-theme="light"] .section-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    font-size: 2rem;
-}
-
-/* Signature font — Herr Von Muellerhoff: wild artistic signature */
-[data-theme="light"] .glitch {
-    font-family: 'Herr Von Muellerhoff', cursive;
-    font-weight: 400;
-    font-size: 6.5rem;
-    letter-spacing: 0.02em;
-    color: var(--text-heading);
-    text-shadow: none;
-}
-
-/* Reset ornament to simple */
-[data-theme="light"] .hero-ornament {
-    width: 60px;
-    height: 2px;
-    margin-top: var(--space-4);
-    background: linear-gradient(90deg, var(--neon-pink), var(--neon-cyan));
-    opacity: 0.6;
-    transform: none;
-}
-
-[data-theme="light"] .stat-number {
-    font-family: 'Cormorant Garamond', serif;
-    font-weight: 600;
-}
-
-[data-theme="light"] .timeline-header h3 {
-    font-family: 'Cormorant Garamond', serif;
-    font-weight: 600;
-    font-size: 1.2rem;
-}
-
-/* Body text: warm literary serif */
-[data-theme="light"] .journal-text,
-[data-theme="light"] .journal-body,
-[data-theme="light"] .contact-letter .journal-text,
-[data-theme="light"] .timeline-details li,
-[data-theme="light"] .pub-content h3 {
-    font-family: 'Lora', serif;
-}
-
-[data-theme="light"] .hero-subtitle {
-    font-family: 'Lora', serif;
-    letter-spacing: 0.5px;
-    font-weight: 400;
-    color: var(--text-secondary);
-}
-
-[data-theme="light"] .hero-tagline {
-    font-family: 'Caveat', cursive;
-    font-size: 1.3rem;
-    font-weight: 400;
-    font-style: normal;
-}
-
-/* Nav: elegant serif */
-[data-theme="light"] .nav-link {
-    font-family: 'Cormorant Garamond', serif;
-    letter-spacing: 0.05em;
-    text-transform: none;
-    font-size: var(--text-sm);
-    font-weight: 600;
-}
-
-/* Footer: handwritten closing note */
-[data-theme="light"] .footer-links a {
-    font-family: 'Cormorant Garamond', serif;
-    letter-spacing: 0.05em;
-    text-transform: none;
-    font-weight: 600;
-}
-
-[data-theme="light"] .footer-text {
-    font-family: 'Caveat', cursive;
-    font-style: normal;
-    font-size: 1.1rem;
-}
-
-/* Small labels: Lora light for dates, venues */
-[data-theme="light"] .timeline-company {
-    font-family: 'Lora', serif;
-    font-style: italic;
-    color: var(--neon-pink);
-}
-
-[data-theme="light"] .timeline-date {
-    font-family: 'Lora', serif;
-    font-style: italic;
-}
-
-[data-theme="light"] .pub-venue,
-[data-theme="light"] .pub-authors {
-    font-family: 'Lora', serif;
-}
-
-/* Section subtitles: handwritten accent */
-[data-theme="light"] .section-subtitle,
-[data-theme="light"] .research-focus {
-    font-family: 'Caveat', cursive;
-    font-style: normal;
-    font-size: 1.2rem;
-    letter-spacing: normal;
-}
-
-/* Hide code-style decorations — too technical for art mode */
-[data-theme="light"] .title-decoration {
-    display: none;
-}
-
-/* Cards: no glass, just paper with soft shadow */
-[data-theme="light"] .neon-card {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: none;
-    border-radius: var(--radius-lg);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.03);
-}
-
-[data-theme="light"] .neon-card::before {
-    display: none;
-}
-
-[data-theme="light"] .neon-card::after {
-    display: none;
-}
-
-[data-theme="light"] .neon-card:hover {
-    box-shadow: 0 2px 6px rgba(0,0,0,0.06), 0 8px 30px rgba(0,0,0,0.05);
-}
-
-/* Terminal → Notebook feel */
-[data-theme="light"] .terminal-window {
-    border: none;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.03);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
-
-[data-theme="light"] .terminal-header {
-    background: rgba(0, 0, 0, 0.02);
-}
-
-[data-theme="light"] .terminal-body {
-    background-image: none;
-}
-
-/* Stat cards: paper feel */
-[data-theme="light"] .stat-card {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: none;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.03);
-}
-
-[data-theme="light"] .stat-card:hover {
-    border: none;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.06), 0 8px 30px rgba(0,0,0,0.05);
-}
-
-/* Buttons: text links with understated underline — literary, not techy */
-[data-theme="light"] .neon-btn {
-    border-radius: 0;
-    border: none;
-    border-bottom: 1px solid var(--text-secondary);
-    color: var(--text-heading);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: transparent;
-    font-family: 'Cormorant Garamond', serif;
-    font-size: var(--text-sm);
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    padding: 0.4rem 0;
-}
-
-[data-theme="light"] .neon-btn:hover {
-    background: transparent;
-    border-color: var(--text-heading);
-    box-shadow: none;
-}
-
-[data-theme="light"] .neon-btn.alt {
-    border-color: var(--neon-pink);
-    color: var(--neon-pink);
-}
-
-[data-theme="light"] .neon-btn.alt:hover {
-    background: transparent;
-    border-color: var(--neon-pink);
-    box-shadow: none;
-}
-
-[data-theme="light"] .substack-submit {
-    border: none !important;
-    border-bottom: 1px solid var(--neon-pink) !important;
-    color: var(--neon-pink) !important;
-    border-radius: 0;
-    font-family: 'Cormorant Garamond', serif;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    padding: 0.4rem 0;
-}
-
-[data-theme="light"] .substack-submit:hover {
-    background: transparent !important;
-    box-shadow: none !important;
-}
-
-/* Hero: completely different atmosphere */
-[data-theme="light"] .hero-content {
-    border: none;
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    padding: var(--space-8) var(--space-6);
-    box-shadow: none;
-}
-
-/* Canvas stays visible in both themes — each draws differently */
-
-/* Hero title: handled in typography section above */
-
-/* Contact item: paper card */
-[data-theme="light"] .contact-item {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: none;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03);
-}
-
-/* Footer: warm, no glass */
-[data-theme="light"] footer {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: rgba(240, 234, 220, 0.9);
-    border-top: 1px solid rgba(0,0,0,0.04);
-    box-shadow: none;
-}
-
-[data-theme="light"] .footer-gradient {
-    background: linear-gradient(90deg, transparent, var(--neon-pink), transparent);
-    opacity: 0.15;
-}
-
-/* Header: warm, no glass effect */
-[data-theme="light"] header.scrolled {
-    background: rgba(245, 240, 232, 0.9);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-}
-
-/* Timeline: warm colors — handled in layout section */
-
-/* Scrollbar */
-[data-theme="light"] ::-webkit-scrollbar-track {
-    background: var(--bg-dark);
-}
-
-[data-theme="light"] ::-webkit-scrollbar-thumb {
-    background: var(--neon-pink);
-}
-
-/* Logo */
-[data-theme="light"] .logo-mark {
-    filter: none;
-    color: var(--neon-pink);
-}
-
-/* Selection */
-[data-theme="light"] ::selection {
-    background: var(--neon-pink);
-    color: #fff;
-}
-
-/* Light theme: typewriter → handwritten signature */
-[data-theme="light"] .typewriter {
-    font-family: 'Caveat', cursive;
-    color: #5a7a4a;
-    font-style: normal;
-    font-weight: 500;
-    font-size: 1.4rem;
-}
-
-[data-theme="light"] .cursor {
-    display: none;
-}
-
-/* Handwriting reveal: text appears as if written by hand */
-[data-theme="light"] #typewriter-text {
-    display: inline-block;
-    background: linear-gradient(90deg, #5a7a4a 50%, transparent 50%);
-    background-size: 200% 100%;
-    background-position: 100% 0;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: handwrite-reveal 2.5s var(--ease-out) forwards;
-}
-
-@keyframes handwrite-reveal {
-    to {
-        background-position: 0 0;
-    }
-}
-
-/* Light theme: tech tags hidden in layout section above */
-[data-theme="light"] .tech-tags span {
-    border-color: transparent;
-    background: rgba(0, 0, 0, 0.03);
-    color: var(--text-secondary);
-}
-
-/* Light theme: scroll indicator — hide completely (too technical) */
-[data-theme="light"] .scroll-indicator {
-    display: none;
-}
-
-/* ── LIGHT THEME: LAYOUT TRANSFORMATION ──────────────────────────────────
-   Dark = portfolio for peers. Light = personal world for curious minds.
-   Hide resume artifacts, open up the layout, let content breathe. */
-
-/* About: full-width journal, hide stats grid */
-[data-theme="light"] .about-content {
-    grid-template-columns: 1fr;
-    max-width: 700px;
-    margin: 0 auto;
-}
-
-[data-theme="light"] .stats-grid {
-    display: none;
-}
-
-/* Timeline: remove the mechanical timeline line and markers */
-[data-theme="light"] .timeline::before {
-    display: none;
-}
-
-[data-theme="light"] .timeline-marker {
-    display: none;
-}
-
-[data-theme="light"] .timeline-item {
-    padding-left: 0;
-    margin-bottom: var(--space-5);
-}
-
-/* Timeline cards: simpler, no tech tags */
-[data-theme="light"] .tech-tags {
-    display: none;
-}
-
-[data-theme="light"] .timeline-content {
-    border: none;
-    border-left: 2px solid var(--neon-pink);
-    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-    box-shadow: none;
-    /* Paper wash so text stays legible over the generative paint */
-    background: rgba(245, 238, 225, 0.82);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    padding: var(--space-4) var(--space-5);
-}
-
-[data-theme="light"] .timeline-content::before,
-[data-theme="light"] .timeline-content::after {
-    display: none;
-}
-
-[data-theme="light"] .timeline-content:hover {
-    transform: none;
-    box-shadow: none;
-}
-
-/* Timeline details: more prose-like */
-[data-theme="light"] .timeline-details li {
-    font-family: var(--font-body);
-    color: var(--text-primary);
-    padding-left: 0;
-}
-
-[data-theme="light"] .timeline-details li::before {
-    display: none;
-}
-
-/* Publications: hide the big colored year, simpler layout */
-[data-theme="light"] .pub-card {
-    border: none;
-    box-shadow: none;
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 0;
-}
-
-[data-theme="light"] .pub-card::before,
-[data-theme="light"] .pub-card::after {
-    display: none;
-}
-
-[data-theme="light"] .pub-card:hover {
-    transform: none;
-    box-shadow: none;
-}
-
-[data-theme="light"] .pub-year {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--neon-pink);
-    border-right: none;
-    padding-right: var(--space-3);
-    min-width: 60px;
-}
-
-/* Blog section: keep but simpler CTA */
-[data-theme="light"] .view-all-btn {
-    border-radius: 999px;
-}
-
-/* Light theme: warm gallery ambient light — via full-page CSS gradients, no hard edges */
-[data-theme="light"] body {
-    background:
-        radial-gradient(ellipse at 15% 10%, rgba(212, 165, 116, 0.07) 0%, transparent 50%),
-        radial-gradient(ellipse at 85% 80%, rgba(196, 154, 175, 0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 50%, rgba(168, 184, 156, 0.03) 0%, transparent 50%),
-        var(--bg-dark);
+    --font-display: 'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
+    --font-body: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 
 /* Hide tech orbs entirely */
@@ -687,7 +241,7 @@ ul {
 }
 
 [data-theme="light"] .paper-texture {
-    opacity: 1;
+    opacity: 0;
 }
 
 .gen-art-canvas {
@@ -1940,18 +1494,6 @@ footer {
 
 .substack-input::placeholder {
     color: var(--text-secondary);
-}
-
-/* Light theme: input matches paper aesthetic */
-[data-theme="light"] .substack-input {
-    background: rgba(240, 234, 220, 0.6);
-    border: 1px solid rgba(139, 109, 92, 0.2);
-    border-radius: var(--radius-sm);
-    font-family: 'Lora', serif;
-}
-
-[data-theme="light"] .substack-input:focus {
-    border-color: var(--neon-pink);
 }
 
 .substack-submit {
