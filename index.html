@@ -36,9 +36,10 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="blog/blog.css">
+    <link rel="stylesheet" href="zen.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Caveat:wght@400;500;600&family=Herr+Von+Muellerhoff&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
     <script>
         (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
     </script>
@@ -104,7 +105,7 @@
                 </div>
                 <p class="hero-subtitle">Senior Machine Learning Engineer @ Zoox</p>
                 <p class="hero-tagline dark-only">// teaching machines to see, think, and occasionally hallucinate</p>
-                <p class="hero-tagline light-only">where mathematics meets imagination</p>
+                <p class="hero-tagline light-only">Building models that see, reason, and act in the physical world.</p>
                 <div class="hero-buttons">
                     <a href="#about" class="btn neon-btn">EXPLORE</a>
                     <a href="#contact" class="btn neon-btn alt">GET IN TOUCH</a>
@@ -344,7 +345,7 @@
             <div class="blog-preview-grid" id="blog-preview-grid">
                 <!-- Dynamically loaded from blog/index.html -->
             </div>
-            <a href="blog/index.html" class="btn neon-btn view-all-btn">ALL POSTS</a>
+            <a href="blog/index.html" class="btn neon-btn view-all-btn"><span class="dark-only">ALL POSTS</span><span class="light-only">All writing</span></a>
         </section>
 
         <!-- Contact Section -->
@@ -416,6 +417,7 @@
 
     <script src="shared.js"></script>
     <script src="generative-bg.js"></script>
+    <script src="zen.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
     <script defer src="neural-net.js"></script>
     <script>

@@ -177,96 +177,14 @@
         }
     }
 
-    // ── Light: generative color field painting ─────────────────────────────
+    // ── Light: plain washi ─────────────────────────────────────────────────
+    // The light theme draws a single ensō instead (zen.js); keep the canvas clear.
     let lightPainted = false;
 
     function paintLight() {
         if (lightPainted) return;
         lightPainted = true;
-
         ctx.clearRect(0, 0, W, H);
-
-        const palette = [
-            { h: 18,  s: 55, l: 68 },   // warm sienna — deeper, more pigmented
-            { h: 355, s: 42, l: 66 },   // dusty rose
-            { h: 38,  s: 48, l: 72 },   // golden amber
-            { h: 215, s: 40, l: 70 },   // ultramarine accent
-            { h: 160, s: 28, l: 72 },   // cool sage
-            { h: 8,   s: 50, l: 62 },   // deep terra cotta
-        ];
-
-        // Balanced pick — warm and cool roughly equal presence
-        const weights = [2, 2, 2, 2, 1, 1];
-        const totalWeight = weights.reduce((s, w) => s + w, 0);
-        function pick() {
-            let r = Math.random() * totalWeight;
-            for (let i = 0; i < palette.length; i++) {
-                r -= weights[i];
-                if (r <= 0) return palette[i];
-            }
-            return palette[0];
-        }
-
-        // Layer 1: large flowing color fields (multiply blend)
-        // Frankenthaler style — big, bold, overlapping, organic
-        ctx.globalCompositeOperation = 'multiply';
-        const count = 5 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < count; i++) {
-            const c = pick();
-            const cx = (0.05 + Math.random() * 0.9) * W;
-            const cy = (0.05 + Math.random() * 0.9) * H;
-            const baseR = (0.2 + Math.random() * 0.3) * Math.max(W, H);
-            const seed = Math.random() * 100;
-
-            // Organic shape — noise-perturbed but LARGE and SMOOTH
-            ctx.beginPath();
-            const segments = 80;
-            for (let s = 0; s <= segments; s++) {
-                const angle = (s / segments) * Math.PI * 2;
-                // Low frequency noise → smooth, flowing edges (not lumpy)
-                const n = noise2(
-                    Math.cos(angle) * 1.2 + seed,
-                    Math.sin(angle) * 1.2 + seed
-                );
-                const stretch = 0.6 + Math.abs(Math.sin(angle * 0.5 + seed)) * 0.5;
-                const r = baseR * (0.7 + n * 0.35) * stretch;
-                const x = cx + Math.cos(angle) * r;
-                const y = cy + Math.sin(angle) * r * 0.7; // flatten slightly
-                if (s === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.closePath();
-
-            // Each wash has a random edge character — some soak soft, some stop hard
-            const edgeHardness = Math.random();
-            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR);
-
-            if (edgeHardness < 0.4) {
-                // Soft soak — paint bleeds gradually into paper
-                grad.addColorStop(0,    `hsl(${c.h}, ${c.s}%, ${c.l}%)`);
-                grad.addColorStop(0.4,  `hsla(${c.h}, ${c.s}%, ${c.l + 2}%, 0.7)`);
-                grad.addColorStop(0.8,  `hsla(${c.h}, ${c.s - 5}%, ${c.l + 5}%, 0.2)`);
-                grad.addColorStop(1,    `hsla(${c.h}, ${c.s}%, ${c.l + 8}%, 0)`);
-            } else if (edgeHardness < 0.75) {
-                // Hard edge — paint stops where paper resists
-                grad.addColorStop(0,    `hsl(${c.h}, ${c.s}%, ${c.l}%)`);
-                grad.addColorStop(0.55, `hsla(${c.h}, ${c.s}%, ${c.l + 1}%, 0.65)`);
-                grad.addColorStop(0.7,  `hsla(${c.h}, ${c.s}%, ${c.l + 3}%, 0.15)`);
-                grad.addColorStop(0.78, `hsla(${c.h}, ${c.s}%, ${c.l + 5}%, 0)`);
-                grad.addColorStop(1,    `hsla(${c.h}, ${c.s}%, ${c.l + 5}%, 0)`);
-            } else {
-                // Feathered — pigment spreads thin at edge like wet-on-wet
-                grad.addColorStop(0,    `hsl(${c.h}, ${c.s}%, ${c.l}%)`);
-                grad.addColorStop(0.3,  `hsla(${c.h}, ${c.s + 5}%, ${c.l - 2}%, 0.8)`);
-                grad.addColorStop(0.6,  `hsla(${c.h}, ${c.s}%, ${c.l + 3}%, 0.35)`);
-                grad.addColorStop(1,    `hsla(${c.h}, ${c.s - 8}%, ${c.l + 8}%, 0.05)`);
-            }
-
-            ctx.fillStyle = grad;
-            ctx.fill();
-        }
-
-        ctx.globalCompositeOperation = 'source-over';
     }
 
     // ── Main loop ────────────────────────────────────────────────────────────
