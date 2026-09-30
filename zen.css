@@ -29,8 +29,6 @@ html[data-theme="light"] .paper-texture,
 html[data-theme="light"] .grid-bg,
 html[data-theme="light"] .gradient-orbs,
 html[data-theme="light"] .vignette,
-html[data-theme="light"] .cursor-glow,
-html[data-theme="light"] .neural-net-canvas,
 html[data-theme="light"] .scroll-indicator {
     display: none !important;
 }
@@ -61,7 +59,7 @@ html[data-theme="light"] .nav-link {
 html[data-theme="light"] .nav-link:hover,
 html[data-theme="light"] .nav-link.active { color: var(--neon-pink); }
 html[data-theme="light"] .nav-link::after { background: var(--neon-pink); height: 1px; }
-html[data-theme="light"] .logo-mark { color: var(--text-primary); filter: grayscale(1) contrast(1.2); opacity: 0.85; }
+html[data-theme="light"] .logo-mark { color: var(--text-primary); --logo-gold: #a8862e; filter: none; }
 html[data-theme="light"] .theme-toggle { border-color: var(--border-subtle); background: transparent; }
 html[data-theme="light"] .theme-toggle-slider { background: var(--text-primary); box-shadow: none; }
 

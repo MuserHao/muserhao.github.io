@@ -44,7 +44,6 @@
     --bar-bg: rgba(255, 255, 255, 0.05);
 
     /* Cursor glow */
-    --cursor-blend: screen;
 
     /* Glass */
     --glass-bg: rgba(12, 14, 24, 0.45);
@@ -128,7 +127,6 @@
     --shadow-dark: transparent;
     --bar-bg: rgba(29, 29, 27, 0.05);
 
-    --cursor-blend: multiply;
 
     --dot-red: #b9b5ad;
     --dot-yellow: #b9b5ad;
@@ -514,6 +512,27 @@ nav {
     color: var(--text-secondary);
     margin-bottom: var(--space-5);
 }
+
+/* Dark: no tagline under the role, so the role carries the gap to the buttons */
+html:not([data-theme="light"]) .hero-subtitle { margin-bottom: var(--space-5); }
+
+/* Diffusion timestep counter (dark hero) */
+.diffusion-t {
+    position: absolute;
+    left: 2rem;
+    bottom: var(--space-5);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 1px;
+    color: var(--text-faint);
+    background: none;
+    border: none;
+    padding: var(--space-2);
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+    z-index: 2;
+}
+.diffusion-t:hover { color: var(--neon-cyan); }
 
 /* Buttons */
 .hero-buttons {
@@ -1216,20 +1235,6 @@ footer {
     color: var(--text-faint);
 }
 
-/* ========== CURSOR GLOW ========== */
-.cursor-glow {
-    position: fixed;
-    width: 180px;
-    height: 180px;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 9999;
-    transform: translate(-50%, -50%);
-    background: radial-gradient(circle, var(--cyan-glow-md) 0%, transparent 70%);
-    mix-blend-mode: var(--cursor-blend);
-    opacity: 0.4;
-}
-
 /* ========== HERO BORDER ========== */
 .hero-content {
     position: relative;
@@ -1445,10 +1450,6 @@ footer {
 
     .stats-grid {
         grid-template-columns: 1fr 1fr;
-    }
-
-    .cursor-glow {
-        display: none;
     }
 }
 
