@@ -15,10 +15,10 @@ The mark is one glyph that reads as both letters: an **H** whose two legs lean t
 | Element | Geometry | Meaning |
 |---|---|---|
 | Ring | arc from 290° to 340° is gold, the rest `currentColor` | Kintsugi: the break is kept and mended in gold, not hidden |
-| H legs | (13,30) to (15.8,10) and (24.2,10) to (27,30), stroke 2.4 | Two paths converging on a horizon they never reach |
-| X | crosses between the legs from y=17 to y=24, stroke 1.8, gold | The crossbar that holds the H together is the X |
+| H legs | (12.75,30.25) to (16.15,9.75) and (23.85,9.75) to (27.25,30.25), stroke 2.3 | Two paths converging on a horizon they never reach |
+| X | crosses between the legs from y=16.75 to y=24.25, stroke 2.0, gold | The crossbar that holds the H together is the X |
 
-The legs converge gently (top gap 8.4 units, base gap 14). Earlier versions converged so hard that the H read as an A.
+The legs converge gently (top gap 7.7 units, base gap 14.5), halfway between a stronger perspective and near-parallel legs. Earlier versions converged so hard that the H read as an A.
 
 ## Color
 
