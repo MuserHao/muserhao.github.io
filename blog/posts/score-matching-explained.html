@@ -22,7 +22,7 @@
     <meta property="article:tag" content="Score Matching">
     <meta property="article:tag" content="Machine Learning">
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary">
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Score Matching Explained: From Theory to Diffusion Models">
     <meta name="twitter:description" content="A deep dive into score matching and DDPM -- the math behind modern diffusion models.">
     <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
@@ -84,7 +84,6 @@
         <div class="orb orb-teal"></div>
     </div>
 
-    <div id="particles"></div>
 
     <header>
         <nav>
@@ -690,6 +689,8 @@
                     </ol>
                 </div>
             </div>
+        </article>
+
         <div class="post-nav">
             <a href="../index.html"><i class="fas fa-arrow-left"></i> BACK TO BLOG</a>
             <a href="gan-meets-rl.html">WHEN GANS MEET RL <i class="fas fa-arrow-right"></i></a>
@@ -697,9 +698,17 @@
     </main>
 
     <footer>
+        <div class="footer-gradient"></div>
         <div class="footer-content">
-            <p class="footer-text">// built with caffeine and mass GPU hours</p>
-            <p class="footer-copy">&copy; 2026 Hao Xin. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="https://github.com/MuserHao" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://www.linkedin.com/in/hao9xin/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                <a href="https://scholar.google.com/citations?hl=en&user=6y09MRIAAAAJ" target="_blank" rel="noopener noreferrer">Scholar</a>
+                <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>
+            </div>
+            <p class="footer-text dark-only">// built with caffeine and mass GPU hours</p>
+            <p class="footer-text light-only">made with curiosity and care</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin</p>
         </div>
     </footer>
 
@@ -707,8 +716,6 @@
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <script src="../../shared.js"></script>
     <script>
-        createParticles(30);
-
         // ── Reading progress bar ──
         const bar = document.createElement('div');
         bar.id = 'reading-progress';

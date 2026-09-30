@@ -23,7 +23,7 @@
     <meta property="article:tag" content="LLM">
     <meta property="article:tag" content="Tutorial">
     <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary">
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="EvoSys: Teaching Machines to Build Their Own Muscles">
     <meta name="twitter:description" content="A taxonomy of skills from regex to reasoning, and what happens when you actually build the system. Implementation lessons from EvoSys.">
     <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
@@ -86,7 +86,6 @@
         <div class="orb orb-teal"></div>
     </div>
 
-    <div id="particles"></div>
 
     <header>
         <nav>
@@ -697,9 +696,17 @@ Tier 0: Pure deterministic function</code></pre>
     </main>
 
     <footer>
+        <div class="footer-gradient"></div>
         <div class="footer-content">
-            <p class="footer-text">// built with caffeine and mass GPU hours</p>
-            <p class="footer-copy">&copy; 2026 Hao Xin. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="https://github.com/MuserHao" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://www.linkedin.com/in/hao9xin/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                <a href="https://scholar.google.com/citations?hl=en&user=6y09MRIAAAAJ" target="_blank" rel="noopener noreferrer">Scholar</a>
+                <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>
+            </div>
+            <p class="footer-text dark-only">// built with caffeine and mass GPU hours</p>
+            <p class="footer-text light-only">made with curiosity and care</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin</p>
         </div>
     </footer>
 
@@ -707,8 +714,6 @@ Tier 0: Pure deterministic function</code></pre>
     <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <script src="../../shared.js"></script>
     <script>
-        createParticles(30);
-
         // ── Reading progress bar ──
         const bar = document.createElement('div');
         bar.id = 'reading-progress';

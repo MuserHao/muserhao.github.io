@@ -33,6 +33,12 @@
         edgeMat.blending = C.blending; edgeMat.needsUpdate = true;
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+    // Pause rendering once the hero has scrolled out of view
+    let heroOnScreen = true;
+    new IntersectionObserver(([entry]) => {
+        heroOnScreen = entry.isIntersecting;
+    }).observe(hero);
+
     function dim() {
         return { w: hero.offsetWidth || window.innerWidth, h: hero.offsetHeight || window.innerHeight };
     }
@@ -187,8 +193,8 @@
     function animate() {
         requestAnimationFrame(animate);
 
-        // Skip rendering in light theme
-        if (!isDark()) return;
+        // Skip rendering in light theme or when the hero is off-screen
+        if (!isDark() || !heroOnScreen) return;
 
         t += 0.007;
 

@@ -62,5 +62,19 @@ class TestHTMLValidation(unittest.TestCase):
 
         self.assertEqual(errors, [], f"HTML validation errors found: {', '.join(errors)}")
 
+    def test_all_pages_validity(self):
+        root = os.path.join(os.path.dirname(__file__), '..')
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+            for name in filenames:
+                # Skip the empty Google Search Console verification file
+                if not name.endswith('.html') or name.startswith('google'):
+                    continue
+                path = os.path.join(dirpath, name)
+                with self.subTest(page=os.path.relpath(path, root)):
+                    with open(path, 'r') as f:
+                        errors = HTMLValidator().validate(f.read())
+                    self.assertEqual(errors, [], f"HTML validation errors found: {', '.join(errors)}")
+
 if __name__ == '__main__':
     unittest.main()
