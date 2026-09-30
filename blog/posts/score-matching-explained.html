@@ -77,14 +77,6 @@
 
     <div class="grid-bg"></div>
 
-    <!-- Floating gradient orbs -->
-    <div class="gradient-orbs" aria-hidden="true">
-        <div class="orb orb-cyan"></div>
-        <div class="orb orb-pink"></div>
-        <div class="orb orb-purple"></div>
-        <div class="orb orb-gold"></div>
-        <div class="orb orb-teal"></div>
-    </div>
 
 
     <header>
@@ -124,12 +116,12 @@
                     <span class="blog-tag">TUTORIAL</span>
                 </div>
                 <h1 class="post-title">Score Matching Explained: From Theory to Diffusion Models</h1>
-                <p class="post-subtitle">// the math behind why your AI can draw pictures</p>
+                <p class="post-subtitle"><span class="dark-only">// </span>the math behind why your AI can draw pictures</p>
                 <div class="post-divider"></div>
             </div>
 
             <div class="post-content">
-                <h2>01 // INTRODUCTION</h2>
+                <h2><span class="sec-num">01<span class="dark-only"> //</span></span> INTRODUCTION</h2>
 
                 <p>
                     If you've been following the generative AI space, you've probably heard of
@@ -157,7 +149,7 @@
                     <p>"The score function is the gradient of the log-density. That's it. That's the tweet."</p>
                 </blockquote>
 
-                <h2>02 // THE SCORE FUNCTION</h2>
+                <h2><span class="sec-num">02<span class="dark-only"> //</span></span> THE SCORE FUNCTION</h2>
 
                 <p>
                     Given a probability density $p(\mathbf{x})$, the <strong>score function</strong>
@@ -214,7 +206,7 @@
                     converges to $p(\mathbf{x})$. The score function is literally all you need to sample.
                 </p>
 
-                <h2>03 // SCORE MATCHING OBJECTIVE</h2>
+                <h2><span class="sec-num">03<span class="dark-only"> //</span></span> SCORE MATCHING OBJECTIVE</h2>
 
                 <p>
                     The goal of <strong>score matching</strong> (Hyv&auml;rinen, 2005) is to learn a model
@@ -261,7 +253,7 @@
                     via backpropagation. But in practice, an even simpler approach won out.
                 </p>
 
-                <h2>04 // DENOISING SCORE MATCHING</h2>
+                <h2><span class="sec-num">04<span class="dark-only"> //</span></span> DENOISING SCORE MATCHING</h2>
 
                 <p>
                     <strong>Denoising score matching</strong> (Vincent, 2011) is the approach that actually
@@ -308,7 +300,7 @@
                     </p>
                 </div>
 
-                <h2>05 // NCSN: MULTI-SCALE SCORE MATCHING</h2>
+                <h2><span class="sec-num">05<span class="dark-only"> //</span></span> NCSN: MULTI-SCALE SCORE MATCHING</h2>
 
                 <p>
                     Song &amp; Ermon (2019) resolved the noise level dilemma with <strong>Noise Conditional
@@ -340,7 +332,7 @@
                     was reaching similar conclusions from a very different angle.
                 </p>
 
-                <h2>06 // THE DDPM LINE OF WORK</h2>
+                <h2><span class="sec-num">06<span class="dark-only"> //</span></span> THE DDPM LINE OF WORK</h2>
 
                 <p>
                     While the score matching community was thinking about gradients of log-densities,
@@ -495,7 +487,7 @@
                     This technique is used in virtually every modern text-to-image model.
                 </p>
 
-                <h2>07 // THE SDE UNIFICATION</h2>
+                <h2><span class="sec-num">07<span class="dark-only"> //</span></span> THE SDE UNIFICATION</h2>
 
                 <p>
                     Song et al. (2021) provided the grand unification. They showed that both NCSN and
@@ -546,7 +538,7 @@
                     encoding, and faster sampling with adaptive ODE solvers.
                 </p>
 
-                <h2>08 // THE TRAINING OBJECTIVE (UNIFIED)</h2>
+                <h2><span class="sec-num">08<span class="dark-only"> //</span></span> THE TRAINING OBJECTIVE (UNIFIED)</h2>
 
                 <p>
                     The unified training objective for a time-conditional score network
@@ -576,7 +568,7 @@
                     in practice, but the underlying math is the same.
                 </p>
 
-                <h2>09 // FAST SAMPLING: DDIM AND BEYOND</h2>
+                <h2><span class="sec-num">09<span class="dark-only"> //</span></span> FAST SAMPLING: DDIM AND BEYOND</h2>
 
                 <p>
                     The original DDPM requires ~1000 denoising steps to generate a sample. Song et al.
@@ -601,7 +593,7 @@
                     required function evaluations.
                 </p>
 
-                <h2>10 // SUMMARY</h2>
+                <h2><span class="sec-num">10<span class="dark-only"> //</span></span> SUMMARY</h2>
 
                 <p>
                     The full picture, from 30,000 feet:
@@ -624,7 +616,7 @@
                     universal language they both speak.
                 </p>
 
-                <h2>11 // REFERENCES</h2>
+                <h2><span class="sec-num">11<span class="dark-only"> //</span></span> REFERENCES</h2>
 
                 <div class="references">
                     <ol class="ref-list">

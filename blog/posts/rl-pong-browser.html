@@ -77,14 +77,6 @@
 
     <div class="grid-bg"></div>
 
-    <!-- Floating gradient orbs -->
-    <div class="gradient-orbs" aria-hidden="true">
-        <div class="orb orb-cyan"></div>
-        <div class="orb orb-pink"></div>
-        <div class="orb orb-purple"></div>
-        <div class="orb orb-gold"></div>
-        <div class="orb orb-teal"></div>
-    </div>
 
 
     <header>
@@ -123,12 +115,12 @@
                     <span class="blog-tag">TUTORIAL</span>
                 </div>
                 <h1 class="post-title">Teaching Pong to Play Itself: 3 RL Algorithms in the Browser</h1>
-                <p class="post-subtitle">// 579 parameters, zero GPUs, and the reward shaping tricks the textbooks leave out</p>
+                <p class="post-subtitle"><span class="dark-only">// </span>579 parameters, zero GPUs, and the reward shaping tricks the textbooks leave out</p>
                 <div class="post-divider"></div>
             </div>
 
             <div class="post-content">
-                <h2>01 // THE SETUP</h2>
+                <h2><span class="sec-num">01<span class="dark-only"> //</span></span> THE SETUP</h2>
 
                 <p>
                     I wanted to build something visitors could <em>feel</em>. Not a static chart showing a loss
@@ -155,7 +147,7 @@
                 </blockquote>
 
 
-                <h2>02 // THE THREE ALGORITHMS</h2>
+                <h2><span class="sec-num">02<span class="dark-only"> //</span></span> THE THREE ALGORITHMS</h2>
 
                 <p>
                     Before the war stories, here's what we're working with.
@@ -236,7 +228,7 @@ Total: 8×48 + 48 + 48×3 + 3 = 579 parameters</code></pre>
                 </p>
 
 
-                <h2>03 // THE STATE REPRESENTATION</h2>
+                <h2><span class="sec-num">03<span class="dark-only"> //</span></span> THE STATE REPRESENTATION</h2>
 
                 <p>
                     This is the single most important design decision, and it's where the browser constraint
@@ -284,7 +276,7 @@ Total: 8×48 + 48 + 48×3 + 3 = 579 parameters</code></pre>
                 </p>
 
 
-                <h2>04 // THE REWARD THAT BROKE EVERYTHING</h2>
+                <h2><span class="sec-num">04<span class="dark-only"> //</span></span> THE REWARD THAT BROKE EVERYTHING</h2>
 
                 <p>
                     Here's where the textbook diverges from reality. The standard Pong reward is elegant:
@@ -357,7 +349,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
 
-                <h2>05 // THE TRAINING LOOP EVOLUTION</h2>
+                <h2><span class="sec-num">05<span class="dark-only"> //</span></span> THE TRAINING LOOP EVOLUTION</h2>
 
                 <p>
                     The training mechanism went through three iterations, each solving a real problem.
@@ -443,7 +435,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
 
-                <h2>06 // ALGORITHM-SPECIFIC LESSONS</h2>
+                <h2><span class="sec-num">06<span class="dark-only"> //</span></span> ALGORITHM-SPECIFIC LESSONS</h2>
 
                 <h3>Q-Learning: Fast But Brittle</h3>
 
@@ -594,7 +586,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
 
-                <h2>07 // THE NEURAL NETWORK IN 150 LINES</h2>
+                <h2><span class="sec-num">07<span class="dark-only"> //</span></span> THE NEURAL NETWORK IN 150 LINES</h2>
 
                 <p>
                     Building a neural network from scratch in JavaScript is an exercise in appreciating
@@ -624,7 +616,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
 
-                <h2>08 // WHAT WOULD WE DO DIFFERENTLY</h2>
+                <h2><span class="sec-num">08<span class="dark-only"> //</span></span> WHAT WOULD WE DO DIFFERENTLY</h2>
 
                 <p>
                     If we rebuilt this from scratch:
@@ -653,7 +645,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </ul>
 
 
-                <h2>09 // TRY IT YOURSELF</h2>
+                <h2><span class="sec-num">09<span class="dark-only"> //</span></span> TRY IT YOURSELF</h2>
 
                 <p>
                     The <a href="../../lab/pong.html">RL Pong Lab</a> is live. Switch between algorithms
@@ -678,7 +670,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
 
-                <h2>10 // REFERENCES</h2>
+                <h2><span class="sec-num">10<span class="dark-only"> //</span></span> REFERENCES</h2>
 
                 <div class="references">
                     <ol class="ref-list">

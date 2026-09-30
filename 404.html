@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>404 | Hao Xin</title>
     <meta name="description" content="Page not found.">
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="zen.css">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/zen.css">
     <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -18,21 +18,15 @@
 <body>
     <div class="grid-bg"></div>
 
-    <div class="gradient-orbs" aria-hidden="true">
-        <div class="orb orb-cyan"></div>
-        <div class="orb orb-pink"></div>
-        <div class="orb orb-purple"></div>
-    </div>
-
 
     <header>
         <nav>
-            <a href="index.html" class="logo" aria-label="HAO.XIN">
+            <a href="/index.html" class="logo" aria-label="HAO.XIN">
             </a>
             <ul class="nav-links">
-                <li><a href="index.html" class="nav-link"><span class="dark-only">HOME</span><span class="light-only">Home</span></a></li>
-                <li><a href="blog/index.html" class="nav-link"><span class="dark-only">BLOG</span><span class="light-only">Writing</span></a></li>
-                <li><a href="lab/index.html" class="nav-link"><span class="dark-only">FUN LAB</span><span class="light-only">Lab</span></a></li>
+                <li><a href="/index.html" class="nav-link"><span class="dark-only">HOME</span><span class="light-only">Home</span></a></li>
+                <li><a href="/blog/index.html" class="nav-link"><span class="dark-only">BLOG</span><span class="light-only">Writing</span></a></li>
+                <li><a href="/lab/index.html" class="nav-link"><span class="dark-only">FUN LAB</span><span class="light-only">Lab</span></a></li>
                 <li>
                     <button class="theme-toggle" aria-label="Toggle theme">
                         <span class="theme-toggle-icon-light">&#9728;</span>
@@ -52,9 +46,10 @@
     <main style="display:flex; align-items:center; justify-content:center; min-height:60vh; text-align:center; padding:2rem;">
         <div>
             <h1 style="font-family:var(--font-display); font-size:6rem; color:var(--neon-cyan); margin-bottom:0.5rem; text-shadow:0 0 30px var(--cyan-text-glow);">404</h1>
-            <p style="font-family:var(--font-mono); font-size:1.2rem; color:var(--text-secondary); margin-bottom:2rem;">// page_not_found -- the path you seek does not exist</p>
-            <a href="index.html" style="font-family:var(--font-mono); color:var(--neon-cyan); text-decoration:none; border:1px solid var(--neon-cyan); padding:0.8rem 2rem; border-radius:4px; transition:all 0.3s ease;">
-                <i class="fas fa-arrow-left"></i> RETURN HOME
+            <p class="dark-only" style="font-family:var(--font-mono); font-size:1.2rem; color:var(--text-secondary); margin-bottom:2rem;">// page_not_found -- the path you seek does not exist</p>
+            <p class="light-only nf-note">This page doesn't exist, or it has moved.</p>
+            <a href="/index.html" class="nf-home" style="font-family:var(--font-mono); color:var(--neon-cyan); text-decoration:none; border:1px solid var(--neon-cyan); padding:0.8rem 2rem; border-radius:4px; transition:all 0.3s ease;">
+                <span class="dark-only"><i class="fas fa-arrow-left"></i> RETURN HOME</span><span class="light-only">Back to the homepage</span>
             </a>
         </div>
     </main>
@@ -74,7 +69,7 @@
         </div>
     </footer>
 
-    <script src="shared.js"></script>
+    <script src="/shared.js"></script>
     <script>
     </script>
 </body>

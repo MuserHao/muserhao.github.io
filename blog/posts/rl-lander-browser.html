@@ -77,14 +77,6 @@
 
     <div class="grid-bg"></div>
 
-    <!-- Floating gradient orbs -->
-    <div class="gradient-orbs" aria-hidden="true">
-        <div class="orb orb-cyan"></div>
-        <div class="orb orb-pink"></div>
-        <div class="orb orb-purple"></div>
-        <div class="orb orb-gold"></div>
-        <div class="orb orb-teal"></div>
-    </div>
 
 
     <header>
@@ -123,13 +115,13 @@
                     <span class="blog-tag">TUTORIAL</span>
                 </div>
                 <h1 class="post-title">Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser</h1>
-                <p class="post-subtitle">// ~4,200 parameters, zero GPUs, and the visualization that makes RLHF click</p>
+                <p class="post-subtitle"><span class="dark-only">// </span>~4,200 parameters, zero GPUs, and the visualization that makes RLHF click</p>
                 <div class="post-divider"></div>
             </div>
 
             <div class="post-content">
 
-<h2>01 // THE SETUP</h2>
+<h2><span class="sec-num">01<span class="dark-only"> //</span></span> THE SETUP</h2>
 
 <p>
 After <a href="rl-pong-browser.html">building RL Pong</a> with Q-Learning, DQN, and REINFORCE, the natural next step was the algorithm family that actually runs the modern world: <strong>Actor-Critic methods</strong>. A2C is how DeepMind's agents learn. PPO is how ChatGPT was aligned via RLHF. And if you read <a href="gan-meets-rl.html">When GANs Meet RL</a>, you already know the punchline &mdash; the actor is the generator, the critic is the discriminator. Same adversarial game, different costume.
@@ -143,7 +135,7 @@ Lunar Lander was the obvious vehicle. It fits the space theme, has intuitive phy
 The goal: implement DQN (baseline visitors know from Pong), A2C (the core teaching algorithm), and PPO (the modern standard) &mdash; all training live in the browser with a real-time actor-critic visualization panel.
 </p>
 
-<h2>02 // THE THREE ALGORITHMS</h2>
+<h2><span class="sec-num">02<span class="dark-only"> //</span></span> THE THREE ALGORITHMS</h2>
 
 <h3>DQN &mdash; The Baseline</h3>
 
@@ -203,7 +195,7 @@ $$\hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda)^l \, \delta_{t+l}, \quad \delta_
 The $\lambda$ parameter (0.95 here) interpolates between high-bias/low-variance (TD, $\lambda=0$) and low-bias/high-variance (Monte Carlo, $\lambda=1$). Same architecture as A2C: <strong>~4,200 parameters</strong>.
 </p>
 
-<h2>03 // THE PHYSICS</h2>
+<h2><span class="sec-num">03<span class="dark-only"> //</span></span> THE PHYSICS</h2>
 
 <p>
 Everything runs in an 800&times;600 logical coordinate space (same as Pong). The physics are deliberately simple &mdash; just enough to make landing non-trivial:
@@ -239,7 +231,7 @@ const ACTIONS = {
     ROTATE_RIGHT: 5
 };</code></pre>
 
-<h2>04 // THE REWARD THAT BROKE EVERYTHING (THREE TIMES)</h2>
+<h2><span class="sec-num">04<span class="dark-only"> //</span></span> THE REWARD THAT BROKE EVERYTHING (THREE TIMES)</h2>
 
 <p>
 The state is an 8-dimensional vector, all normalized to roughly [-1, 1]:
@@ -332,7 +324,7 @@ Two more structural changes each contributed ~5 percentage points:
     <li><strong>Curriculum spawn altitude.</strong> Level 0 originally spawned at 120&ndash;200px. Free-fall from 160px builds $v_y = 3.2$ by impact &mdash; impossible to land. Dropping to 35&ndash;60px lets the agent discover braking within 50 episodes, bootstrapping the learning signal.</li>
 </ul>
 
-<h2>05 // THE TRAINING LOOP</h2>
+<h2><span class="sec-num">05<span class="dark-only"> //</span></span> THE TRAINING LOOP</h2>
 
 <p>
 Lunar Lander is single-player, so difficulty comes from <strong>curriculum learning via spawn randomization</strong>:
@@ -349,7 +341,7 @@ Lunar Lander is single-player, so difficulty comes from <strong>curriculum learn
 The level advances when the rolling landing rate (last 20 episodes) exceeds 60%. The warmup boot pre-trains each agent for 600&ndash;1,000 episodes in non-blocking chunks (~2&ndash;3 seconds on page load).
 </p>
 
-<h2>06 // WHAT EACH ALGORITHM ACTUALLY DID</h2>
+<h2><span class="sec-num">06<span class="dark-only"> //</span></span> WHAT EACH ALGORITHM ACTUALLY DID</h2>
 
 <h3>DQN: The Replay Buffer Wins at Small Scale</h3>
 
@@ -430,7 +422,7 @@ Some lessons come from negative results:
 <strong>The meta-lesson:</strong> the changes that actually mattered were all <em>structural</em> &mdash; exploration bias, reward scale, network depth, spawn difficulty. If your RL agent isn&rsquo;t learning, resist the urge to tune. Look for a mismatch between your assumptions and your problem.
 </p>
 
-<h2>07 // SEEING ACTOR-CRITIC</h2>
+<h2><span class="sec-num">07<span class="dark-only"> //</span></span> SEEING ACTOR-CRITIC</h2>
 
 <p>
 This is the teaching payoff. When you select A2C or PPO, a visualization panel appears below the game canvas with two components:
@@ -452,7 +444,7 @@ If you&rsquo;ve read the <a href="gan-meets-rl.html">GAN-RL blog post</a>, this 
 In RLHF for LLMs, the actor is the language model (generating tokens), and the critic is the reward model (scoring responses). PPO is the training algorithm. Every piece of this visualization maps directly onto how ChatGPT was trained.
 </p>
 
-<h2>08 // TECHNICAL DETAILS</h2>
+<h2><span class="sec-num">08<span class="dark-only"> //</span></span> TECHNICAL DETAILS</h2>
 
 <h3>trainPPO() &mdash; The New MiniNet Method</h3>
 
@@ -506,7 +498,7 @@ Every parameter is a Float64 in typed arrays &mdash; no framework, no tensors, j
     <li><strong>A2C/PPO Total:</strong> 3,990 + 3,745 = <strong>7,735</strong> &mdash; A2C uses Adam, PPO uses SGD</li>
 </ul>
 
-<h2>09 // TRY IT YOURSELF</h2>
+<h2><span class="sec-num">09<span class="dark-only"> //</span></span> TRY IT YOURSELF</h2>
 
 <p>
 <a href="../../lab/lander.html" style="color:var(--neon-cyan); text-decoration:underline;"><strong>&rarr; Play RL Lunar Lander</strong></a>
@@ -520,7 +512,7 @@ Start with DQN (the algorithm you know from Pong). Hit AUTO-TRAIN for 100 episod
 All three agents persist in localStorage. Refresh the page and they keep their learned weights. Clear your browser data to start fresh.
 </p>
 
-<h2>10 // REFERENCES</h2>
+<h2><span class="sec-num">10<span class="dark-only"> //</span></span> REFERENCES</h2>
 
 <div class="references">
     <ol class="ref-list">

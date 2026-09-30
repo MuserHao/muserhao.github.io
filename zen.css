@@ -27,7 +27,6 @@ html[data-theme="light"] .gen-art-canvas,
 html[data-theme="light"] .blog-bg-canvas,
 html[data-theme="light"] .paper-texture,
 html[data-theme="light"] .grid-bg,
-html[data-theme="light"] .gradient-orbs,
 html[data-theme="light"] .vignette,
 html[data-theme="light"] .scroll-indicator {
     display: none !important;
@@ -567,3 +566,14 @@ html[data-theme="light"] .blog-tag {
 @media (prefers-reduced-motion: reduce) {
     html[data-theme="light"] .hero-content > * { animation: none !important; }
 }
+
+/* ---------- consistency fixes ---------- */
+/* Nav jumps land below the fixed header instead of under it */
+html[data-theme="light"] main > section { scroll-margin-top: 5.5rem; }
+/* The dark theme's boxed hover state doesn't belong here */
+html[data-theme="light"] .nav-link:hover { border-color: transparent; background: none; }
+/* Post section numbers: a quiet numeral, no terminal slashes */
+html[data-theme="light"] .post-content h2 .sec-num { color: var(--text-faint); margin-right: 0.9em; font-variant-numeric: tabular-nums; }
+/* 404 */
+html[data-theme="light"] .nf-note { font-family: var(--font-body); color: var(--text-secondary); margin-bottom: 2.5rem; }
+html[data-theme="light"] .nf-home { font-family: var(--font-body) !important; color: var(--neon-pink) !important; border: none !important; border-bottom: 1px solid var(--border-hover) !important; border-radius: 0 !important; padding: 0 0 0.2rem !important; }
