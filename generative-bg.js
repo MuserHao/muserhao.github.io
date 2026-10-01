@@ -16,7 +16,7 @@
         hues:  [190, 195, 205, 215, 340],
         num:   1500,
         steps: 1000,           // shown as the timestep counter
-        dur:   9000,           // ms from pure noise to the sample
+        dur:   4500,           // ms from pure noise to the sample
     };
 
     function getTheme() {
