@@ -104,6 +104,7 @@
         if (p < 1) { ctx.fillStyle = DARK.bg; ctx.fillRect(0, 0, W, H); }
         else ctx.clearRect(0, 0, W, H);
 
+        ctx.globalCompositeOperation = 'lighter';   // overlaps glow like light, not paint
         for (let i = 0; i < particles.length; i++) {
             const q = particles[i];
             q.a += q.spin * (1 - t) * 16;
@@ -111,9 +112,14 @@
             const x0 = cx + Math.cos(q.a) * r, y0 = cy + Math.sin(q.a) * r;
             const x = (1 - t) * x0 + t * (cx + q.zx * S);
             const y = (1 - t) * y0 + t * (cy + q.zy * S);
-            ctx.fillStyle = `hsla(${q.hue},60%,${q.lit}%,${0.35 + 0.45 * (1 - t)})`;
+            // Thin-film iridescence: hue drifts around the ring, so colour flows along it.
+            const film = 0.5 + 0.5 * Math.sin(q.a + now * 0.00035);
+            const hue = 185 + film * 150 + (q.hue - 200) * 0.3;
+            ctx.fillStyle = `hsla(${hue},85%,${q.lit + 8}%,${0.35 + 0.5 * (1 - t)})`;
             ctx.fillRect(x, y, q.size, q.size);
         }
+
+        ctx.globalCompositeOperation = 'source-over';
 
         if (counter) {
             const step = Math.round(t * DARK.steps);
