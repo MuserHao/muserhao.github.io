@@ -737,6 +737,22 @@
 }
 
 /* Post navigation */
+.post-author {
+    max-width: 800px;
+    margin: 3rem auto 0;
+    padding: 1.5rem 2rem;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.post-author p {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+}
+
+.post-author a { color: var(--neon-cyan); }
+
 .post-nav {
     max-width: 800px;
     margin: 0 auto;

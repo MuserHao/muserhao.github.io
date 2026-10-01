@@ -577,3 +577,7 @@ html[data-theme="light"] .post-content h2 .sec-num { color: var(--text-faint); m
 /* 404 */
 html[data-theme="light"] .nf-note { font-family: var(--font-body); color: var(--text-secondary); margin-bottom: 2.5rem; }
 html[data-theme="light"] .nf-home { font-family: var(--font-body) !important; color: var(--neon-pink) !important; border: none !important; border-bottom: 1px solid var(--border-hover) !important; border-radius: 0 !important; padding: 0 0 0.2rem !important; }
+html[data-theme="light"] .post-author p { font-family: var(--font-body); font-size: 0.92rem; color: var(--text-secondary); }
+html[data-theme="light"] .post-author a { color: var(--neon-pink); text-decoration: underline; text-decoration-color: var(--border-hover); text-underline-offset: 3px; }
+html[data-theme="light"] .post-author + .post-nav { border-top: none; }
+html[data-theme="light"] .pub-group { font-family: var(--font-body); font-size: 0.75rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-faint); text-align: left; margin: 2rem 0 0; padding-top: 2rem; border-top: 1px solid var(--border-subtle); }
