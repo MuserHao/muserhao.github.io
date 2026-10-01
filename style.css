@@ -122,7 +122,7 @@
     --pink-glow-sm: transparent;
     --pink-border: #d8d5ce;
     --grid-line: transparent;
-    --nav-bg: rgba(241, 240, 236, 0.94);
+    --nav-bg: rgba(241, 240, 236, 0.985);
     --nav-mobile-bg: rgba(241, 240, 236, 0.98);
     --shadow-dark: transparent;
     --bar-bg: rgba(29, 29, 27, 0.05);
@@ -144,15 +144,10 @@
     --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 
-/* Hide tech orbs entirely */
-[data-theme="light"] .gradient-orbs {
-    display: none;
-}
-
 /* Smooth transitions on theme switch */
 body, header, .neon-card, .neon-btn, footer,
 .terminal-window, .stat-card, .contact-item,
-.filter-btn, .gradient-orbs, .orb {
+.filter-btn {
     transition: var(--theme-transition);
 }
 
@@ -1001,6 +996,17 @@ section.visible .stat-card:nth-child(4) { transition-delay: 0.4s; }
     margin-top: calc(-1 * var(--space-5));
 }
 
+.pub-group {
+    max-width: 900px;
+    margin: var(--space-7) auto var(--space-4);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 400;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+    text-align: center;
+}
+
 .pub-list {
     max-width: 900px;
     margin: 0 auto;
@@ -1255,56 +1261,6 @@ footer {
     background: radial-gradient(ellipse at center, transparent 50%, rgba(6, 8, 14, 0.5) 100%);
 }
 
-/* ========== GRADIENT ORBS ========== */
-.gradient-orbs {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    overflow: hidden;
-}
-
-.orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(50px);
-    opacity: 0.25;
-    mix-blend-mode: screen;
-    will-change: transform;
-}
-
-.orb-cyan {
-    width: 700px;
-    height: 700px;
-    background: radial-gradient(circle, transparent 5%, var(--neon-cyan) 25%, rgba(88, 196, 220, 0.2) 50%, transparent 70%);
-    top: 10%;
-    left: -5%;
-    animation: orb-drift-1 25s ease-in-out infinite;
-}
-
-.orb-pink {
-    width: 650px;
-    height: 650px;
-    background: radial-gradient(circle, transparent 5%, var(--neon-pink) 25%, rgba(224, 112, 152, 0.2) 50%, transparent 70%);
-    top: 40%;
-    right: -8%;
-    animation: orb-drift-2 30s ease-in-out infinite;
-}
-
-@keyframes orb-drift-1 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    25% { transform: translate(120px, 80px) scale(1.1); }
-    50% { transform: translate(50px, -60px) scale(0.9); }
-    75% { transform: translate(-50px, 40px) scale(1.05); }
-}
-
-@keyframes orb-drift-2 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    25% { transform: translate(-100px, -70px) scale(1.08); }
-    50% { transform: translate(-40px, 60px) scale(0.92); }
-    75% { transform: translate(70px, -30px) scale(1.06); }
-}
-
 /* ========== FOCUS-VISIBLE (keyboard accessibility) ========== */
 :focus-visible {
     outline: 2px solid var(--neon-cyan);
@@ -1525,9 +1481,5 @@ footer {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
-    }
-
-    .gradient-orbs {
-        display: none;
     }
 }

@@ -78,14 +78,6 @@
 
     <div class="grid-bg"></div>
 
-    <!-- Floating gradient orbs -->
-    <div class="gradient-orbs" aria-hidden="true">
-        <div class="orb orb-cyan"></div>
-        <div class="orb orb-pink"></div>
-        <div class="orb orb-purple"></div>
-        <div class="orb orb-gold"></div>
-        <div class="orb orb-teal"></div>
-    </div>
 
 
     <header>
@@ -126,12 +118,12 @@
                     <span class="blog-tag">LLM</span>
                 </div>
                 <h1 class="post-title">When GANs Meet RL: The Adversarial Game Behind Generative AI</h1>
-                <p class="post-subtitle">// two players, one game -- why your GAN and your RLHF pipeline are secretly the same thing</p>
+                <p class="post-subtitle"><span class="dark-only">// </span>two players, one game -- why your GAN and your RLHF pipeline are secretly the same thing</p>
                 <div class="post-divider"></div>
             </div>
 
             <div class="post-content">
-                <h2>01 // INTRODUCTION</h2>
+                <h2><span class="sec-num">01<span class="dark-only"> //</span></span> INTRODUCTION</h2>
 
                 <p>
                     Generative Adversarial Networks (GANs) and Reinforcement Learning (RL) appear, at first glance, to
@@ -166,7 +158,7 @@
                     <p>"The generator is the actor, the discriminator is the critic. The rest is notation."</p>
                 </blockquote>
 
-                <h2>02 // THE GAN GAME</h2>
+                <h2><span class="sec-num">02<span class="dark-only"> //</span></span> THE GAN GAME</h2>
 
                 <p>
                     Let's start with the GAN formulation <a href="#ref-1">[1]</a>. A GAN consists of two neural networks locked in a
@@ -236,7 +228,7 @@
                     </p>
                 </div>
 
-                <h2>03 // THE RL GAME</h2>
+                <h2><span class="sec-num">03<span class="dark-only"> //</span></span> THE RL GAME</h2>
 
                 <p>
                     Now let's set up the RL framework. A standard RL problem is defined by a
@@ -284,7 +276,7 @@
                     generates behavior; the critic evaluates it.
                 </p>
 
-                <h2>04 // THE EQUIVALENCE</h2>
+                <h2><span class="sec-num">04<span class="dark-only"> //</span></span> THE EQUIVALENCE</h2>
 
                 <p>
                     Pfau and Vinyals <a href="#ref-2">[2]</a> made the connection explicit: <em>a GAN is
@@ -347,7 +339,7 @@
                     </p>
                 </div>
 
-                <h2>05 // THE GAME THEORY</h2>
+                <h2><span class="sec-num">05<span class="dark-only"> //</span></span> THE GAME THEORY</h2>
 
                 <p>
                     Both frameworks can be unified under the language of game theory. The abstract
@@ -416,7 +408,7 @@
                     </p>
                 </div>
 
-                <h2>06 // F-DIVERGENCE FRAMEWORK</h2>
+                <h2><span class="sec-num">06<span class="dark-only"> //</span></span> F-DIVERGENCE FRAMEWORK</h2>
 
                 <p>
                     The deepest mathematical thread connecting GANs and RL runs through
@@ -496,7 +488,7 @@
                     </p>
                 </div>
 
-                <h2>07 // RLHF: THE BRIDGE</h2>
+                <h2><span class="sec-num">07<span class="dark-only"> //</span></span> RLHF: THE BRIDGE</h2>
 
                 <p>
                     With this framework in place, we can now examine
@@ -592,7 +584,7 @@
                     from collapsing onto a narrow set of outputs that exploit the discriminator's blind spots.
                 </p>
 
-                <h2>08 // THE OPTIMAL POLICY AND THE BOLTZMANN CONNECTION</h2>
+                <h2><span class="sec-num">08<span class="dark-only"> //</span></span> THE OPTIMAL POLICY AND THE BOLTZMANN CONNECTION</h2>
 
                 <p>
                     The RLHF objective has a beautiful closed-form solution. Given a fixed reward model
@@ -644,7 +636,7 @@
                     </p>
                 </div>
 
-                <h2>09 // FAILURE MODES: SAME GAME, SAME PATHOLOGIES</h2>
+                <h2><span class="sec-num">09<span class="dark-only"> //</span></span> FAILURE MODES: SAME GAME, SAME PATHOLOGIES</h2>
 
                 <p>
                     If GANs and RL are instances of the same game, we should expect similar failure modes.
@@ -705,7 +697,7 @@
                     <tr><td style="padding:0.5rem;">Two-timescale learning rates</td><td style="padding:0.5rem;">Separate actor/critic learning rates</td></tr>
                 </table>
 
-                <h2>10 // SEQUENTIAL GENERATION: SeqGAN</h2>
+                <h2><span class="sec-num">10<span class="dark-only"> //</span></span> SEQUENTIAL GENERATION: SeqGAN</h2>
 
                 <p>
                     Standard GANs generate samples in a single forward pass -- image pixels all at once.
@@ -743,7 +735,7 @@
                     against a learned evaluator.
                 </p>
 
-                <h2>11 // THE UNIFIED VIEW</h2>
+                <h2><span class="sec-num">11<span class="dark-only"> //</span></span> THE UNIFIED VIEW</h2>
 
                 <p>
                     Let's step back and see the full picture. We can describe a single abstract framework
@@ -811,7 +803,7 @@
                     the adversarial dynamics simplify -- but at the cost of less adaptive evaluation.
                 </p>
 
-                <h2>12 // CONCLUSION</h2>
+                <h2><span class="sec-num">12<span class="dark-only"> //</span></span> CONCLUSION</h2>
 
                 <p>
                     The connection between GANs and RL is not a loose analogy -- it is a formal mathematical
@@ -938,9 +930,13 @@
             </div>
         </article>
 
+        <aside class="post-author">
+            <p><span class="dark-only">// </span>I'm Hao Xin, a senior ML engineer at Zoox working on vision-language-action models for robotaxis. Before that: on-device VLMs at Apple, generative AI at Walmart, and a PhD in statistics at Purdue. New posts go out on <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>, or say hi at <a href="mailto:hao9xin@gmail.com">hao9xin@gmail.com</a>.</p>
+        </aside>
+
         <div class="post-nav">
-            <a href="score-matching-explained.html"><i class="fas fa-arrow-left"></i> SCORE MATCHING EXPLAINED</a>
-            <a href="rl-pong-browser.html">RL PONG IN THE BROWSER <i class="fas fa-arrow-right"></i></a>
+            <a href="score-matching-explained.html"><i class="fas fa-arrow-left"></i> <span class="dark-only">SCORE MATCHING EXPLAINED</span><span class="light-only">Score Matching Explained</span></a>
+            <a href="rl-pong-browser.html"><span class="dark-only">TEACHING PONG TO PLAY ITSELF</span><span class="light-only">Teaching Pong to Play Itself</span> <i class="fas fa-arrow-right"></i></a>
         </div>
     </main>
 
@@ -953,7 +949,7 @@
                 <a href="https://scholar.google.com/citations?hl=en&user=6y09MRIAAAAJ" target="_blank" rel="noopener noreferrer">Scholar</a>
                 <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>
             </div>
-            <p class="footer-text dark-only">// built with caffeine and mass GPU hours</p>
+            <p class="footer-text dark-only">// built with caffeine and curiosity</p>
             <p class="footer-text light-only">made with curiosity and care</p>
             <p class="footer-copy">&copy; 2026 Hao Xin</p>
         </div>

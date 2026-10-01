@@ -75,13 +75,6 @@
 
     <div class="grid-bg"></div>
 
-    <div class="gradient-orbs" aria-hidden="true">
-        <div class="orb orb-cyan"></div>
-        <div class="orb orb-pink"></div>
-        <div class="orb orb-purple"></div>
-        <div class="orb orb-gold"></div>
-        <div class="orb orb-teal"></div>
-    </div>
 
 
     <header>
@@ -120,12 +113,12 @@
                     <span class="blog-tag">TUTORIAL</span>
                 </div>
                 <h1 class="post-title">The Multi-GPU Training Gauntlet: Threads, Processes, and the GIL</h1>
-                <p class="post-subtitle">// four attempts to parallelize PyTorch training, and why only the last one worked</p>
+                <p class="post-subtitle"><span class="dark-only">// </span>four attempts to parallelize PyTorch training, and why only the last one worked</p>
                 <div class="post-divider"></div>
             </div>
 
             <div class="post-content">
-                <h2>01 // THE PROBLEM</h2>
+                <h2><span class="sec-num">01<span class="dark-only"> //</span></span> THE PROBLEM</h2>
 
                 <p>
                     You have 8 GPUs and 13 independent models to train. Each model takes ~1 hour on a single GPU.
@@ -149,7 +142,7 @@
                 </p>
 
 
-                <h2>02 // ATTEMPT 1: ThreadPoolExecutor</h2>
+                <h2><span class="sec-num">02<span class="dark-only"> //</span></span> ATTEMPT 1: ThreadPoolExecutor</h2>
 
                 <p>The simplest approach. Python's <code>concurrent.futures.ThreadPoolExecutor</code> with one thread per GPU:</p>
 
@@ -180,7 +173,7 @@ with ThreadPoolExecutor(max_workers=8) as pool:
                 <p><strong>Lesson:</strong> third-party libraries are often not thread-safe, and there's no way to know without testing or reading their source code.</p>
 
 
-                <h2>03 // ATTEMPT 2: Threading + Lock</h2>
+                <h2><span class="sec-num">03<span class="dark-only"> //</span></span> ATTEMPT 2: Threading + Lock</h2>
 
                 <p>We added a <code>threading.Lock</code> to serialize the FID calls:</p>
 
@@ -207,7 +200,7 @@ def compute_fid(samples):
                 <p><strong>Lesson:</strong> Python threads are <em>concurrent</em> but not <em>parallel</em> for CPU-bound work. The GIL serializes all Python execution.</p>
 
 
-                <h2>04 // ATTEMPT 3: torch.multiprocessing</h2>
+                <h2><span class="sec-num">04<span class="dark-only"> //</span></span> ATTEMPT 3: torch.multiprocessing</h2>
 
                 <p>Since threads don't work, use <code>torch.multiprocessing</code> with <code>spawn</code> context. Each GPU gets its own process with its own GIL:</p>
 
@@ -249,7 +242,7 @@ for p in processes:
                 <p><strong>Lesson:</strong> <code>torch.compile</code> adds significant hidden complexity. Disable it when running multiple processes. And <code>spawn</code> requires everything to be serializable &mdash; no closures, no lambda functions, no complex objects.</p>
 
 
-                <h2>05 // ATTEMPT 4: subprocess.Popen (SUCCESS)</h2>
+                <h2><span class="sec-num">05<span class="dark-only"> //</span></span> ATTEMPT 4: subprocess.Popen (SUCCESS)</h2>
 
                 <p>The solution that finally worked is the simplest conceptually: launch each training job as a <strong>completely independent OS process</strong> using <code>subprocess.Popen</code>.</p>
 
@@ -315,7 +308,7 @@ if __name__ == '__main__':
                 <p>This is essentially what <code>submitit</code> (from FAIR) does for SLURM clusters, and what you'd do manually by opening 8 terminal windows. The pattern is ancient and battle-tested.</p>
 
 
-                <h2>06 // THE ARCHITECTURE</h2>
+                <h2><span class="sec-num">06<span class="dark-only"> //</span></span> THE ARCHITECTURE</h2>
 
                 <p>The final system has two phases:</p>
 
@@ -345,7 +338,7 @@ if __name__ == '__main__':
                 </ul>
 
 
-                <h2>07 // KEY DESIGN DECISIONS</h2>
+                <h2><span class="sec-num">07<span class="dark-only"> //</span></span> KEY DESIGN DECISIONS</h2>
 
                 <p><strong>Use <code>CUDA_VISIBLE_DEVICES</code> per subprocess, not <code>torch.device('cuda:N')</code>.</strong>
                 Setting <code>CUDA_VISIBLE_DEVICES=3</code> makes the process see only GPU 3 as <code>cuda:0</code>.
@@ -371,7 +364,7 @@ if __name__ == '__main__':
                 Always use <code>print(..., flush=True)</code> so you can monitor progress in real time.</p>
 
 
-                <h2>08 // DECISION TREE</h2>
+                <h2><span class="sec-num">08<span class="dark-only"> //</span></span> DECISION TREE</h2>
 
                 <p>When you need to run multiple PyTorch jobs on multiple GPUs, here's how to choose:</p>
 
@@ -413,7 +406,7 @@ if __name__ == '__main__':
                 </table>
 
 
-                <h2>09 // THE TAKEAWAY</h2>
+                <h2><span class="sec-num">09<span class="dark-only"> //</span></span> THE TAKEAWAY</h2>
 
                 <p>
                     The fundamental lesson: <strong>Python threads do not provide parallelism for CPU-bound code.</strong>
@@ -441,9 +434,15 @@ if __name__ == '__main__':
             </div>
         </article>
 
-        <div class="post-nav" style="display:flex;justify-content:space-between;max-width:48rem;margin:3rem auto;padding:0 1rem;">
-            <a href="../index.html" class="read-more" style="text-decoration:none;"><i class="fas fa-arrow-left"></i> BACK TO BLOG</a>
+        <aside class="post-author">
+            <p><span class="dark-only">// </span>I'm Hao Xin, a senior ML engineer at Zoox working on vision-language-action models for robotaxis. Before that: on-device VLMs at Apple, generative AI at Walmart, and a PhD in statistics at Purdue. New posts go out on <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>, or say hi at <a href="mailto:hao9xin@gmail.com">hao9xin@gmail.com</a>.</p>
+        </aside>
+
+        <div class="post-nav">
+            <a href="rl-lander-browser.html"><i class="fas fa-arrow-left"></i> <span class="dark-only">LANDING THE ACTOR-CRITIC</span><span class="light-only">Landing the Actor-Critic</span></a>
+            <a href="../index.html"><span class="dark-only">BACK TO BLOG</span><span class="light-only">All writing</span> <i class="fas fa-arrow-right"></i></a>
         </div>
+
     </main>
 
     <footer>
@@ -455,7 +454,7 @@ if __name__ == '__main__':
                 <a href="https://scholar.google.com/citations?hl=en&user=6y09MRIAAAAJ" target="_blank" rel="noopener noreferrer">Scholar</a>
                 <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>
             </div>
-            <p class="footer-text dark-only">// built with caffeine and mass GPU hours</p>
+            <p class="footer-text dark-only">// built with caffeine and curiosity</p>
             <p class="footer-text light-only">made with curiosity and care</p>
             <p class="footer-copy">&copy; 2026 Hao Xin</p>
         </div>
