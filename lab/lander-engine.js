@@ -94,6 +94,7 @@ const LanderEngine = (function () {
         let running = false;
         let windEnabled = false;
         let windForce = 0;
+        let prevPotential = null;
 
         // Flame particles
         let flames = [];
@@ -146,6 +147,7 @@ const LanderEngine = (function () {
             thrustLeft = false;
             thrustRight = false;
             windForce = 0;
+            prevPotential = null;
             flames = [];
         }
 
@@ -181,8 +183,8 @@ const LanderEngine = (function () {
         function checkLanding() {
             const tips = getLegTips();
 
-            // Check if legs are touching or near the pad surface (within 8px)
-            const legsTouchingGround = tips.left.y >= padY - 8 && tips.right.y >= padY - 8;
+            // Both feet on the pad surface (within 3px)
+            const legsTouchingGround = tips.left.y >= padY - 3 && tips.right.y >= padY - 3;
 
             const onPad = legsTouchingGround &&
                           tips.left.x >= padLeft && tips.left.x <= padRight &&
@@ -190,11 +192,7 @@ const LanderEngine = (function () {
             const upright = Math.abs(lander.angle) < (20 * Math.PI / 180);
             const slow = Math.abs(lander.vy) < 1.5 && Math.abs(lander.vx) < 0.8;
 
-            if (onPad && upright && slow) {
-                leftContact = 1;
-                rightContact = 1;
-                return 'landed';
-            }
+            if (onPad && upright && slow) return 'landed';
 
             // Check crash — any leg tip below terrain
             const lTerrain = terrainHeightAt(tips.left.x);
@@ -211,6 +209,16 @@ const LanderEngine = (function () {
             }
 
             return null;
+        }
+
+        // Φ(s): distance to the pad (in 100 px), speed and tilt all lower it;
+        // each foot on the ground raises it a little.
+        function shapingPotential(padCx) {
+            const dx = (lander.x - padCx) / 100;
+            const dy = (lander.y - padY) / 100;
+            const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
+            return -3 * Math.sqrt(dx * dx + dy * dy) - 3 * speed - 3 * Math.abs(lander.angle)
+                   + 0.5 * (leftContact + rightContact);
         }
 
         // Physics step
@@ -289,7 +297,6 @@ const LanderEngine = (function () {
 
             // Check boundaries
             let result = null;
-            let reward = 0;
 
             if (lander.x < -20 || lander.x > W + 20 || lander.y < -50 || lander.y > H + 20) {
                 result = 'oob';
@@ -299,49 +306,32 @@ const LanderEngine = (function () {
                 result = checkLanding();
             }
 
-            // Compute reward
+            // Leg contact sensors: is each foot touching the ground?
+            const tips = getLegTips();
+            leftContact = tips.left.y >= terrainHeightAt(tips.left.x) - 3 ? 1 : 0;
+            rightContact = tips.right.y >= terrainHeightAt(tips.right.x) - 3 ? 1 : 0;
+
+            // Reward = potential-based shaping + terminal bonus + fuel cost.
+            // Φ(s) is higher when the lander is close to the pad, slow and level.
+            // Each frame pays Φ(s') − Φ(s), so moving toward a good state earns
+            // reward and moving away costs the same amount back. Hovering earns
+            // nothing, so the only way to collect real reward is to land.
+            // (Ng, Harada & Russell 1999; the same trick as Gym's LunarLander.)
             const padCx = (padLeft + padRight) / 2;
-            const padCy = padY;
-            const dx = (lander.x - padCx) / W;
-            const dy = (lander.y - padCy) / H;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const potential = shapingPotential(padCx);
+            let reward = prevPotential === null ? 0 : potential - prevPotential;
+            prevPotential = potential;
+            if (thrustMain) reward -= 0.03;
+            if (thrustLeft || thrustRight) reward -= 0.003;
 
-            if (result === 'landed') {
-                const uprightBonus = Math.max(0, 3 * (1 - Math.abs(lander.angle) / (20 * Math.PI / 180)));
-                const gentleBonus = Math.max(0, 3 * (1 - Math.abs(lander.vy) / 1.5));
-                reward = 20 + uprightBonus + gentleBonus;
-            } else if (result === 'crash' || result === 'oob') {
-                const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
-                const distPenalty = Math.min(1, dist * 2);
-                reward = -3 - 4 * Math.min(1, speed / 4) - 3 * distPenalty;
-            } else if (result === 'timeout') {
-                reward = -3;
-            } else {
-                // Dense per-frame reward — 3 smooth components + near-pad bonus
-                const speed = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy);
-                const closeness = Math.max(0, 1 - dist / 0.8);
-
-                // 1. Controlled approach: close AND slow (smooth, teaches braking)
-                reward = closeness * Math.max(0, 3 - speed) * 0.5;
-
-                // 2. Uprightness (always active, smooth)
-                const uprightness = 1 - Math.abs(lander.angle) / Math.PI;
-                reward += uprightness * 0.15;
-
-                // 3. Near-pad slow bonus (smooth ramp instead of step function)
-                //    closeness^2 * (3-speed)/3 gives smooth gradient near pad
-                if (speed < 3) {
-                    reward += closeness * closeness * (3 - speed) / 3 * 1.5;
-                }
-
-                // 4. Small time penalty
-                reward -= 0.01;
-            }
+            if (result === 'landed') reward += 10;
+            else if (result === 'crash' || result === 'oob') reward -= 10;
+            else if (result === 'timeout') reward -= 10;   // hovering until time runs out is a failure too
 
             // Build 8D state
             const state = [
-                (lander.x - padCx) / W,           // pad-relative X
-                (lander.y - padCy) / H,           // pad-relative Y
+                (lander.x - padCx) / 200,         // pad-relative X
+                (lander.y - padY) / 200,          // pad-relative Y
                 lander.vx / 5,                     // normalized vx
                 lander.vy / 5,                     // normalized vy
                 lander.angle / Math.PI,            // normalized angle
@@ -672,8 +662,8 @@ const LanderEngine = (function () {
             getState() {
                 const padCx = (padLeft + padRight) / 2;
                 return [
-                    (lander.x - padCx) / W,
-                    (lander.y - padY) / H,
+                    (lander.x - padCx) / 200,
+                    (lander.y - padY) / 200,
                     lander.vx / 5,
                     lander.vy / 5,
                     lander.angle / Math.PI,

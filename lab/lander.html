@@ -104,6 +104,13 @@
                 <option value="200">200 episodes</option>
                 <option value="500">500 episodes</option>
             </select>
+            <select class="train-select" id="level-select" aria-label="Difficulty">
+                <option value="0">EASY</option>
+                <option value="1">MEDIUM</option>
+                <option value="2">HARD</option>
+                <option value="3" selected>FULL</option>
+            </select>
+            <button class="train-btn" id="brain-btn">BLANK BRAIN</button>
             <span class="train-progress" id="train-progress"></span>
         </div>
 
@@ -180,6 +187,7 @@
     <script src="../shared.js"></script>
     <script src="stars.js"></script>
     <script src="lander-engine.js"></script>
+    <script src="tiny-nn.js"></script>
     <script src="lander-rl.js"></script>
     <script src="lander-ui.js"></script>
     <script>
