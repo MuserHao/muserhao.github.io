@@ -118,6 +118,7 @@
                 <h1 class="post-title">Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser</h1>
                 <p class="post-subtitle"><span class="dark-only">// </span>~4,200 parameters, zero GPUs, and the visualization that makes RLHF click</p>
                 <div class="post-divider"></div>
+                <p class="post-subtitle"><em>Update, October 2026: the first version&rsquo;s agents were gaming their reward and almost never landed. <a href="#postmortem">The postmortem</a> explains how that was found and fixed. Parameter counts and success rates in the earlier sections describe the first version.</em></p>
             </div>
 
             <div class="post-content">
@@ -499,21 +500,152 @@ Every parameter is a Float64 in typed arrays &mdash; no framework, no tensors, j
     <li><strong>A2C/PPO Total:</strong> 3,990 + 3,745 = <strong>7,735</strong> &mdash; A2C uses Adam, PPO uses SGD</li>
 </ul>
 
-<h2><span class="sec-num">09<span class="dark-only"> //</span></span> TRY IT YOURSELF</h2>
+<h2 id="postmortem"><span class="sec-num">09<span class="dark-only"> //</span></span> POSTMORTEM: THE AGENTS NEVER LEARNED TO LAND</h2>
+
+<p><em>Added October 2026.</em> Everything above describes the first version. Six months later I went back, measured what the shipped agents actually did, and found that the reward function had been gamed all along. This section is what went wrong, how I proved it, and how I fixed it. The live lab now runs the fixed version.</p>
+
+<h3>The symptom: 1% landings and a return of 450</h3>
+
+<p>
+I replayed the page&rsquo;s own warmup in Node (1,000 / 800 / 600 episodes for DQN / A2C / PPO), then evaluated each agent for 100 episodes per difficulty level:
+</p>
+
+<table style="width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:0.85rem; margin:1.5rem 0;">
+    <thead>
+        <tr style="border-bottom:2px solid var(--border-subtle);">
+            <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">Before</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Easy</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Medium</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Hard</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Full</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr style="border-bottom:1px solid var(--border-subtle);"><td style="padding:0.5rem;">DQN</td><td style="text-align:center;">12%</td><td style="text-align:center;">1%</td><td style="text-align:center;">0%</td><td style="text-align:center;">0%</td></tr>
+        <tr style="border-bottom:1px solid var(--border-subtle);"><td style="padding:0.5rem;">A2C</td><td style="text-align:center;">0%</td><td style="text-align:center;">0%</td><td style="text-align:center;">0%</td><td style="text-align:center;">0%</td></tr>
+        <tr><td style="padding:0.5rem;">PPO</td><td style="text-align:center;">1%</td><td style="text-align:center;">0%</td><td style="text-align:center;">0%</td><td style="text-align:center;">0%</td></tr>
+    </tbody>
+</table>
+
+<p>
+The number that gave it away was PPO&rsquo;s <strong>average episode return: about 450</strong>, while 98% of its episodes ended in a crash. A successful landing was worth +20 to +26. An agent that crashes almost every time should not be earning eighteen landings&rsquo; worth of reward per episode.
+</p>
+
+<h3>The cause: reward hacking</h3>
+
+<p>
+The dense per-frame reward from Failure 2 paid for <em>being</em> in a good state: close to the pad, slow, upright. Near the pad that was worth up to about <strong>+2.7 every frame</strong>. Landing ends the episode and pays +26 once. So ten frames of hovering beat landing, and a 500-frame episode of drifting slowly above the pad was worth over a thousand. The optimal policy for the reward I wrote was: <em>hang around the pad as long as possible, then fall over</em>. The agents found it.
+</p>
+
+<p>
+The irony is that the &ldquo;lesson&rdquo; of Failure 2 made it worse. Shrinking the terminal reward to &plusmn;20 so it wouldn&rsquo;t dwarf the per-frame reward is exactly what made hovering pay more than landing. The low success rates in the first round of debugging were most likely the same disease: the agents weren&rsquo;t failing to learn, they were learning the wrong thing very well.
+</p>
+
+<p>
+This is the same failure mode as reward hacking in RLHF: the policy optimises the reward you wrote, not the behaviour you meant. Here it was cheap to catch because the &ldquo;true&rdquo; objective (did it land?) is a single bit we can measure. With a learned reward model you usually can&rsquo;t.
+</p>
+
+<h3>The fix: potential-based shaping</h3>
+
+<p>
+Ng, Harada &amp; Russell <a href="#ref-8">[8]</a> proved there is exactly one family of shaping rewards that can never change the optimal policy: the <em>difference</em> of a potential function,
+</p>
+
+$$F(s, s') = \gamma\,\Phi(s') - \Phi(s)$$
+
+<p>
+Any loop of states sums to (almost) zero, so circling or hovering earns nothing. Moving toward a better state is paid, and moving away costs the same amount back. The only way to collect a large total is the terminal bonus. Gym&rsquo;s LunarLander uses the same trick (with $\gamma \approx 1$). The new reward:
+</p>
+
+<pre><code class="language-javascript">// Φ(s): higher when close to the pad (in 100 px), slow and level
+function shapingPotential(padCx) {
+    const dx = (lander.x - padCx) / 100, dy = (lander.y - padY) / 100;
+    const speed = Math.hypot(lander.vx, lander.vy);
+    return -3 * Math.hypot(dx, dy) - 3 * speed - 3 * Math.abs(lander.angle)
+           + 0.5 * (leftContact + rightContact);
+}
+
+let reward = potential - prevPotential;     // pay for progress, not for presence
+if (thrustMain) reward -= 0.03;              // fuel
+if (result === 'landed') reward += 10;
+else if (result === 'crash' || result === 'oob') reward -= 10;
+else if (result === 'timeout') reward -= 10; // hovering until time runs out is a failure too</code></pre>
+
+<p>
+With nothing else changed, the old DQN and PPO agents went from 1&ndash;12% to 54&ndash;60% on Easy. The timeout penalty mattered too: at &minus;5, one PPO seed settled on &ldquo;hover until time runs out&rdquo; as a safe local optimum, so a timeout now costs as much as a crash.
+</p>
+
+<h3>The other bugs</h3>
+
+<p>
+Fixing the reward exposed four smaller problems, each of which also had a lesson in it:
+</p>
+
+<ul>
+    <li><strong>&epsilon;-greedy on top of a policy gradient.</strong> A2C and PPO picked a random (thrust-biased) action 10&ndash;30% of the time instead of sampling from &pi;. Policy-gradient math assumes the data came from &pi;, so these updates were biased. Worse, PPO stored &pi;<sub>old</sub>(a|s) for actions &pi; never chose, so its importance ratio was wrong. Now A2C and PPO explore only by sampling from &pi;, with a small entropy bonus.</li>
+    <li><strong>Off-by-one rewards.</strong> PPO stored (s<sub>t</sub>, a<sub>t</sub>) together with the reward of the <em>previous</em> action. Every agent now uses one interface, <code>observe(s, a, r, s&prime;, done)</code>, so the reward always belongs to the action that caused it.</li>
+    <li><strong>Sensors that never fired.</strong> The two leg-contact inputs were set only at the instant of a successful landing, so they were 0 in every state the network ever learned from. They now report real ground contact. Also, &ldquo;landed&rdquo; used to trigger while the feet were still 8 px above the pad; now they must touch.</li>
+    <li><strong>One-sample updates.</strong> The old MiniNet applied Adam (or SGD) after every single sample. The new <code>tiny-nn.js</code> accumulates a real mini-batch gradient, clips its norm, and takes one Adam step: 64 samples for DQN, 32 frames for A2C, minibatches of 64 for PPO.</li>
+</ul>
+
+<p>
+DQN also got <strong>action repeat</strong>, as in the original Atari DQN <a href="#ref-1">[1]</a>: each decision is held for 4 frames. At 60 fps one frame of thrust barely changes the state, so the Q-values of different actions were nearly identical and the argmax was mostly noise. Holding each action for 4 frames makes the differences between actions large enough to learn. The networks are now 8&rarr;64&rarr;64 (5,126 parameters for DQN, ~9,900 for each actor-critic pair).
+</p>
+
+<h3>Train offline, ship the weights</h3>
+
+<p>
+The old page trained every agent from scratch on each first visit; in a headless browser on a 4-core machine that was about 7 minutes of a black screen. Now <code>tools/lab-train.js</code> trains each agent in Node for 1.5 million frames on a random mix of all four levels, keeps the best checkpoint by evaluation, and writes <code>lab/weights/lander.json</code> (~200 KB). The page loads it instantly. If you want to watch learning happen, press <strong>BLANK BRAIN</strong> to swap in an untrained network and then <strong>AUTO-TRAIN</strong>.
+</p>
+
+<p>
+The shipped weights, evaluated on 100 fresh episodes per level (no exploration):
+</p>
+
+<table style="width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:0.85rem; margin:1.5rem 0;">
+    <thead>
+        <tr style="border-bottom:2px solid var(--border-subtle);">
+            <th style="text-align:left; padding:0.5rem; color:var(--neon-cyan);">After</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Easy</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Medium</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Hard</th>
+            <th style="text-align:center; padding:0.5rem; color:var(--neon-cyan);">Full</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr style="border-bottom:1px solid var(--border-subtle);"><td style="padding:0.5rem;">PPO</td><td style="text-align:center;">100%</td><td style="text-align:center;">99%</td><td style="text-align:center;">100%</td><td style="text-align:center;">86%</td></tr>
+        <tr style="border-bottom:1px solid var(--border-subtle);"><td style="padding:0.5rem;">A2C</td><td style="text-align:center;">97%</td><td style="text-align:center;">99%</td><td style="text-align:center;">93%</td><td style="text-align:center;">67%</td></tr>
+        <tr style="border-bottom:1px solid var(--border-subtle);"><td style="padding:0.5rem;">DQN</td><td style="text-align:center;">100%</td><td style="text-align:center;">100%</td><td style="text-align:center;">65%</td><td style="text-align:center;">49%</td></tr>
+    </tbody>
+</table>
+
+<p>
+The ranking flipped as well. In the first version DQN looked like the most reliable learner, but that was an artefact of the broken reward. With a reward that can&rsquo;t be farmed, PPO is the clear winner, A2C learns fastest per frame but is less steady on the windy level, and DQN is the most cautious: its failures are mostly timeouts, hovering rather than crashing.
+</p>
+
+<h3>What I&rsquo;d tell my earlier self</h3>
+
+<ul>
+    <li><strong>Measure the thing you care about, not the reward.</strong> A rising return is not progress. Track the success rate (landings) next to it; when the two disagree, the reward is being gamed.</li>
+    <li><strong>Shape with differences, not levels.</strong> If you must add a dense reward, write it as $\Phi(s&prime;) - \Phi(s)$.</li>
+    <li><strong>Exploration is part of the algorithm.</strong> Bolting &epsilon;-greedy onto an on-policy method quietly breaks its maths.</li>
+</ul>
+
+<h2><span class="sec-num">10<span class="dark-only"> //</span></span> TRY IT YOURSELF</h2>
 
 <p>
 <a href="../../lab/lander.html" style="color:var(--neon-cyan); text-decoration:underline;"><strong>&rarr; Play RL Lunar Lander</strong></a>
 </p>
 
 <p>
-Start with DQN (the algorithm you know from Pong). Hit AUTO-TRAIN for 100 episodes and watch the landing rate climb. Then switch to A2C &mdash; notice how the Actor-Critic panel appears. Train it and watch the critic meter track the lander&rsquo;s altitude. Finally, try PPO and compare the learning curves. The action probability bars tell the whole story.
+The agents load pretrained, so the lander starts landing right away. Switch between DQN, A2C and PPO and watch the critic meter rise as the lander settles toward the pad, and the actor&rsquo;s probability mass shift onto main thrust. Hold the arrow keys to take over and fly it yourself. To watch learning from scratch, press BLANK BRAIN, pick a level, and hit AUTO-TRAIN.
 </p>
 
 <p>
-All three agents persist in localStorage. Refresh the page and they keep their learned weights. Clear your browser data to start fresh.
+Anything you train persists in localStorage. Press LOAD PRETRAINED to go back to the shipped weights.
 </p>
 
-<h2><span class="sec-num">10<span class="dark-only"> //</span></span> REFERENCES</h2>
+<h2><span class="sec-num">11<span class="dark-only"> //</span></span> REFERENCES</h2>
 
 <div class="references">
     <ol class="ref-list">
@@ -558,7 +690,12 @@ All three agents persist in localStorage. Refresh the page and they keep their l
             <span class="ref-venue">Blog post, 2026</span>
             <a href="gan-meets-rl.html" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
         </li>
-    </ol>
+            <li id="ref-8">
+            <span class="ref-authors">Ng, A. Y., Harada, D. &amp; Russell, S.</span>
+            <span class="ref-title">Policy invariance under reward transformations: Theory and application to reward shaping</span>
+            <span class="ref-venue">ICML, 1999</span>
+        </li>
+</ol>
 </div>
 
             </div>

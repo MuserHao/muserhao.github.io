@@ -1,5 +1,6 @@
 // ========== PONG UI ==========
-// Connects PongEngine to RL agents, manages HUD, localStorage, algo switching
+// Connects PongEngine to the RL agents: pretrained weights, live learning while
+// you play, auto-train against a scripted bot, localStorage persistence.
 
 (function () {
     'use strict';
@@ -8,184 +9,122 @@
     if (!canvas) return;
 
     const engine = PongEngine.create(canvas);
+    const ALGOS = ['qlearning', 'dqn', 'reinforce'];
+    const STORE = 'pong_v2_';               // v2: new networks; old saves are ignored
 
-    // ---- Agents ----
-    const agents = {
-        qlearning: loadAgent('qlearning') || new PongRL.QLearningAgent(),
-        dqn: loadAgent('dqn') || new PongRL.DQNAgent(),
-        reinforce: loadAgent('reinforce') || new PongRL.ReinforceAgent()
-    };
-
+    let agents = {};
+    let pretrained = null;
     let currentAlgo = 'qlearning';
-    let prevDiscreteState = null;
-    let prevState = null;
-    let prevAction = null;
-    let gameStarted = false;
-    let autoTraining = false;
-    let trainTarget = 0;
-    let trainStart = 0;
-    let trainRafId = null;
+    let ready = false, gameStarted = false, autoTraining = false;
+    let trainTarget = 0, trainStart = 0, trainRafId = null;
+    let prev = null;                        // { obs, a } waiting for its reward
 
-    // ---- HUD elements ----
-    const hudAlgo = document.getElementById('hud-algo');
-    const hudEpisode = document.getElementById('hud-episode');
-    const hudWinrate = document.getElementById('hud-winrate');
-    const hudEpsilon = document.getElementById('hud-epsilon');
-    const overlay = document.getElementById('canvas-overlay');
+    const $ = id => document.getElementById(id);
+    const hudAlgo = $('hud-algo'), hudEpisode = $('hud-episode'), hudWinrate = $('hud-winrate');
+    const hudEpsilon = $('hud-epsilon'), hudBot = $('hud-bot');
+    const overlay = $('canvas-overlay');
+    const overlayMain = overlay.querySelector('p'), overlaySub = overlay.querySelector('.overlay-sub');
+    const trainBtn = $('train-btn'), trainSelect = $('train-episodes'), trainProgress = $('train-progress');
+    const brainBtn = $('brain-btn');
 
-    // ---- Algorithm info descriptions ----
     const algoInfo = {
         qlearning: {
             title: 'Q-Learning',
-            text: 'The simplest RL algorithm here. It builds a big lookup table mapping every game state to the best action (UP / STAY / DOWN). Each frame it updates one entry in the table based on the reward it received. Early on it explores randomly (\u03B5-greedy), but as \u03B5 decays it exploits what it\u2019s learned. You should see improvement within ~20 rounds.'
+            text: 'The simplest RL algorithm here. It chops the game into 24,000 discrete states and keeps a lookup table of Q(s, a) for UP / STAY / DOWN. Every frame it nudges one entry toward r + γ·max Q(s′). It explores with ε-greedy: ε is the chance of a random move. It keeps learning while you play.'
         },
         dqn: {
             title: 'Deep Q-Network (DQN)',
-            text: 'Instead of a lookup table, DQN uses a tiny neural network (6 inputs \u2192 32 hidden \u2192 3 outputs) to estimate Q-values for each action. It stores experiences in a replay buffer and trains on random mini-batches after each episode. A separate "target network" stabilizes learning. Slower to start, but handles continuous states better. Expect improvement around ~50\u2013100 episodes.'
+            text: 'Instead of a table, a tiny network (8 inputs → 48 hidden → 3 outputs, 579 parameters) estimates the Q-values, so similar states share what they learned. It stores frames in a replay buffer and trains on a random mini-batch every 4 frames; a separate target network keeps the targets from chasing themselves.'
         },
         reinforce: {
             title: 'REINFORCE (Policy Gradient)',
-            text: 'Unlike Q-Learning and DQN which learn action values, REINFORCE directly learns a policy \u2014 a probability distribution over actions. After each full episode it computes discounted returns, normalizes them as advantages, and updates the network to make rewarding actions more likely. Learning is noisier and slower (~100\u2013200 episodes), but it\u2019s the foundation of modern policy optimization (PPO, etc).'
+            text: 'Instead of valuing actions, it learns the policy directly: a probability for each move, and it explores by sampling from it. When a point ends it computes the discounted return of every move in that rally, and after 5 points it makes the moves with above-average returns more likely. The ancestor of PPO.'
         }
     };
 
-    // ---- Update HUD ----
+    // ---- persistence ----
+    function save(name) {
+        try { localStorage.setItem(STORE + name, JSON.stringify(agents[name].serialize())); } catch (e) { /* quota */ }
+    }
+    function loadSaved(name) {
+        try {
+            const raw = localStorage.getItem(STORE + name);
+            return raw ? PongRL.deserialize(JSON.parse(raw)) : null;
+        } catch (e) { return null; }
+    }
+    function forget(name) { try { localStorage.removeItem(STORE + name); } catch (e) { /* ignore */ } }
+    try { ALGOS.forEach(n => localStorage.removeItem('pong_rl_' + n)); } catch (e) { /* ignore */ }
+
+    function fromPretrained(name) {
+        if (!pretrained || !pretrained[name]) return null;
+        const a = PongRL.deserialize(pretrained[name]);
+        a.episodes = 0; a.wins = 0; a.totalGames = 0;
+        return a;
+    }
+    function blankAgent(name) {
+        const a = PongRL.create(name);
+        a.blank = true;
+        return a;
+    }
+
+    // ---- HUD ----
     function updateHUD() {
         const a = agents[currentAlgo];
+        if (!a) return;
         hudAlgo.textContent = currentAlgo === 'qlearning' ? 'Q-LEARNING' : currentAlgo.toUpperCase();
         hudEpisode.textContent = a.episodes;
-        const wr = a.totalGames > 0 ? Math.round(a.wins / a.totalGames * 100) : 0;
-        hudWinrate.textContent = wr;
-        const eps = a.epsilon !== undefined ? a.epsilon.toFixed(2) : '\u2014';
-        hudEpsilon.textContent = eps;
-        const hudBot = document.getElementById('hud-bot');
-        if (autoTraining && typeof adaptiveBotStrength === 'function') {
-            const s = adaptiveBotStrength();
-            hudBot.textContent = Math.round(s * 100) + '%';
-        } else if (autoTraining || warmingUp) {
-            hudBot.textContent = 'BOT';
-        } else {
-            hudBot.textContent = 'YOU';
+        hudWinrate.textContent = a.totalGames > 0 ? Math.round(a.wins / a.totalGames * 100) : 0;
+        hudEpsilon.textContent = a.epsilon !== undefined ? a.epsilon.toFixed(2) : '—';
+        hudBot.textContent = autoTraining ? Math.round(botStrength() * 100) + '%' : 'YOU';
+        if (brainBtn) {
+            brainBtn.textContent = a.blank ? 'LOAD PRETRAINED' : 'BLANK BRAIN';
+            brainBtn.disabled = autoTraining || (a.blank && !pretrained);
         }
     }
 
-    // ---- Update info card ----
     function updateInfoCard() {
-        const info = algoInfo[currentAlgo];
-        document.getElementById('algo-info-title').textContent = info.title;
-        document.getElementById('algo-info-text').textContent = info.text;
+        $('algo-info-title').textContent = algoInfo[currentAlgo].title;
+        $('algo-info-text').textContent = algoInfo[currentAlgo].text;
     }
 
-    // ---- localStorage persistence ----
-    function saveAgent(name) {
-        try {
-            const data = agents[name].serialize();
-            localStorage.setItem('pong_rl_' + name, JSON.stringify(data));
-        } catch (e) { /* quota exceeded — silently skip */ }
-    }
-
-    function loadAgent(name) {
-        try {
-            const raw = localStorage.getItem('pong_rl_' + name);
-            if (!raw) return null;
-            const data = JSON.parse(raw);
-            if (name === 'qlearning') return PongRL.QLearningAgent.deserialize(data);
-            if (name === 'dqn') return PongRL.DQNAgent.deserialize(data);
-            if (name === 'reinforce') return PongRL.ReinforceAgent.deserialize(data);
-        } catch (e) { return null; }
-        return null;
-    }
-
-    // ---- Engine callbacks ----
-    engine.setOnStepDone(function (state, discreteState, reward, done) {
+    // ---- engine callbacks: the AI learns from every frame, also while you play ----
+    engine.setOnStepDone(function (s, d, reward, done) {
         const a = agents[currentAlgo];
-
-        if (currentAlgo === 'qlearning') {
-            // Q-learning: update from previous step
-            if (prevDiscreteState !== null) {
-                a.update(prevDiscreteState, prevAction, reward, discreteState, done);
-            }
-            const action = a.chooseAction(discreteState);
-            engine.setAIAction(action);
-            prevDiscreteState = discreteState;
-            prevAction = action;
-        } else if (currentAlgo === 'dqn') {
-            // DQN: store transition from previous step, choose action
-            if (prevAction !== null && prevState !== null) {
-                a.storeTransition(prevState, prevAction, reward, state, done);
-            }
-            const action = a.chooseAction(state);
-            engine.setAIAction(action);
-            prevState = state.slice();
-            prevAction = action;
-        } else if (currentAlgo === 'reinforce') {
-            // REINFORCE: store step, choose action
-            const action = a.chooseAction(state);
-            a.storeStep(state, action, reward);
-            engine.setAIAction(action);
-        }
+        const obs = { s, d };
+        const terminal = done || Math.abs(reward) >= 1;   // a point ends the rally
+        if (prev) a.observe(prev.obs, prev.a, reward, obs, terminal);
+        const action = a.act(obs);
+        engine.setAIAction(action);
+        prev = terminal ? null : { obs, a: action };
     });
 
     engine.setOnRoundEnd(function (winner) {
         const a = agents[currentAlgo];
-        a.onEpisodeEnd(winner);
-
-        // Track rolling results for adaptive bot difficulty
-        recentResults.push(winner === 'ai');
-        if (recentResults.length > ROLLING_WINDOW) recentResults.shift();
-
-        // Save periodically (not every episode during fast training)
-        if (!autoTraining && !warmingUp) {
-            saveAgent(currentAlgo);
-            updateHUD();
-        } else if (a.episodes % 10 === 0) {
-            saveAgent(currentAlgo);
-        }
-
-        // Reset per-episode state
-        prevDiscreteState = null;
-        prevState = null;
-        prevAction = null;
+        a.endEpisode(winner);
+        recent.push(winner === 'ai');
+        if (recent.length > ROLLING_WINDOW) recent.shift();
+        if (!autoTraining) { save(currentAlgo); updateHUD(); }
+        else if (a.episodes % 10 === 0) save(currentAlgo);
+        prev = null;
     });
 
-    // ---- Auto-train: bot plays the player side at high speed ----
-    const trainBtn = document.getElementById('train-btn');
-    const trainSelect = document.getElementById('train-episodes');
-    const trainProgress = document.getElementById('train-progress');
+    // ---- auto-train: a scripted bot plays your side at high speed ----
     const STEPS_PER_FRAME = 200;
+    const ROLLING_WINDOW = 20;
+    let recent = [];
 
-    // Bot opponent with configurable strength (0 = random, 1 = near-perfect)
+    // Bot opponent: strength 0 = slow and noisy, 1 = near perfect
     function botMovePlayer(strength) {
-        var ball = engine.getBall();
-        var H = engine.getH();
-        var noise = (1 - strength) * 60;       // weak bot = very noisy
-        var speed = 1.5 + strength * 4.5;      // weak bot = slow
-        var target = ball.y + (Math.random() - 0.5) * noise;
-        var st = engine.getState();
-        var pY = st[5] * H;
-        var diff = target - pY;
-        engine.setPlayerY(pY + Math.sign(diff) * Math.min(Math.abs(diff), speed));
+        const ball = engine.getBall(), H = engine.getH();
+        const target = ball.y + (Math.random() - 0.5) * (1 - strength) * 60;
+        const pY = engine.getState()[5] * H;
+        const diff = target - pY;
+        engine.setPlayerY(pY + Math.sign(diff) * Math.min(Math.abs(diff), 1.5 + strength * 4.5));
     }
 
-    // Track rolling win rate over last N episodes for adaptive difficulty
-    var recentResults = []; // true = AI win, false = AI loss
-    var ROLLING_WINDOW = 20;
-
-    function rollingWinRate() {
-        if (recentResults.length === 0) return 0;
-        var wins = 0;
-        for (var i = 0; i < recentResults.length; i++) {
-            if (recentResults[i]) wins++;
-        }
-        return wins / recentResults.length;
-    }
-
-    // Adaptive bot: scales difficulty to match AI's current ability
-    // This is curriculum learning — AI always faces an appropriate challenge
-    function adaptiveBotStrength() {
-        var wr = rollingWinRate();
-        // AI losing badly → very weak bot (so AI can score and get +1 rewards)
-        // AI winning often → strong bot (forces AI to learn real strategies)
+    // Curriculum: the bot gets stronger as the AI's rolling win rate rises
+    function botStrength() {
+        const wr = recent.length ? recent.filter(Boolean).length / recent.length : 0;
         if (wr < 0.15) return 0.1;
         if (wr < 0.30) return 0.25;
         if (wr < 0.45) return 0.4;
@@ -195,49 +134,41 @@
     }
 
     function autoTrainFrame() {
-        var a = agents[currentAlgo];
-        var strength = adaptiveBotStrength();
-        for (var i = 0; i < STEPS_PER_FRAME; i++) {
+        const a = agents[currentAlgo];
+        const strength = botStrength();
+        for (let i = 0; i < STEPS_PER_FRAME; i++) {
             botMovePlayer(strength);
             engine.step();
         }
         engine.render();
-
-        var done = a.episodes - trainStart;
-        var wr = Math.round(rollingWinRate() * 100);
+        const done = a.episodes - trainStart;
+        const wr = recent.length ? Math.round(recent.filter(Boolean).length / recent.length * 100) : 0;
         trainProgress.textContent = done + '/' + trainTarget + '  (' + wr + '% win)';
-
-        if (done >= trainTarget) {
-            stopAutoTrain();
-            return;
-        }
+        updateHUD();
+        if (done >= trainTarget) { stopAutoTrain(); return; }
         trainRafId = requestAnimationFrame(autoTrainFrame);
     }
 
+    function setLocked(locked) {
+        trainSelect.disabled = locked;
+        if (brainBtn) brainBtn.disabled = locked;
+        document.querySelectorAll('.algo-tab').forEach(t => { t.disabled = locked; });
+    }
+
     function startAutoTrain() {
+        if (!ready) return;
         if (autoTraining) { stopAutoTrain(); return; }
-
-        // Ensure game is initialized
-        if (!gameStarted) {
-            gameStarted = true;
-            overlay.classList.add('hidden');
-        }
-        engine.stop(); // stop the normal game loop
-
+        hideOverlay();
+        engine.stop();
         autoTraining = true;
         trainTarget = parseInt(trainSelect.value, 10);
         trainStart = agents[currentAlgo].episodes;
+        recent = [];
+        prev = null;
         trainBtn.innerHTML = '<i class="fas fa-stop"></i> STOP';
         trainBtn.classList.add('training');
-        trainSelect.disabled = true;
-        document.querySelectorAll('.algo-tab').forEach(t => t.disabled = true);
-
+        setLocked(true);
         engine.reset();
-        prevDiscreteState = null;
-        prevState = null;
-        prevAction = null;
-        recentResults = []; // fresh rolling tracker
-
         trainRafId = requestAnimationFrame(autoTrainFrame);
     }
 
@@ -246,171 +177,87 @@
         if (trainRafId) { cancelAnimationFrame(trainRafId); trainRafId = null; }
         trainBtn.innerHTML = '<i class="fas fa-bolt"></i> AUTO-TRAIN';
         trainBtn.classList.remove('training');
-        trainSelect.disabled = false;
-        document.querySelectorAll('.algo-tab').forEach(t => t.disabled = false);
+        setLocked(false);
         trainProgress.textContent = '';
-        saveAgent(currentAlgo);
+        save(currentAlgo);
         updateHUD();
-
-        // Resume normal game loop
+        prev = null;
         engine.reset();
         engine.start();
     }
 
     trainBtn.addEventListener('click', startAutoTrain);
 
-    // ---- Algorithm tab switching ----
-    document.querySelectorAll('.algo-tab').forEach(tab => {
+    // ---- algorithm tabs ----
+    document.querySelectorAll('.algo-tab').forEach(function (tab) {
         tab.addEventListener('click', function () {
             const algo = this.dataset.algo;
-            if (algo === currentAlgo) return;
+            if (!ready || algo === currentAlgo) return;
             if (autoTraining) stopAutoTrain();
-
-            // Update active tab
             document.querySelectorAll('.algo-tab').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
-
-            // Switch
             currentAlgo = algo;
-            prevDiscreteState = null;
-            prevState = null;
-            prevAction = null;
-            recentResults = [];
-
-            // Reset game state but keep agent learned state
+            prev = null;
+            recent = [];
             engine.reset();
             updateHUD();
             updateInfoCard();
         });
     });
 
-    // ---- Start game on first interaction ----
-    function startGame() {
+    // ---- blank brain <-> pretrained ----
+    if (brainBtn) {
+        brainBtn.addEventListener('click', function () {
+            if (!ready || autoTraining) return;
+            const a = agents[currentAlgo];
+            agents[currentAlgo] = a.blank ? (fromPretrained(currentAlgo) || a) : blankAgent(currentAlgo);
+            forget(currentAlgo);
+            if (agents[currentAlgo].blank) save(currentAlgo);
+            prev = null;
+            recent = [];
+            engine.reset();
+            updateHUD();
+        });
+    }
+
+    // ---- start on first interaction ----
+    function hideOverlay() {
         if (gameStarted) return;
         gameStarted = true;
         overlay.classList.add('hidden');
+    }
+
+    function startGame() {
+        if (!ready || gameStarted) return;
+        hideOverlay();
         engine.start();
         updateHUD();
     }
 
-    canvas.addEventListener('mousemove', startGame, { once: true });
-    canvas.addEventListener('touchstart', startGame, { once: true });
-    document.addEventListener('keydown', function onKey(e) {
-        if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'w' || e.key === 's') {
-            startGame();
-            document.removeEventListener('keydown', onKey);
-        }
+    canvas.addEventListener('mousemove', startGame);
+    canvas.addEventListener('touchstart', startGame);
+    document.addEventListener('keydown', function (e) {
+        if (['ArrowUp', 'ArrowDown', 'w', 's'].includes(e.key)) startGame();
     });
 
-    // Initial HUD + info
-    updateHUD();
-    updateInfoCard();
-
-    // ---- Boot sequence: background training with loading screen ----
-    // First-time visitors see a cool boot animation while agents train.
-    // Returning visitors (agents in localStorage) skip straight to play.
-    var overlayMain = overlay.querySelector('p');
-    var overlaySub = overlay.querySelector('.overlay-sub');
-    var warmingUp = false;
-
-    var WARMUP_EPISODES = { qlearning: 100, dqn: 150, reinforce: 200 };
-    var WARMUP_BUDGET_MS = 8;
-
-    var bootMessages = [
-        'INITIALIZING NEURAL NETWORK...',
-        'LOADING Q-TABLE INTO MEMORY...',
-        'CALIBRATING REWARD SIGNALS...',
-        'TRAINING Q-LEARNING AGENT...',
-        'TRAINING DQN AGENT...',
-        'TRAINING REINFORCE AGENT...',
-        'OPTIMIZING POLICY GRADIENTS...',
-        'FINALIZING WEIGHT MATRICES...',
-        'AGENTS READY.'
-    ];
-
-    function warmupAgentAsync(algoName) {
-        return new Promise(function (resolve) {
-            var a = agents[algoName];
-            var target = WARMUP_EPISODES[algoName] || 0;
-            if (a.episodes >= target) { resolve(); return; }
-
-            currentAlgo = algoName;
-            prevDiscreteState = null;
-            prevState = null;
-            prevAction = null;
-            engine.reset();
-
-            // Aggressive hyperparameters for fast convergence
-            var origDecay, origLr;
-            if (a.epsilonDecay !== undefined) {
-                origDecay = a.epsilonDecay;
-                a.epsilonDecay = 0.97;
-            }
-            if (algoName === 'dqn' || algoName === 'reinforce') {
-                origLr = a.lr;
-                a.lr = 0.003;
-            }
-
-            function botStrength() {
-                return 0.3 + (a.episodes / target) * 0.6;
-            }
-
-            function chunk() {
-                var deadline = performance.now() + WARMUP_BUDGET_MS;
-                while (a.episodes < target && performance.now() < deadline) {
-                    botMovePlayer(botStrength());
-                    engine.step();
-                }
-
-                // Update boot screen
-                var totalEps = WARMUP_EPISODES.qlearning + WARMUP_EPISODES.dqn + WARMUP_EPISODES.reinforce;
-                var doneEps = Math.min(agents.qlearning.episodes, WARMUP_EPISODES.qlearning)
-                    + Math.min(agents.dqn.episodes, WARMUP_EPISODES.dqn)
-                    + Math.min(agents.reinforce.episodes, WARMUP_EPISODES.reinforce);
-                var pct = Math.min(100, Math.round(doneEps / totalEps * 100));
-                var msgIdx = Math.min(Math.floor(pct / 12), bootMessages.length - 1);
-                overlayMain.textContent = bootMessages[msgIdx];
-                overlaySub.textContent = '[ ' + pct + '% ]';
-
-                if (a.episodes >= target) {
-                    if (origDecay !== undefined) a.epsilonDecay = origDecay;
-                    if (origLr !== undefined) a.lr = origLr;
-                    if (a.epsilon !== undefined) a.epsilon = 0.12;
-                    a.wins = 0;
-                    a.totalGames = 0;
-                    saveAgent(algoName);
-                    resolve();
-                } else {
-                    setTimeout(chunk, 0);
-                }
-            }
-            chunk();
+    // ---- boot: load pretrained weights (trained offline by tools/lab-train.js) ----
+    function boot(weights) {
+        pretrained = weights;
+        ALGOS.forEach(function (name) {
+            agents[name] = loadSaved(name) || fromPretrained(name) || blankAgent(name);
         });
+        ready = true;
+        engine.render();
+        updateHUD();
+        updateInfoCard();
+        overlayMain.textContent = 'MOVE YOUR MOUSE TO PLAY';
+        overlaySub.textContent = 'or arrow keys / W,S / touch';
     }
 
-    // Check if any agent needs training
-    var needsWarmup = ['qlearning', 'dqn', 'reinforce'].some(function (name) {
-        return agents[name].episodes < (WARMUP_EPISODES[name] || 0);
-    });
-
-    if (needsWarmup) {
-        warmingUp = true;
-        overlayMain.textContent = bootMessages[0];
-        overlaySub.textContent = '[ 0% ]';
-
-        warmupAgentAsync('qlearning')
-            .then(function () { return warmupAgentAsync('dqn'); })
-            .then(function () { return warmupAgentAsync('reinforce'); })
-            .then(function () {
-                warmingUp = false;
-                currentAlgo = 'qlearning';
-                prevDiscreteState = null;
-                prevState = null;
-                prevAction = null;
-                engine.reset();
-                updateHUD();
-                overlayMain.textContent = 'SYSTEM READY';
-                overlaySub.textContent = 'move mouse or touch to play';
-            });
-    }
+    overlayMain.textContent = 'LOADING WEIGHTS...';
+    overlaySub.textContent = '';
+    fetch('weights/pong.json')
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null)
+        .then(boot);
 })();

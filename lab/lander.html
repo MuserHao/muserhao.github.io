@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RL Lunar Lander | Fun Lab | Hao Xin</title>
-    <meta name="description" content="Land a spacecraft using 3 RL algorithms that learn in real time: DQN, Actor-Critic (A2C), and PPO. Watch the actor-critic split in action — ~4,200 parameters, zero GPUs.">
+    <meta name="description" content="Land a spacecraft using 3 RL algorithms that learn in real time: DQN, Actor-Critic (A2C), and PPO. Watch the actor-critic split in action — ~7,700 parameters, zero GPUs.">
     <meta name="author" content="Hao Xin">
     <link rel="canonical" href="https://muserhao.github.io/lab/lander.html">
     <!-- Open Graph -->
@@ -25,8 +25,10 @@
     <link rel="stylesheet" href="../style.css">
     <link rel="stylesheet" href="lab.css">
     <link rel="stylesheet" href="lander.css">
+    <link rel="stylesheet" href="../xeno.css">
+    <link rel="stylesheet" href="lab-xeno.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script>
         (function(){document.documentElement.setAttribute('data-theme','dark')})();
     </script>
@@ -82,15 +84,18 @@
 
     <main class="lander-main">
         <section class="lander-hero">
+            <p class="exp-kicker"><a href="index.html">Fun Lab</a> <span aria-hidden="true">/</span> L&mdash;01</p>
             <h1 class="lander-title">RL LUNAR LANDER</h1>
             <p class="lander-subtitle">Watch Actor-Critic AI learn to land. DQN &rarr; A2C &rarr; PPO.</p>
         </section>
 
+        <!-- Instrument console: controls on the top edge, screen, readout rail -->
+        <div class="console">
         <!-- Algorithm tabs -->
         <div class="algo-tabs" role="tablist">
-            <button class="algo-tab active" role="tab" data-algo="dqn">DQN</button>
+            <button class="algo-tab" role="tab" data-algo="dqn">DQN</button>
             <button class="algo-tab" role="tab" data-algo="a2c">A2C</button>
-            <button class="algo-tab" role="tab" data-algo="ppo">PPO</button>
+            <button class="algo-tab active" role="tab" data-algo="ppo">PPO</button>
         </div>
 
         <!-- Train controls -->
@@ -104,16 +109,14 @@
                 <option value="200">200 episodes</option>
                 <option value="500">500 episodes</option>
             </select>
+            <select class="train-select level-select" id="level-select" aria-label="Difficulty level">
+                <option value="0">EASY</option>
+                <option value="1">MEDIUM</option>
+                <option value="2">HARD</option>
+                <option value="3" selected>FULL</option>
+            </select>
+            <button class="brain-btn" id="brain-btn" type="button" title="Swap the pretrained network for a blank, untrained one (and back)">BLANK BRAIN</button>
             <span class="train-progress" id="train-progress"></span>
-        </div>
-
-        <!-- HUD bar -->
-        <div class="lander-hud">
-            <span class="hud-item"><span class="hud-label">ALGO</span> <span id="hud-algo">DQN</span></span>
-            <span class="hud-item"><span class="hud-label">EPISODE</span> <span id="hud-episode">0</span></span>
-            <span class="hud-item"><span class="hud-label">LAND %</span> <span id="hud-landrate">0</span></span>
-            <span class="hud-item"><span class="hud-label">&epsilon;</span> <span id="hud-epsilon">1.00</span></span>
-            <span class="hud-item"><span class="hud-label">LEVEL</span> <span id="hud-level">EASY</span></span>
         </div>
 
         <!-- Game canvas -->
@@ -123,6 +126,15 @@
                 <p>INITIALIZING NEURAL NETWORKS...</p>
                 <p class="overlay-sub">[ 0% ]</p>
             </div>
+        </div>
+
+        <!-- HUD bar -->
+        <div class="lander-hud">
+            <span class="hud-item"><span class="hud-label">ALGO</span> <span id="hud-algo">PPO</span></span>
+            <span class="hud-item"><span class="hud-label">EPISODE</span> <span id="hud-episode">0</span></span>
+            <span class="hud-item"><span class="hud-label">LAND %</span> <span id="hud-landrate">0</span></span>
+            <span class="hud-item"><span class="hud-label">&epsilon;</span> <span id="hud-epsilon">1.00</span></span>
+            <span class="hud-item"><span class="hud-label">LEVEL</span> <span id="hud-level">EASY</span></span>
         </div>
 
         <!-- Actor-Critic Visualization Panel -->
@@ -153,11 +165,13 @@
             </div>
         </div>
 
+        </div>
+
         <!-- Algorithm info card -->
         <div class="algo-info" id="algo-info">
             <h3 class="algo-info-title" id="algo-info-title">Deep Q-Network (DQN)</h3>
             <p class="algo-info-text" id="algo-info-text">
-                The same algorithm that learned Pong. A neural network (8&rarr;64&rarr;48&rarr;6) estimates Q-values for each action. Uses Double DQN with a replay buffer and target network for stability. 2,198 parameters. The replay buffer makes DQN the most consistent learner at this scale.
+                The same algorithm that learned Pong. A neural network (8&rarr;64&rarr;48&rarr;6) estimates Q-values for each action. Uses Double DQN with a replay buffer and target network for stability. 3,990 parameters. The replay buffer makes DQN the most consistent learner at this scale.
             </p>
         </div>
     </main>
@@ -180,8 +194,10 @@
     <script src="../shared.js"></script>
     <script src="stars.js"></script>
     <script src="lander-engine.js"></script>
+    <script src="tiny-nn.js"></script>
     <script src="lander-rl.js"></script>
     <script src="lander-ui.js"></script>
+    <script src="lab-xeno.js"></script>
     <script>
         // No colored particles on lab pages — stars.js handles the background
     </script>
