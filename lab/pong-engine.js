@@ -317,9 +317,18 @@ const PongEngine = (function () {
         }
 
         // Game loop
+        // Fixed 60 Hz physics so the game runs at the same speed on 60/120/144 Hz screens
+        const STEP_MS = 1000 / 60;
         let rafId = null;
-        function loop() {
-            step();
+        let lastTime = null, accumulator = 0;
+        function loop(now) {
+            if (lastTime === null) lastTime = now;
+            accumulator += Math.min(now - lastTime, 100);
+            lastTime = now;
+            while (accumulator >= STEP_MS) {
+                step();
+                accumulator -= STEP_MS;
+            }
             render();
             if (running) rafId = requestAnimationFrame(loop);
         }
@@ -327,6 +336,8 @@ const PongEngine = (function () {
         function start() {
             if (running) return;
             running = true;
+            lastTime = null;
+            accumulator = 0;
             serveBall();
             rafId = requestAnimationFrame(loop);
         }

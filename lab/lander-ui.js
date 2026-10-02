@@ -48,15 +48,15 @@
     const algoInfo = {
         dqn: {
             title: 'Deep Q-Network (DQN)',
-            text: 'The same algorithm that learned Pong. A neural network (8\u219264\u219248\u21926) estimates Q-values for each action. Uses Double DQN with a replay buffer and target network for stability. 2,198 parameters. The replay buffer makes DQN the most consistent learner at this scale.'
+            text: 'The same algorithm that learned Pong. A neural network (8\u219264\u219248\u21926) estimates Q-values for each action. Uses Double DQN with a replay buffer and target network for stability. 3,990 parameters. The replay buffer makes DQN the most consistent learner at this scale.'
         },
         a2c: {
             title: 'Advantage Actor-Critic (A2C)',
-            text: 'The core teaching algorithm. TWO separate networks: an Actor (\u03C0) that outputs action probabilities, and a Critic (V) that estimates state value. The advantage A = r + \u03B3V(s\u2019) \u2013 V(s) tells the actor whether its action was better or worse than expected. This is the foundation of modern RL \u2014 from RLHF for LLMs to robotic control. ~4,200 parameters across both networks.'
+            text: 'The core teaching algorithm. TWO separate networks: an Actor (\u03C0) that outputs action probabilities, and a Critic (V) that estimates state value. The advantage A = (16-step return) \u2013 V(s) tells the actor whether its action was better or worse than expected. This is the foundation of modern RL \u2014 from RLHF for LLMs to robotic control. ~7,700 parameters across both networks.'
         },
         ppo: {
             title: 'Proximal Policy Optimization (PPO)',
-            text: 'The algorithm behind ChatGPT\u2019s RLHF. Same actor-critic architecture as A2C, but collects trajectories and runs multiple epochs with a clipped importance ratio to prevent catastrophic updates. PPO is the most conservative learner \u2014 it needs more data per update but never degrades. ~4,200 parameters.'
+            text: 'The algorithm behind ChatGPT\u2019s RLHF. Same actor-critic architecture as A2C, but collects trajectories and runs multiple epochs with a clipped importance ratio to prevent catastrophic updates. PPO is the most conservative learner \u2014 it needs more data per update, but each update is kept small. ~7,700 parameters.'
         }
     };
 
@@ -260,6 +260,7 @@
     }
 
     function startAutoTrain() {
+        if (warmingUp) return;
         if (autoTraining) { stopAutoTrain(); return; }
 
         if (!gameStarted) {
@@ -307,7 +308,7 @@
     document.querySelectorAll('.algo-tab').forEach(function (tab) {
         tab.addEventListener('click', function () {
             var algo = this.dataset.algo;
-            if (algo === currentAlgo) return;
+            if (warmingUp || algo === currentAlgo) return;
             if (autoTraining) stopAutoTrain();
 
             document.querySelectorAll('.algo-tab').forEach(function (t) { t.classList.remove('active'); });
@@ -329,7 +330,7 @@
 
     // ---- Start game on first interaction ----
     function startGame() {
-        if (gameStarted) return;
+        if (gameStarted || warmingUp) return;
         gameStarted = true;
         overlay.classList.add('hidden');
         engine.generateTerrain();
@@ -338,12 +339,12 @@
         updateHUD();
     }
 
-    canvas.addEventListener('click', startGame, { once: true });
-    canvas.addEventListener('touchstart', startGame, { once: true });
+    canvas.addEventListener('click', startGame);
+    canvas.addEventListener('touchstart', startGame);
     document.addEventListener('keydown', function onKey(e) {
         if (['ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
             startGame();
-            document.removeEventListener('keydown', onKey);
+            if (gameStarted) document.removeEventListener('keydown', onKey);
         }
     });
 
@@ -470,8 +471,15 @@
         return agents[name].episodes < (WARMUP_EPISODES[name] || 0);
     });
 
+    function setControlsLocked(locked) {
+        trainBtn.disabled = locked;
+        trainSelect.disabled = locked;
+        document.querySelectorAll('.algo-tab').forEach(function (t) { t.disabled = locked; });
+    }
+
     if (needsWarmup) {
         warmingUp = true;
+        setControlsLocked(true);
         overlayMain.textContent = bootMessages[0];
         overlaySub.textContent = '[ 0% ]';
 
@@ -492,6 +500,7 @@
             })
             .then(function () {
                 warmingUp = false;
+                setControlsLocked(false);
                 currentAlgo = 'dqn';
                 prevState = null;
                 prevAction = null;

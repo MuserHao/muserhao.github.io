@@ -41,7 +41,7 @@
         },
         dqn: {
             title: 'Deep Q-Network (DQN)',
-            text: 'Instead of a lookup table, DQN uses a tiny neural network (6 inputs \u2192 32 hidden \u2192 3 outputs) to estimate Q-values for each action. It stores experiences in a replay buffer and trains on random mini-batches after each episode. A separate "target network" stabilizes learning. Slower to start, but handles continuous states better. Expect improvement around ~50\u2013100 episodes.'
+            text: 'Instead of a lookup table, DQN uses a tiny neural network (8 inputs \u2192 48 hidden \u2192 3 outputs, 579 parameters) to estimate Q-values for each action. It stores experiences in a replay buffer and trains on a random mini-batch every 4 frames. A separate "target network" stabilizes learning. Slower to start, but handles continuous states better. Expect improvement around ~50\u2013100 episodes.'
         },
         reinforce: {
             title: 'REINFORCE (Policy Gradient)',
@@ -215,6 +215,7 @@
     }
 
     function startAutoTrain() {
+        if (warmingUp) return;
         if (autoTraining) { stopAutoTrain(); return; }
 
         // Ensure game is initialized
@@ -263,7 +264,7 @@
     document.querySelectorAll('.algo-tab').forEach(tab => {
         tab.addEventListener('click', function () {
             const algo = this.dataset.algo;
-            if (algo === currentAlgo) return;
+            if (warmingUp || algo === currentAlgo) return;
             if (autoTraining) stopAutoTrain();
 
             // Update active tab
@@ -286,19 +287,19 @@
 
     // ---- Start game on first interaction ----
     function startGame() {
-        if (gameStarted) return;
+        if (gameStarted || warmingUp) return;
         gameStarted = true;
         overlay.classList.add('hidden');
         engine.start();
         updateHUD();
     }
 
-    canvas.addEventListener('mousemove', startGame, { once: true });
-    canvas.addEventListener('touchstart', startGame, { once: true });
+    canvas.addEventListener('mousemove', startGame);
+    canvas.addEventListener('touchstart', startGame);
     document.addEventListener('keydown', function onKey(e) {
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'w' || e.key === 's') {
             startGame();
-            document.removeEventListener('keydown', onKey);
+            if (gameStarted) document.removeEventListener('keydown', onKey);
         }
     });
 
@@ -393,8 +394,15 @@
         return agents[name].episodes < (WARMUP_EPISODES[name] || 0);
     });
 
+    function setControlsLocked(locked) {
+        trainBtn.disabled = locked;
+        trainSelect.disabled = locked;
+        document.querySelectorAll('.algo-tab').forEach(function (t) { t.disabled = locked; });
+    }
+
     if (needsWarmup) {
         warmingUp = true;
+        setControlsLocked(true);
         overlayMain.textContent = bootMessages[0];
         overlaySub.textContent = '[ 0% ]';
 
@@ -403,6 +411,7 @@
             .then(function () { return warmupAgentAsync('reinforce'); })
             .then(function () {
                 warmingUp = false;
+                setControlsLocked(false);
                 currentAlgo = 'qlearning';
                 prevDiscreteState = null;
                 prevState = null;

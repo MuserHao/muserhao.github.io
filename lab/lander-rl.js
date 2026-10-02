@@ -452,7 +452,7 @@ const LanderRL = (function () {
 
     // ========================================================
     // 1. DQN AGENT — Double DQN + Replay Buffer
-    //    MiniNet2(8, 48, 32, 6) = ~2K params
+    //    MiniNet2(8, 64, 48, 6) = 3,990 params
     // ========================================================
     function DQNAgent() {
         this.net = new MiniNet2(8, 64, 48, 6);
@@ -608,7 +608,7 @@ const LanderRL = (function () {
 
     // ========================================================
     // 2. A2C AGENT — Advantage Actor-Critic
-    //    Actor: MiniNet2(8, 48, 32, 6), Critic: MiniNet2(8, 48, 32, 1)
+    //    Actor: MiniNet2(8, 64, 48, 6), Critic: MiniNet2(8, 64, 48, 1) = 7,735 params
     // ========================================================
     function A2CAgent() {
         this.actor = new MiniNet2(8, 64, 48, 6);

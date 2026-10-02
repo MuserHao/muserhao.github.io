@@ -599,11 +599,20 @@ const LanderEngine = (function () {
         }
 
         // Game loop
+        // Fixed 60 Hz physics so the lander falls at the same speed on 60/120/144 Hz screens
+        const STEP_MS = 1000 / 60;
         let rafId = null;
         let currentAction = 0;
+        let lastTime = null, accumulator = 0;
 
-        function loop() {
-            stepAgent();
+        function loop(now) {
+            if (lastTime === null) lastTime = now;
+            accumulator += Math.min(now - lastTime, 100);
+            lastTime = now;
+            while (accumulator >= STEP_MS) {
+                stepAgent();
+                accumulator -= STEP_MS;
+            }
             render();
             if (running) rafId = requestAnimationFrame(loop);
         }
@@ -613,6 +622,8 @@ const LanderEngine = (function () {
             generateTerrain();
             spawnLander(level || 0);
             running = true;
+            lastTime = null;
+            accumulator = 0;
             rafId = requestAnimationFrame(loop);
         }
 
