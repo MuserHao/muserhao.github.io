@@ -12,7 +12,7 @@ const path = require('path');
 
 const RUNS = {
     lander: { script: 'lander-eval.js', budgets: { dqn: 1500000, a2c: 1500000, ppo: 1500000 } },
-    pong:   { script: 'pong-eval.js',   budgets: { qlearning: 3000, dqn: 2000, reinforce: 2000 } }
+    pong:   { script: 'pong-eval.js',   budgets: { qlearning: 3000, dqn: 200, reinforce: 2000 } }
 };
 
 const [onlyGame, onlyAlgo] = process.argv.slice(2);

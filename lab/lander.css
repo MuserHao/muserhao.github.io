@@ -447,25 +447,7 @@
         gap: 1rem;
     }
 
-    .ac-critic {
-        flex-direction: row;
-        gap: 1rem;
-    }
-
-    .critic-bar-bg {
-        width: 100%;
-        height: 20px;
-    }
-
-    .critic-bar {
-        height: 100% !important;
-        width: 0%;
-        bottom: auto;
-        left: 0;
-        top: 0;
-        right: auto;
-        border-radius: 3px 0 0 3px;
-    }
+    /* (critic meter stays vertical on mobile: the UI drives its height) */
 }
 
 /* Reduced motion */

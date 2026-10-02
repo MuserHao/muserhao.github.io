@@ -24,8 +24,15 @@
     var stars = [];
     var meteors = [];
     var blackHoles = [];
-    var STAR_COUNT = 1200;
     var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Experiment pages get a calm sky (sparse stars only) so the instrument
+    // console reads cleanly; the index keeps a richer, but quieter, field.
+    var calm = !!document.querySelector('#pong-canvas, #lander-canvas');
+    var STAR_COUNT = calm ? 240 : 650;
+    var MILKY_ALPHA = calm ? 0 : 0.55;   // multiplier on the nebula band
+    var METEOR_RATE = calm ? 0 : 0.005;  // per frame
+    var USE_BLACK_HOLES = false;         // retired: too busy behind content
+    var frameSkip = calm ? 3 : 2;        // twinkle is slow; no need for 60fps
 
     // Box-Muller: Gaussian random (mean=0, std=1)
     function randn() {
@@ -57,7 +64,7 @@
 
         for (var i = 0; i < STAR_COUNT; i++) {
             // 65% of stars drawn from the Gaussian milky way distribution
-            var inBand = Math.random() < 0.65;
+            var inBand = !calm && Math.random() < 0.55;
             var x, y;
 
             if (inBand) {
@@ -83,9 +90,9 @@
                 y: y,
                 r: depth * 1.6 * bandScale + 0.2,
                 baseAlpha: depth * 0.6 * bandScale + 0.12,
-                twinkleSpeed: Math.random() * 3 + 0.3,
+                twinkleSpeed: (Math.random() * 3 + 0.3) * 0.4,
                 twinklePhase: Math.random() * Math.PI * 2,
-                hue: Math.random() < 0.5 ? 0 : (Math.random() < 0.6 ? 210 + Math.random() * 30 : 20 + Math.random() * 30),
+                hue: Math.random() < 0.5 ? 0 : (Math.random() < 0.7 ? 220 + Math.random() * 40 : 185 + Math.random() * 10),
                 sat: Math.random() < 0.5 ? 0 : Math.random() * 60 + 20
             });
         }
@@ -95,10 +102,11 @@
     // MILKY WAY — layered nebula bands
     // ================================================================
     function drawMilkyWay() {
+        if (!MILKY_ALPHA) return;
         ctx.save();
 
         // Dense star dust — many tiny dots along the band
-        ctx.globalAlpha = 0.08;
+        ctx.globalAlpha = MILKY_ALPHA * 0.08;
         var grad1 = ctx.createLinearGradient(0, 0, W, H);
         grad1.addColorStop(0, 'transparent');
         grad1.addColorStop(0.25, 'rgba(140, 130, 200, 0.3)');
@@ -115,7 +123,7 @@
 
         // Wider soft glow
         ctx.save();
-        ctx.globalAlpha = 0.04;
+        ctx.globalAlpha = MILKY_ALPHA * 0.04;
         ctx.translate(W / 2, H / 2);
         ctx.rotate(-0.5);
         var grad2 = ctx.createLinearGradient(-W, 0, W, 0);
@@ -130,7 +138,7 @@
 
         // Warm dust lane through center
         ctx.save();
-        ctx.globalAlpha = 0.025;
+        ctx.globalAlpha = MILKY_ALPHA * 0.025;
         ctx.translate(W / 2, H / 2);
         ctx.rotate(-0.5);
         var grad3 = ctx.createLinearGradient(-W, 0, W, 0);
@@ -313,7 +321,7 @@
         }
 
         // Layer 3: Black holes
-        if (!reducedMotion) drawBlackHoles(t);
+        if (!reducedMotion && USE_BLACK_HOLES) drawBlackHoles(t);
 
         // Layer 4: Meteors
         for (var j = meteors.length - 1; j >= 0; j--) {
@@ -352,12 +360,13 @@
         }
 
         // Spawn meteors — ~1 every 0.5 seconds at 60fps
-        if (!reducedMotion && Math.random() < 0.035) spawnMeteor();
+        if (!reducedMotion && Math.random() < METEOR_RATE * frameSkip) spawnMeteor();
     }
 
     // ---- Loop ----
+    var frameN = 0;
     function loop(t) {
-        draw(t * 0.001);
+        if (frameN++ % frameSkip === 0 && !document.hidden) draw(t * 0.001);
         requestAnimationFrame(loop);
     }
 
@@ -365,6 +374,7 @@
         resize();
         generateStars();
         generateBlackHoles();
+        if (reducedMotion) { draw(0); return; } // one still frame
         requestAnimationFrame(loop);
     }
 
@@ -372,6 +382,7 @@
         resize();
         generateStars();
         generateBlackHoles();
+        if (reducedMotion) draw(0);
     });
 
     init();

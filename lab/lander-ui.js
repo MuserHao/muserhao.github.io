@@ -19,7 +19,7 @@
 
     let agents = {};
     let pretrained = null;                 // serialized weights from weights/lander.json
-    let currentAlgo = 'dqn';
+    let currentAlgo = 'ppo';               // the strongest lander opens the show
     let level = 3;
     let ready = false, gameStarted = false, autoTraining = false;
     let trainTarget = 0, trainStart = 0, trainRafId = null;

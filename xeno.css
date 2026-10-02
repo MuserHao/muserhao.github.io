@@ -2,8 +2,8 @@
    XENO — the dark theme's surface layer
    Alien tech: liquid chrome type, thin-film iridescence, frosted glass.
    Colour lives only on the name, numbers, dates and hairlines; the rest is
-   cold grey. Loaded after style.css and zen.css on every page except the
-   Lab, which keeps its own nebula world. Light theme is untouched.
+   cold grey. Loaded after style.css and zen.css on every page; the Lab adds
+   lab/lab-xeno.css on top for its always-night console. Light theme is untouched.
    ========================================================================== */
 
 html:not([data-theme="light"]) {

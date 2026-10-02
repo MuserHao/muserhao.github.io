@@ -25,8 +25,10 @@
     <link rel="stylesheet" href="../style.css">
     <link rel="stylesheet" href="../blog/blog.css">
     <link rel="stylesheet" href="lab.css">
+    <link rel="stylesheet" href="../xeno.css">
+    <link rel="stylesheet" href="lab-xeno.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script>
         (function(){document.documentElement.setAttribute('data-theme','dark')})();
     </script>
@@ -81,49 +83,55 @@
         </nav>
     </header>
 
-    <main class="blog-main">
-        <section class="blog-hero">
-            <h1 class="section-title"><span class="title-decoration">&lt;</span> FUN.LAB <span class="title-decoration">/&gt;</span></h1>
-            <p class="blog-hero-subtitle">// interactive experiments in ML, RL, and creative coding</p>
+    <main class="lab-main">
+        <section class="lab-head">
+            <p class="lab-kicker">Fun Lab <span aria-hidden="true">&middot;</span> always night</p>
+            <h1 class="lab-title">Experiments</h1>
+            <p class="lab-sub">Interactive experiments in ML, RL, and creative coding. Small agents that learn live in your browser tab.</p>
         </section>
 
-        <section class="blog-list">
-            <!-- Experiment 2 -->
-            <a href="lander.html" class="blog-card neon-card">
-                <div class="blog-card-header">
-                    <time class="blog-date" datetime="2026-03-16"><i class="fas fa-clock"></i> Mar 16, 2026</time>
-                    <div class="blog-tags">
-                        <span class="blog-tag">RL</span>
-                        <span class="blog-tag">GAME</span>
+        <ol class="exhibit-list">
+            <li class="exhibit">
+                <div class="exhibit-index">
+                    <span class="exhibit-code">L&mdash;01</span>
+                    <span class="exhibit-year">2026</span>
+                    <time class="exhibit-date" datetime="2026-03-16">Mar 16</time>
+                </div>
+                <a class="exhibit-visual" href="lander.html" tabindex="-1" aria-hidden="true">
+                    <canvas class="exhibit-preview" data-preview="lander"></canvas>
+                </a>
+                <div class="exhibit-body">
+                    <p class="exhibit-tags"><span>#rl</span><span>#game</span><span>#actor-critic</span></p>
+                    <h2 class="exhibit-title"><a href="lander.html">RL Lunar Lander: Actor-Critic Learns to Land</a></h2>
+                    <p class="exhibit-text">Land a spacecraft with DQN, A2C, and PPO &mdash; all training live in your browser. Watch the actor decide actions while the critic judges states. The foundation of RLHF, visualized.</p>
+                    <div class="exhibit-links">
+                        <a class="exhibit-play" href="lander.html">Launch experiment <span aria-hidden="true">&rarr;</span></a>
+                        <a class="exhibit-read" href="../blog/posts/rl-lander-browser.html">read the write-up</a>
                     </div>
                 </div>
-                <h2 class="blog-card-title">RL Lunar Lander: Actor-Critic Learns to Land</h2>
-                <p class="blog-card-excerpt">Land a spacecraft with DQN, A2C, and PPO &mdash; all training live in your browser. Watch the actor decide actions while the critic judges states. The foundation of RLHF, visualized. ~7,700 parameters, zero GPUs.</p>
-                <div class="blog-card-footer">
-                    <span class="read-time"><i class="fas fa-gamepad"></i> Interactive</span>
-                    <span class="read-more">PLAY NOW <i class="fas fa-arrow-right"></i></span>
-                </div>
-            </a>
+            </li>
 
-            <!-- Experiment 1 -->
-            <a href="pong.html" class="blog-card neon-card">
-                <div class="blog-card-header">
-                    <time class="blog-date" datetime="2026-03-05"><i class="fas fa-clock"></i> Mar 05, 2026</time>
-                    <div class="blog-tags">
-                        <span class="blog-tag">RL</span>
-                        <span class="blog-tag">GAME</span>
+            <li class="exhibit">
+                <div class="exhibit-index">
+                    <span class="exhibit-code">L&mdash;02</span>
+                    <span class="exhibit-year">2026</span>
+                    <time class="exhibit-date" datetime="2026-03-05">Mar 05</time>
+                </div>
+                <a class="exhibit-visual" href="pong.html" tabindex="-1" aria-hidden="true">
+                    <canvas class="exhibit-preview" data-preview="pong"></canvas>
+                </a>
+                <div class="exhibit-body">
+                    <p class="exhibit-tags"><span>#rl</span><span>#game</span><span>#q-learning</span></p>
+                    <h2 class="exhibit-title"><a href="pong.html">RL Pong: Watch AI Learn to Play in Real Time</a></h2>
+                    <p class="exhibit-text">Play Pong against Q-Learning, DQN, and REINFORCE agents that train live in your browser. Hit AUTO-TRAIN to watch them practice at 200x speed, or jump in and play against them yourself.</p>
+                    <div class="exhibit-links">
+                        <a class="exhibit-play" href="pong.html">Launch experiment <span aria-hidden="true">&rarr;</span></a>
+                        <a class="exhibit-read" href="../blog/posts/rl-pong-browser.html">read the write-up</a>
                     </div>
                 </div>
-                <h2 class="blog-card-title">RL Pong: Watch AI Learn to Play in Real Time</h2>
-                <p class="blog-card-excerpt">Play Pong against Q-Learning, DQN, and REINFORCE agents that train live in your browser. Hit AUTO-TRAIN to watch them practice at 200x speed, or jump in and play against them yourself. 579 parameters, zero GPUs.</p>
-                <div class="blog-card-footer">
-                    <span class="read-time"><i class="fas fa-gamepad"></i> Interactive</span>
-                    <span class="read-more">PLAY NOW <i class="fas fa-arrow-right"></i></span>
-                </div>
-            </a>
-
+            </li>
             <!-- More experiments coming soon -->
-        </section>
+        </ol>
     </main>
 
     <footer>
@@ -143,6 +151,7 @@
 
     <script src="../shared.js"></script>
     <script src="stars.js"></script>
+    <script src="previews.js"></script>
     <script>
         // No colored particles on lab pages — stars.js handles the background
     </script>

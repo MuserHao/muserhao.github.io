@@ -61,7 +61,7 @@ if (require.main === module) {
         if (steps >= next) {
             next += 50000;
             console.log(algo, (steps / 1000 | 0) + 'k steps', agent.episodes + ' ep', ((Date.now() - t0) / 1000 | 0) + 's', 'land E/M/H/F', evaluate(agent, runner, 50));
-            if (evaluate.last >= bestScore) { bestScore = evaluate.last; best = JSON.stringify(agent.serialize()); }
+            if (evaluate.last >= bestScore) { bestScore = evaluate.last; best = JSON.stringify(agent.serialize()); if (process.argv[4]) require('fs').writeFileSync(process.argv[4], best); }
         }
     }
     // Keep the best checkpoint seen (evaluation is noisy, training can regress)

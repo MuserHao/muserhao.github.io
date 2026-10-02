@@ -413,21 +413,27 @@ const LanderEngine = (function () {
             }
         }
 
-        // Theme colors
+        // Xeno palette (the Lab is always night). Read once and cached; the
+        // canvas background comes from CSS so the screen matches the page.
         function getColors() {
-            const s = getComputedStyle(document.documentElement);
-            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-            return {
-                lander: s.getPropertyValue('--neon-cyan').trim() || '#00f0ff',
-                pad: s.getPropertyValue('--neon-green').trim() || '#39ff14',
-                terrain: isDark ? '#2a3a4a' : '#7a8a9a',
-                terrainFill: isDark ? 'rgba(20, 35, 50, 0.8)' : 'rgba(180, 200, 220, 0.6)',
-                bg: getComputedStyle(canvas).backgroundColor || '#0a0a12',
-                text: s.getPropertyValue('--text-primary').trim() || '#ffffff',
-                flame: '#ff6600',
-                flameHot: '#ffcc00',
-                stars: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.15)'
+            if (getColors.cache) return getColors.cache;
+            const bg = getComputedStyle(canvas).backgroundColor;
+            getColors.cache = {
+                lander: '#8ff6ff',
+                hull: '#0d0f22',
+                legs: '#aab2d4',
+                pad: '#8ff6ff',
+                beacon: '#ffe3a3',
+                terrain: 'rgba(170, 178, 212, 0.55)',
+                terrainTop: '#12142a',
+                contour: '157, 140, 255',
+                bg: bg && bg !== 'rgba(0, 0, 0, 0)' ? bg : '#05060d',
+                text: '#8a93b8',
+                flame: '#ff8ad8',
+                flameHot: '#ffe3a3',
+                stars: '#eef1ff'
             };
+            return getColors.cache;
         }
 
         // Stars (background decoration)
@@ -450,27 +456,55 @@ const LanderEngine = (function () {
             const c = getColors();
             const sx = canvas.width / W;
             const sy = canvas.height / H;
+            const glow = !prefersReducedMotion;
 
             ctx.setTransform(sx, 0, 0, sy, 0, 0);
-            ctx.clearRect(0, 0, W, H);
+
+            // Gradients that never change are built once
+            if (!render.g) {
+                const sky = ctx.createLinearGradient(0, 0, 0, H);
+                sky.addColorStop(0, 'rgba(157, 140, 255, 0)');
+                sky.addColorStop(0.7, 'rgba(157, 140, 255, 0.06)');
+                sky.addColorStop(1, 'rgba(143, 246, 255, 0.03)');
+                const ground = ctx.createLinearGradient(0, H * 0.45, 0, H);
+                ground.addColorStop(0, c.terrainTop);
+                ground.addColorStop(1, c.bg);
+                const ridge = ctx.createLinearGradient(0, 0, W, 0);
+                ridge.addColorStop(0, 'rgba(143, 246, 255, 0.45)');
+                ridge.addColorStop(0.35, 'rgba(157, 140, 255, 0.6)');
+                ridge.addColorStop(0.7, 'rgba(255, 138, 216, 0.45)');
+                ridge.addColorStop(1, 'rgba(255, 227, 163, 0.4)');
+                // chrome/iridescent hull rim, in lander-local coords
+                const rim = ctx.createLinearGradient(-LANDER_W / 2, -LANDER_H / 2, LANDER_W / 2, LANDER_H / 2);
+                rim.addColorStop(0, '#8ff6ff');
+                rim.addColorStop(0.4, '#9d8cff');
+                rim.addColorStop(0.7, '#ff8ad8');
+                rim.addColorStop(1, '#ffe3a3');
+                const plume = ctx.createLinearGradient(0, LANDER_H / 2, 0, LANDER_H / 2 + 24);
+                plume.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+                plume.addColorStop(0.35, 'rgba(255, 227, 163, 0.85)');
+                plume.addColorStop(1, 'rgba(255, 138, 216, 0)');
+                render.g = { sky, ground, ridge, rim, plume };
+            }
+            const g = render.g;
 
             // Background
             ctx.fillStyle = c.bg;
             ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = g.sky;
+            ctx.fillRect(0, 0, W, H);
 
-            // Stars
+            // Stars: tiny squares, slow shimmer
             ctx.fillStyle = c.stars;
             for (const star of stars) {
-                const flicker = prefersReducedMotion ? 1 : 0.5 + 0.5 * Math.sin(star.twinkle + stepCount * 0.02);
+                const flicker = prefersReducedMotion ? 0.6 : 0.35 + 0.35 * Math.sin(star.twinkle + stepCount * 0.02);
                 ctx.globalAlpha = flicker;
-                ctx.beginPath();
-                ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillRect(star.x, star.y, star.r, star.r);
             }
             ctx.globalAlpha = 1;
 
             // Terrain fill
-            ctx.fillStyle = c.terrainFill;
+            ctx.fillStyle = g.ground;
             ctx.beginPath();
             ctx.moveTo(0, H);
             for (const pt of terrain) {
@@ -480,9 +514,22 @@ const LanderEngine = (function () {
             ctx.closePath();
             ctx.fill();
 
-            // Terrain line
-            ctx.strokeStyle = c.terrain;
-            ctx.lineWidth = 2;
+            // Contour lines: the ridge echoed downward, fading
+            ctx.lineWidth = 1;
+            for (let k = 1; k <= 4; k++) {
+                ctx.strokeStyle = 'rgba(' + c.contour + ', ' + (0.2 - k * 0.04).toFixed(2) + ')';
+                ctx.beginPath();
+                for (let i = 0; i < terrain.length; i++) {
+                    const y = terrain[i].y + k * 16;
+                    if (i === 0) ctx.moveTo(terrain[i].x, y);
+                    else ctx.lineTo(terrain[i].x, y);
+                }
+                ctx.stroke();
+            }
+
+            // Ridge line: iridescent hairline
+            ctx.strokeStyle = g.ridge;
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             for (let i = 0; i < terrain.length; i++) {
                 if (i === 0) ctx.moveTo(terrain[i].x, terrain[i].y);
@@ -490,26 +537,28 @@ const LanderEngine = (function () {
             }
             ctx.stroke();
 
-            // Landing pad
-            const glow = !prefersReducedMotion;
-            if (glow) {
-                ctx.shadowColor = c.pad;
-                ctx.shadowBlur = 12;
-            }
+            // Landing pad: soft pool of light + bright bar + blinking beacons
+            const padCx = (padLeft + padRight) / 2;
+            const pool = ctx.createRadialGradient(padCx, padY, 0, padCx, padY, PAD_W);
+            pool.addColorStop(0, 'rgba(143, 246, 255, 0.18)');
+            pool.addColorStop(1, 'rgba(143, 246, 255, 0)');
+            ctx.fillStyle = pool;
+            ctx.fillRect(padCx - PAD_W, padY - PAD_W, PAD_W * 2, PAD_W * 2);
             ctx.fillStyle = c.pad;
-            ctx.fillRect(padLeft, padY - 3, PAD_W, 6);
-            // Pad markers
-            ctx.fillRect(padLeft + 5, padY - 7, 4, 4);
-            ctx.fillRect(padRight - 9, padY - 7, 4, 4);
-            ctx.shadowBlur = 0;
+            ctx.fillRect(padLeft, padY - 2, PAD_W, 4);
+            ctx.globalAlpha = glow ? (Math.floor(stepCount / 20) % 2 ? 1 : 0.35) : 1;
+            ctx.fillStyle = c.beacon;
+            ctx.fillRect(padLeft + 2, padY - 8, 3, 3);
+            ctx.fillRect(padRight - 5, padY - 8, 3, 3);
+            ctx.globalAlpha = 1;
 
             // Flame particles
             updateFlames();
             for (const f of flames) {
                 const t = f.life / f.maxLife;
-                ctx.globalAlpha = t;
+                ctx.globalAlpha = t * 0.85;
                 ctx.fillStyle = t > 0.5 ? c.flameHot : c.flame;
-                const size = 2 + t * 3;
+                const size = 1.5 + t * 3;
                 ctx.fillRect(f.x - size / 2, f.y - size / 2, size, size);
             }
             ctx.globalAlpha = 1;
@@ -519,73 +568,66 @@ const LanderEngine = (function () {
             ctx.translate(lander.x, lander.y);
             ctx.rotate(lander.angle);
 
-            if (glow) {
-                ctx.shadowColor = c.lander;
-                ctx.shadowBlur = 15;
+            // Thrust plume (drawn under the hull, rotates with it)
+            if (thrustMain) {
+                const flameLen = 12 + Math.random() * 12;
+                ctx.save();
+                ctx.scale(1, flameLen / 24);
+                ctx.translate(0, LANDER_H / 2 * (1 - 24 / flameLen));
+                ctx.fillStyle = g.plume;
+                ctx.beginPath();
+                ctx.moveTo(-6, LANDER_H / 2);
+                ctx.lineTo(6, LANDER_H / 2);
+                ctx.lineTo(0, LANDER_H / 2 + 24);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
             }
 
-            // Body — triangle
-            ctx.fillStyle = c.lander;
-            ctx.beginPath();
-            ctx.moveTo(0, -LANDER_H / 2);                     // top
-            ctx.lineTo(-LANDER_W / 2, LANDER_H / 2);         // bottom-left
-            ctx.lineTo(LANDER_W / 2, LANDER_H / 2);          // bottom-right
-            ctx.closePath();
-            ctx.fill();
-
-            // Legs
-            ctx.strokeStyle = c.lander;
-            ctx.lineWidth = 2;
-            // Left leg
+            // Legs + feet: chrome hairlines
+            ctx.strokeStyle = c.legs;
+            ctx.lineWidth = 1.6;
             ctx.beginPath();
             ctx.moveTo(-LANDER_W / 2 + 2, LANDER_H / 2);
             ctx.lineTo(-LEG_SPAN, LANDER_H / 2 + LEG_H);
-            ctx.stroke();
-            // Right leg
-            ctx.beginPath();
             ctx.moveTo(LANDER_W / 2 - 2, LANDER_H / 2);
             ctx.lineTo(LEG_SPAN, LANDER_H / 2 + LEG_H);
-            ctx.stroke();
-
-            // Leg feet (small horizontal lines)
-            ctx.beginPath();
             ctx.moveTo(-LEG_SPAN - 4, LANDER_H / 2 + LEG_H);
             ctx.lineTo(-LEG_SPAN + 4, LANDER_H / 2 + LEG_H);
-            ctx.stroke();
-            ctx.beginPath();
             ctx.moveTo(LEG_SPAN - 4, LANDER_H / 2 + LEG_H);
             ctx.lineTo(LEG_SPAN + 4, LANDER_H / 2 + LEG_H);
             ctx.stroke();
 
-            ctx.shadowBlur = 0;
-
-            // Thrust flame (rendered on lander, so it rotates with it)
-            if (thrustMain) {
-                const flameLen = 10 + Math.random() * 12;
-                ctx.fillStyle = c.flameHot;
-                ctx.globalAlpha = 0.9;
-                ctx.beginPath();
-                ctx.moveTo(-5, LANDER_H / 2 + 1);
-                ctx.lineTo(5, LANDER_H / 2 + 1);
-                ctx.lineTo(0, LANDER_H / 2 + flameLen);
-                ctx.closePath();
-                ctx.fill();
-                ctx.globalAlpha = 1;
-            }
+            // Body: dark hull, iridescent rim, cyan viewport
+            ctx.beginPath();
+            ctx.moveTo(0, -LANDER_H / 2);
+            ctx.lineTo(-LANDER_W / 2, LANDER_H / 2);
+            ctx.lineTo(LANDER_W / 2, LANDER_H / 2);
+            ctx.closePath();
+            ctx.fillStyle = c.hull;
+            ctx.fill();
+            ctx.strokeStyle = g.rim;
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, LANDER_H * 0.1, 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = c.lander;
+            ctx.fill();
 
             ctx.restore();
 
-            // HUD text — altitude + speed on canvas
-            ctx.font = '12px "Share Tech Mono", monospace';
+            // Telemetry — thin mono readout in the corner
+            ctx.font = '11px "JetBrains Mono", ui-monospace, monospace';
             ctx.textAlign = 'left';
             ctx.fillStyle = c.text;
-            ctx.globalAlpha = 0.4;
             const alt = Math.max(0, padY - lander.y - LANDER_H / 2 - LEG_H).toFixed(0);
             const spd = Math.sqrt(lander.vx * lander.vx + lander.vy * lander.vy).toFixed(1);
-            ctx.fillText('ALT ' + alt, 10, 20);
-            ctx.fillText('SPD ' + spd, 10, 36);
-            ctx.fillText('ANG ' + (lander.angle * 180 / Math.PI).toFixed(0) + '\u00B0', 10, 52);
-            ctx.globalAlpha = 1;
+            ctx.fillText('ALT  ' + alt, 16, 24);
+            ctx.fillText('SPD  ' + spd, 16, 40);
+            ctx.fillText('ANG  ' + (lander.angle * 180 / Math.PI).toFixed(0) + '\u00B0', 16, 56);
+            ctx.fillStyle = 'rgba(170, 178, 212, 0.25)';
+            ctx.fillRect(16, 62, 56, 1);
         }
 
         // Game loop

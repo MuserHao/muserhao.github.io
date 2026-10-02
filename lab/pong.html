@@ -25,8 +25,10 @@
     <link rel="stylesheet" href="../style.css">
     <link rel="stylesheet" href="lab.css">
     <link rel="stylesheet" href="pong.css">
+    <link rel="stylesheet" href="../xeno.css">
+    <link rel="stylesheet" href="lab-xeno.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script>
         (function(){document.documentElement.setAttribute('data-theme','dark')})();
     </script>
@@ -82,10 +84,13 @@
 
     <main class="pong-main">
         <section class="pong-hero">
+            <p class="exp-kicker"><a href="index.html">Fun Lab</a> <span aria-hidden="true">/</span> L&mdash;02</p>
             <h1 class="pong-title">RL PONG</h1>
             <p class="pong-subtitle">Play against AI that learns in real time. Hit AUTO-TRAIN or just start playing.</p>
         </section>
 
+        <!-- Instrument console: controls on the top edge, screen, readout rail -->
+        <div class="console">
         <!-- Algorithm tabs -->
         <div class="algo-tabs" role="tablist">
             <button class="algo-tab active" role="tab" data-algo="qlearning">Q-LEARNING</button>
@@ -104,8 +109,17 @@
                 <option value="200">200 episodes</option>
                 <option value="500">500 episodes</option>
             </select>
-            <button class="train-btn" id="brain-btn">BLANK BRAIN</button>
+            <button class="brain-btn" id="brain-btn" type="button" title="Swap the pretrained network for a blank, untrained one (and back)">BLANK BRAIN</button>
             <span class="train-progress" id="train-progress"></span>
+        </div>
+
+        <!-- Game canvas -->
+        <div class="canvas-wrap">
+            <canvas id="pong-canvas"></canvas>
+            <div class="canvas-overlay" id="canvas-overlay">
+                <p>MOVE YOUR MOUSE TO PLAY</p>
+                <p class="overlay-sub">or arrow keys / W,S / touch</p>
+            </div>
         </div>
 
         <!-- HUD bar -->
@@ -117,13 +131,6 @@
             <span class="hud-item"><span class="hud-label">BOT</span> <span id="hud-bot">—</span></span>
         </div>
 
-        <!-- Game canvas -->
-        <div class="canvas-wrap">
-            <canvas id="pong-canvas"></canvas>
-            <div class="canvas-overlay" id="canvas-overlay">
-                <p>MOVE YOUR MOUSE TO PLAY</p>
-                <p class="overlay-sub">or arrow keys / W,S / touch</p>
-            </div>
         </div>
 
         <!-- Algorithm info card -->
@@ -156,6 +163,7 @@
     <script src="tiny-nn.js"></script>
     <script src="pong-rl.js"></script>
     <script src="pong-ui.js"></script>
+    <script src="lab-xeno.js"></script>
     <script>
         // No colored particles on lab pages — stars.js handles the background
     </script>

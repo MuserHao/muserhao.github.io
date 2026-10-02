@@ -118,6 +118,7 @@
                 <h1 class="post-title">Teaching Pong to Play Itself: 3 RL Algorithms in the Browser</h1>
                 <p class="post-subtitle"><span class="dark-only">// </span>579 parameters, zero GPUs, and the reward shaping tricks the textbooks leave out</p>
                 <div class="post-divider"></div>
+                <p class="post-subtitle"><em>Update, October 2026: DQN and REINFORCE in the first version barely learned. <a href="#postmortem">The postmortem</a> explains why and what fixed them.</em></p>
             </div>
 
             <div class="post-content">
@@ -646,13 +647,101 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </ul>
 
 
-                <h2><span class="sec-num">09<span class="dark-only"> //</span></span> TRY IT YOURSELF</h2>
+                <h2 id="postmortem"><span class="sec-num">09<span class="dark-only"> //</span></span> POSTMORTEM: TWO OF THREE AGENTS NEVER LEARNED</h2>
+
+                <p>
+                    <em>Added October 2026.</em> Six months after shipping, I measured how good the agents
+                    you play against actually were. I replayed the page's warmup offline, then had each agent
+                    play 40 games against the scripted bot at 30% strength. The &ldquo;After&rdquo; columns are the shipped weights, measured the same way:
+                </p>
+
+                <table style="width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:0.85rem; margin:1.5rem 0;">
+                    <thead>
+                        <tr style="border-bottom:2px solid var(--border-subtle);">
+                            <th style="text-align:left; padding:0.5rem;">Win rate vs bot</th>
+                            <th style="text-align:center; padding:0.5rem;">Before (30% bot)</th>
+                            <th style="text-align:center; padding:0.5rem;">After (30% bot)</th>
+                            <th style="text-align:center; padding:0.5rem;">After (60% bot)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom:1px solid var(--border-subtle);"><td style="padding:0.5rem;">Q-Learning</td><td style="text-align:center;">50%</td><td style="text-align:center;">95%</td><td style="text-align:center;">55%</td></tr>
+                        <tr style="border-bottom:1px solid var(--border-subtle);"><td style="padding:0.5rem;">DQN</td><td style="text-align:center;">10%</td><td style="text-align:center;">100%</td><td style="text-align:center;">85%</td></tr>
+                        <tr style="border-bottom:1px solid var(--border-subtle);"><td style="padding:0.5rem;">REINFORCE</td><td style="text-align:center;">0%</td><td style="text-align:center;">100%</td><td style="text-align:center;">93%</td></tr>
+                    </tbody>
+                </table>
+
+                <p>
+                    Q-Learning was fine. DQN and REINFORCE barely moved: even against the weakest
+                    bot they lost most games, so anyone choosing those tabs was playing a twitching paddle.
+                    Here is why, and what fixed each one.
+                </p>
+
+                <h3>REINFORCE: wrong data, wrong reward, wrong episode</h3>
+
+                <ul>
+                    <li><strong>It wasn't on-policy.</strong> To "help exploration" it took a random action
+                        5&ndash;30% of the time instead of sampling from &pi;. The policy gradient
+                        $\nabla \log \pi(a|s) \cdot G$ assumes the action came from &pi;, so every update
+                        that used one of those random actions was biased. Now it explores only by sampling
+                        from its own distribution, with a small entropy bonus to keep that distribution
+                        from collapsing.</li>
+                    <li><strong>Off-by-one rewards.</strong> Each step was stored as (s<sub>t</sub>, a<sub>t</sub>)
+                        with the reward produced by the <em>previous</em> action. All three agents now share one
+                        interface, <code>observe(s, a, r, s&prime;, done)</code>, which makes this mistake impossible.</li>
+                    <li><strong>An episode was a whole game.</strong> A first-to-5 game is thousands of frames.
+                        With &gamma; = 0.99, the return at any frame mixes the outcome of the current rally
+                        with the rallies after it, so a good return block got blamed for a later miss.
+                        As in Karpathy's <em>Pong from Pixels</em> <a href="#ref-4">[4]</a>, each point is now
+                        its own episode. The agent updates after every 5 points, normalising the returns across
+                        that batch as its baseline.</li>
+                </ul>
+
+                <h3>DQN: the action gap</h3>
+
+                <p>
+                    The paddle moves 5 px per frame. One frame of UP versus one frame of STAY barely changes
+                    what happens next, so the true Q-values of the three actions differ by a tiny amount. I printed
+                    them for a state with the ball well above the paddle: <code>0.39 / 0.39 / 0.32</code>.
+                    That gap is smaller than the network's estimation noise, so the argmax was close to random.
+                </p>
+
+                <p>
+                    The original Atari DQN <a href="#ref-2">[2]</a> already handled this with
+                    <strong>action repeat</strong>: each decision is held for 4 frames, and the 4 rewards are
+                    summed (discounted). Now each choice has a visible effect, and the gap between good and bad
+                    actions is large enough to learn. Three smaller changes helped:
+                </p>
+                <ul>
+                        <li>A Huber loss, so a single surprising point can't yank the network.</li>
+                        <li>Real mini-batch Adam steps in the new <code>tiny-nn.js</code>, instead of one update per sample.</li>
+                        <li>Treating a scored point as terminal, so the target never bootstraps across a serve.</li>
+                </ul>
+
+                <h3>Train offline, ship the weights</h3>
+
+                <p>
+                    The page used to pre-train every agent on each first visit (about a minute of waiting),
+                    and the 100&ndash;200-episode budget was too small anyway. Now <code>tools/lab-train.js</code>
+                    trains them in Node against bots of random strength and keeps the best checkpoint. The
+                    page loads <code>lab/weights/pong.json</code> instantly. The agents still learn from every
+                    game you play. To watch one learn from nothing, press <strong>BLANK BRAIN</strong>, then
+                    <strong>AUTO-TRAIN</strong>.
+                </p>
+
+                <p>
+                    Q-Learning is now the <em>weakest</em> of the three. Its 24,000-cell table can't generalise
+                    between neighbouring states, while the two networks can. That ordering is the textbook
+                    one, and it only showed up once the other two agents were implemented correctly.
+                </p>
+
+                <h2><span class="sec-num">10<span class="dark-only"> //</span></span> TRY IT YOURSELF</h2>
 
                 <p>
                     The <a href="../../lab/pong.html">RL Pong Lab</a> is live. Switch between algorithms
-                    with the tabs, hit AUTO-TRAIN to watch the AI practice at 200x speed, then take
-                    over and play against it. Your agent's learned weights persist in localStorage --
-                    come back tomorrow and it'll remember everything.
+                    with the tabs and play: the agents load pretrained and keep learning from every game
+                    you play. Press BLANK BRAIN and AUTO-TRAIN to watch one learn from nothing at 200x speed.
+                    Whatever it learns persists in localStorage; LOAD PRETRAINED restores the shipped weights.
                 </p>
 
                 <p>
@@ -661,7 +750,8 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
 
                 <ul>
                     <li><code>pong-engine.js</code> -- game physics, rendering, collision detection</li>
-                    <li><code>pong-rl.js</code> -- MiniNet neural network, Q-Learning, DQN, REINFORCE</li>
+                    <li><code>tiny-nn.js</code> -- the small neural network (mini-batch Adam), shared with the Lander</li>
+                    <li><code>pong-rl.js</code> -- Q-Learning, DQN, REINFORCE</li>
                     <li><code>pong-ui.js</code> -- glue code, HUD, auto-training, localStorage</li>
                     <li><code>pong.html</code> + <code>pong.css</code> -- page shell and styling</li>
                 </ul>
@@ -671,7 +761,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
 
-                <h2><span class="sec-num">10<span class="dark-only"> //</span></span> REFERENCES</h2>
+                <h2><span class="sec-num">11<span class="dark-only"> //</span></span> REFERENCES</h2>
 
                 <div class="references">
                     <ol class="ref-list">

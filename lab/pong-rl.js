@@ -78,25 +78,36 @@ const PongRL = (function () {
         this.lr = 1e-3;
         this.batchSize = 32;
         this.bufferMax = 30000;
-        this.trainEvery = 4;
+        this.trainEvery = 1;           // one mini-batch per decision (= every 4 frames)
         this.targetSyncSteps = 1000;
         this.learnStart = 1000;
         this.epsilon = 1.0;
         this.epsilonMin = 0.03;
-        this.epsilonDecay = 0.99995;  // per step
+        this.epsilonDecay = 0.9998;   // per decision
         this.buffer = [];
         this.bufPos = 0;
         this.stepCount = 0;
+        this.repeat = 4;
+        this.pending = null;
         Stats(this);
     }
 
     DQNAgent.prototype.act = function (obs) {
+        if (this.pending) return this.pending.a;     // still repeating the last action
         if (Math.random() < this.epsilon) return Math.floor(Math.random() * N_ACT);
         return NN.argmax(this.net.predict(obs.s));
     };
 
+    // Action repeat (as in the Atari DQN): one decision is held for `repeat`
+    // frames, so the agent sees the effect of a move instead of a 5 px nudge.
     DQNAgent.prototype.observe = function (obs, a, r, obs2, done) {
-        const t = { s: obs.s, a, r, s2: obs2.s, done };
+        if (!this.pending) this.pending = { s: obs.s, a, r: 0, n: 0 };
+        const p = this.pending;
+        p.r += Math.pow(this.gamma, p.n) * r;
+        p.n++;
+        if (p.n < this.repeat && !done) return;
+        this.pending = null;
+        const t = { s: p.s, a: p.a, r: p.r, s2: obs2.s, done, discount: Math.pow(this.gamma, p.n) };
         if (this.buffer.length < this.bufferMax) this.buffer.push(t);
         else this.buffer[this.bufPos] = t;
         this.bufPos = (this.bufPos + 1) % this.bufferMax;
@@ -109,11 +120,11 @@ const PongRL = (function () {
     DQNAgent.prototype.train = function () {
         const buf = this.buffer;
         for (let n = 0; n < this.batchSize; n++) {
-            const { s, a, r, s2, done } = buf[Math.floor(Math.random() * buf.length)];
+            const { s, a, r, s2, done, discount } = buf[Math.floor(Math.random() * buf.length)];
             let target = r;
             if (!done) {
                 const best = NN.argmax(this.net.predict(s2));          // Double DQN
-                target += this.gamma * this.targetNet.predict(s2)[best];
+                target += discount * this.targetNet.predict(s2)[best];
             }
             const { out, acts } = this.net.forward(s);
             const dOut = new Float64Array(N_ACT);

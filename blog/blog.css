@@ -484,6 +484,7 @@
 }
 
 .post-content h2 {
+    scroll-margin-top: 6rem;   /* clear the fixed header when linked to by #id */
     font-family: var(--font-display);
     font-size: 1.4rem;
     color: var(--neon-cyan);

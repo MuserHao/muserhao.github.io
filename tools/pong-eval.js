@@ -64,7 +64,7 @@ if (require.main === module) {
         if (g % Math.max(1, games / 10 | 0) === 0)
         {
             console.log(algo, g + ' games', ((Date.now() - t0) / 1000 | 0) + 's', 'win vs bot .3/.6/.9', evaluate(agent, runner, 20));
-            if (evaluate.last >= bestScore) { bestScore = evaluate.last; best = JSON.stringify(agent.serialize()); }
+            if (evaluate.last >= bestScore) { bestScore = evaluate.last; best = JSON.stringify(agent.serialize()); if (process.argv[4]) require('fs').writeFileSync(process.argv[4], best); }
         }
     }
     // Keep the best checkpoint seen (evaluation is noisy, training can regress)

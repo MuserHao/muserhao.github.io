@@ -58,18 +58,21 @@ const PongEngine = (function () {
             ball.vy = BALL_SPEED_INIT * Math.sin(angle);
         }
 
-        // Get theme-aware colors from CSS custom properties
+        // Xeno palette (the Lab is always night). Read once and cached: the
+        // canvas background comes from CSS so the screen matches the page.
         function getColors() {
-            const s = getComputedStyle(document.documentElement);
-            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-            return {
-                player: s.getPropertyValue('--neon-cyan').trim() || '#00f0ff',
-                ai: s.getPropertyValue('--neon-pink').trim() || '#ff006e',
-                ball: isDark ? '#ffffff' : '#1e1e2e',
-                net: s.getPropertyValue('--border-subtle').trim() || 'rgba(255,255,255,0.15)',
-                bg: getComputedStyle(canvas).backgroundColor || '#0a0a12',
-                text: s.getPropertyValue('--text-primary').trim() || '#ffffff'
+            if (getColors.cache) return getColors.cache;
+            const bg = getComputedStyle(canvas).backgroundColor;
+            getColors.cache = {
+                player: '#8ff6ff', player2: '#9d8cff',   // film: cyan -> violet
+                ai: '#ff8ad8', ai2: '#ffe3a3',           // film: pink -> gold
+                ball: '#eef1ff',
+                trail: '#9d8cff',
+                net: 'rgba(170, 178, 212, 0.18)',
+                bg: bg && bg !== 'rgba(0, 0, 0, 0)' ? bg : '#05060d',
+                text: '#eef1ff'
             };
+            return getColors.cache;
         }
 
         // Mouse / touch input
@@ -259,61 +262,79 @@ const PongEngine = (function () {
             const sy = canvas.height / H;
 
             ctx.setTransform(sx, 0, 0, sy, 0, 0);
-            ctx.clearRect(0, 0, W, H);
 
-            // Background
+            // Background: page-matched night with a faint violet floor (gradient built once)
+            if (!render.sky) {
+                render.sky = ctx.createLinearGradient(0, 0, 0, H);
+                render.sky.addColorStop(0, 'rgba(157, 140, 255, 0)');
+                render.sky.addColorStop(1, 'rgba(157, 140, 255, 0.06)');
+                // paddle gradients in paddle-local coords (translated at draw time)
+                render.gPlayer = ctx.createLinearGradient(0, -PAD_H / 2, 0, PAD_H / 2);
+                render.gPlayer.addColorStop(0, c.player); render.gPlayer.addColorStop(1, c.player2);
+                render.gAI = ctx.createLinearGradient(0, -PAD_H / 2, 0, PAD_H / 2);
+                render.gAI.addColorStop(0, c.ai); render.gAI.addColorStop(1, c.ai2);
+                render.trail = [];
+            }
             ctx.fillStyle = c.bg;
             ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = render.sky;
+            ctx.fillRect(0, 0, W, H);
 
-            // Center net
-            ctx.setLineDash([8, 8]);
-            ctx.strokeStyle = c.net;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(W / 2, 0);
-            ctx.lineTo(W / 2, H);
-            ctx.stroke();
-            ctx.setLineDash([]);
+            // Center net: dotted hairline
+            ctx.fillStyle = c.net;
+            for (let y = 6; y < H; y += 14) ctx.fillRect(W / 2 - 1, y, 2, 6);
 
-            const glow = !prefersReducedMotion;
+            // Score display: large, thin, faint
+            ctx.font = '300 56px Unbounded, "Space Grotesk", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = c.text;
+            ctx.globalAlpha = 0.14;
+            ctx.fillText(scorePlayer, W / 4, 76);
+            ctx.fillText(scoreAI, (3 * W) / 4, 76);
+            ctx.globalAlpha = 1;
 
-            // Player paddle (left)
-            if (glow) {
-                ctx.shadowColor = c.player;
-                ctx.shadowBlur = 15;
+            // Paddles: rounded, film-coloured
+            function paddle(x, y, grad) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(0, -PAD_H / 2, PAD_W, PAD_H, PAD_W / 2);
+                else ctx.rect(0, -PAD_H / 2, PAD_W, PAD_H);
+                ctx.fill();
+                ctx.restore();
             }
+            paddle(PAD_OFFSET, playerY, render.gPlayer);
+            paddle(W - PAD_OFFSET - PAD_W, aiY, render.gAI);
+
+            // Ball trail: short, fading (reset on serve / jumps)
+            const trail = render.trail;
+            const lastPt = trail[trail.length - 1];
+            if (lastPt && Math.abs(lastPt.x - ball.x) + Math.abs(lastPt.y - ball.y) > 80) trail.length = 0;
+            if (!prefersReducedMotion) {
+                trail.push({ x: ball.x, y: ball.y });
+                if (trail.length > 8) trail.shift();
+                ctx.fillStyle = c.trail;
+                for (let i = 0; i < trail.length - 1; i++) {
+                    const a = (i + 1) / trail.length;
+                    ctx.globalAlpha = a * 0.35;
+                    ctx.beginPath();
+                    ctx.arc(trail[i].x, trail[i].y, BALL_R * (0.35 + a * 0.6), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Ball: soft halo (cheap disc, no shadowBlur) + bright core
+            ctx.globalAlpha = 0.16;
             ctx.fillStyle = c.player;
-            ctx.fillRect(PAD_OFFSET, playerY - PAD_H / 2, PAD_W, PAD_H);
-            ctx.shadowBlur = 0;
-
-            // AI paddle (right)
-            if (glow) {
-                ctx.shadowColor = c.ai;
-                ctx.shadowBlur = 15;
-            }
-            ctx.fillStyle = c.ai;
-            ctx.fillRect(W - PAD_OFFSET - PAD_W, aiY - PAD_H / 2, PAD_W, PAD_H);
-            ctx.shadowBlur = 0;
-
-            // Ball
-            if (glow) {
-                ctx.shadowColor = c.ball;
-                ctx.shadowBlur = 20;
-            }
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, BALL_R * 2.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
             ctx.fillStyle = c.ball;
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0;
-
-            // Score display
-            ctx.font = '48px Orbitron, monospace';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = c.text;
-            ctx.globalAlpha = 0.3;
-            ctx.fillText(scorePlayer, W / 4, 60);
-            ctx.fillText(scoreAI, (3 * W) / 4, 60);
-            ctx.globalAlpha = 1;
         }
 
         // Game loop
