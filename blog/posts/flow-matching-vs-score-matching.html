@@ -159,7 +159,7 @@
                 <ol>
                     <li><strong>The path</strong>: the noise schedule $(\alpha_t, \sigma_t)$ that decides how data and noise are mixed over time.</li>
                     <li><strong>The prediction target</strong>: whether the network predicts the noise $\boldsymbol{\epsilon}$, the clean data $\mathbf{x}_0$, the score $\nabla\log p_t$, the "$\mathbf{v}$-prediction" target $\alpha_t\boldsymbol{\epsilon} - \sigma_t\mathbf{x}_0$ (Salimans &amp; Ho), or the flow velocity $\mathbf{u}$ (section 04 has the full dictionary).</li>
-                    <li><strong>The weighting</strong>: the loss weight times the distribution of training timesteps.</li>
+                    <li><strong>The weighting</strong>: how much training cares about each noise level, which is set jointly by the loss weight at that level and by how often that level is sampled during training.</li>
                     <li><strong>The sampler</strong>: ODE or SDE, which solver, and how many steps.</li>
                 </ol>
 
