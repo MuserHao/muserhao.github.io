@@ -150,8 +150,9 @@
 
                 <p>
                     The short answer, which the rest of this post earns: <strong>when the source
-                    distribution is Gaussian, flow matching and score-based diffusion are the same model
-                    family</strong>. Same marginals, same optimal network (up to a fixed linear map), same
+                    distribution (the noise that sampling starts from) is a standard Gaussian, paired
+                    independently with the data, flow matching and score-based diffusion are the same model
+                    family</strong>. The data distribution itself can be anything. Same marginals, same optimal network (up to a fixed linear map), same
                     family of samplers. Every difference you can measure comes from four knobs that both
                     frameworks expose:
                 </p>
