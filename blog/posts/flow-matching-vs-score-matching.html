@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Matching vs. Score Matching | Hao Xin</title>
+    <meta name="description" content="A deep comparison of flow matching and score-based diffusion: why they are the same model family under a Gaussian source, how losses reduce to weighted ELBOs, why straight paths are a myth, and the principles behind modern improvements from SD3 to MeanFlow.">
+    <meta name="author" content="Hao Xin">
+    <link rel="canonical" href="https://muserhao.github.io/blog/posts/flow-matching-vs-score-matching.html">
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="Flow Matching vs. Score Matching: Same Model, Different Knobs">
+    <meta property="og:description" content="Flow matching and score matching, compared in depth: the shared math, the four knobs that actually differ, and why the improvements work.">
+    <meta property="og:url" content="https://muserhao.github.io/blog/posts/flow-matching-vs-score-matching.html">
+    <meta property="og:site_name" content="Hao Xin">
+    <meta property="og:image" content="https://muserhao.github.io/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="article:published_time" content="2026-10-02">
+    <meta property="article:author" content="Hao Xin">
+    <meta property="article:tag" content="Diffusion Models">
+    <meta property="article:tag" content="Flow Matching">
+    <meta property="article:tag" content="Score Matching">
+    <meta property="article:tag" content="Machine Learning">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Flow Matching vs. Score Matching: Same Model, Different Knobs">
+    <meta name="twitter:description" content="Flow matching and score matching, compared in depth: the shared math, the four knobs that actually differ, and why the improvements work.">
+    <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
+    <!-- JSON-LD Article -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Flow Matching vs. Score Matching: Same Model, Different Knobs",
+        "author": {"@type": "Person", "name": "Hao Xin", "url": "https://muserhao.github.io"},
+        "datePublished": "2026-10-02",
+        "description": "Flow matching and score matching, compared in depth: the shared math, the four knobs that actually differ, and why the improvements work.",
+        "url": "https://muserhao.github.io/blog/posts/flow-matching-vs-score-matching.html",
+        "keywords": ["flow matching", "score matching", "rectified flow", "diffusion models", "generative AI"]
+    }
+    </script>
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="../blog.css">
+    <link rel="stylesheet" href="../../zen.css">
+    <link rel="stylesheet" href="../../xeno.css">
+    <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false}
+            ],
+            throwOnError: false
+        });"></script>
+    <script>
+        (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
+    </script>
+    <style>
+        .fm-demo { margin: 2rem 0; padding: 1rem; border: 1px solid var(--border-subtle); border-radius: 12px; }
+        .fm-demo canvas { display: block; width: 100%; height: auto; }
+        .fm-controls { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; margin-top: 0.75rem; font-size: 0.85rem; }
+        .fm-controls label { display: flex; align-items: center; gap: 0.4rem; color: var(--text-secondary); }
+        .fm-controls select, .fm-controls input { font: inherit; color: var(--text-primary); background: transparent; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.15rem 0.3rem; }
+        .fm-controls select option { color: #111; }
+        .fm-controls input[type=range] { padding: 0; border: none; width: 9rem; }
+        .fm-stats { display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; margin-top: 0.6rem; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-secondary); }
+        .fm-stats b { color: var(--text-primary); font-weight: 500; }
+        .fm-demo figcaption { margin-top: 0.75rem; font-size: 0.85rem; color: var(--text-secondary); }
+        .post-content table { display: block; overflow-x: auto; width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.9rem; }
+        .post-content th, .post-content td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }
+        .post-content th { color: var(--text-secondary); font-weight: 500; letter-spacing: 0.04em; }
+    </style>
+</head>
+<body>
+    <!-- SVG liquid distortion filter -->
+    <svg class="svg-filters" aria-hidden="true" style="position:absolute;width:0;height:0;">
+        <defs>
+            <filter id="liquid-distort" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence id="liquid-turbulence" type="fractalNoise"
+                    baseFrequency="0.006 0.009" numOctaves="4" seed="3" result="noise"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise"
+                    scale="50" xChannelSelector="R" yChannelSelector="G"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="grid-bg"></div>
+
+
+
+    <header>
+        <nav>
+            <a href="../../index.html" class="logo" aria-label="HAO.XIN">
+            </a>
+            <ul class="nav-links">
+                <li><a href="../../index.html" class="nav-link"><span class="dark-only">HOME</span><span class="light-only">Home</span></a></li>
+                <li><a href="../index.html" class="nav-link active"><span class="dark-only">BLOG</span><span class="light-only">Writing</span></a></li>
+                <li><a href="../../lab/index.html" class="nav-link"><span class="dark-only">FUN LAB</span><span class="light-only">Lab</span></a></li>
+                <li>
+                    <button class="theme-toggle" aria-label="Toggle theme">
+                        <span class="theme-toggle-icon-light">&#9728;</span>
+                        <span class="theme-toggle-slider"></span>
+                        <span class="theme-toggle-icon-dark">&#9790;</span>
+                    </button>
+                </li>
+            </ul>
+            <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </nav>
+    </header>
+
+    <main class="post-main">
+        <article>
+            <div class="post-header">
+                <div class="post-meta">
+                    <time class="blog-date" datetime="2026-10-02"><i class="fas fa-clock"></i> Oct 02, 2026</time>
+                    <span class="read-time"><i class="fas fa-book-open"></i> 32 min read</span>
+                </div>
+                <div class="blog-tags" style="justify-content: center; margin-bottom: 1.5rem;">
+                    <span class="blog-tag">DIFFUSION</span>
+                    <span class="blog-tag">MATH</span>
+                </div>
+                <h1 class="post-title">Flow Matching vs. Score Matching: Same Model, Different Knobs</h1>
+                <p class="post-subtitle"><span class="dark-only">// </span>what actually differs, and why the improvements work</p>
+                <div class="post-divider"></div>
+            </div>
+
+            <div class="post-content">
+                <h2><span class="sec-num">01<span class="dark-only"> //</span></span> INTRODUCTION</h2>
+
+                <p>
+                    Somewhere around 2024 the generative modeling world quietly changed its vocabulary.
+                    Stable Diffusion 3 and Flux are "rectified flow transformers". Most new video generation models
+                    train with "flow matching". Physical Intelligence's &pi;<sub>0</sub> generates robot
+                    actions with a "flow matching action expert". If you learned diffusion through
+                    <a href="score-matching-explained.html">score matching</a> like I did, the natural question is:
+                    <em>did something fundamental change, or did we just rename the parts?</em>
+                </p>
+
+                <p>
+                    The short answer, which the rest of this post earns: <strong>whenever generation
+                    starts from Gaussian noise, flow matching and score-based diffusion are the same model
+                    family</strong>, whatever the data looks like. Same marginals, same optimal network (up to a fixed linear map), same
+                    family of samplers. Every difference you can measure comes from four knobs that both
+                    frameworks expose:
+                </p>
+
+                <ol>
+                    <li><strong>The path</strong>: the noise schedule $(\alpha_t, \sigma_t)$ that decides how data and noise are mixed over time.</li>
+                    <li><strong>The prediction target</strong>: whether the network predicts the noise $\boldsymbol{\epsilon}$, the clean data $\mathbf{x}_0$, the score $\nabla\log p_t$, the "$\mathbf{v}$-prediction" target $\alpha_t\boldsymbol{\epsilon} - \sigma_t\mathbf{x}_0$ (Salimans &amp; Ho), or the flow velocity $\mathbf{u}$ (section 04 has the full dictionary).</li>
+                    <li><strong>The weighting</strong>: how much training cares about each noise level, which is set jointly by the loss weight at that level and by how often that level is sampled during training.</li>
+                    <li><strong>The sampler</strong>: ODE or SDE, which solver, and how many steps.</li>
+                </ol>
+
+                <p>
+                    Flow matching's practical wins are real, but they mostly come from shipping
+                    <em>better defaults</em> for these knobs, plus a cleaner mental model that made new
+                    ideas (couplings, reflow, learning the flow map) easier to think of. The two frameworks
+                    genuinely part ways only when you leave the Gaussian case: arbitrary source
+                    distributions, data-to-data transport, manifolds, discrete tokens.
+                </p>
+
+                <p>
+                    This is a technical post. I'll assume you know denoising score matching and the
+                    probability flow ODE at the level of the <a href="score-matching-explained.html">previous
+                    post</a>. Everything else is derived here.
+                </p>
+
+                <blockquote>
+                    <p>"Flow matching is diffusion with the right defaults and a better story. The better story turned out to matter."</p>
+                </blockquote>
+
+                <h2><span class="sec-num">02<span class="dark-only"> //</span></span> THE SCORE SIDE IN ONE SCREEN</h2>
+
+                <p>
+                    One notation for the whole post. A <strong>Gaussian probability path</strong> mixes a
+                    data point $\mathbf{x}_0 \sim q$ with noise $\boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$:
+                </p>
+
+                <div class="math-block">
+                    $$\mathbf{x}_t = \alpha_t \mathbf{x}_0 + \sigma_t \boldsymbol{\epsilon}, \qquad t \in [0, 1]$$
+                </div>
+
+                <p>
+                    with $\alpha_0 = 1, \sigma_0 = 0$ (clean data) and $\alpha_1 \approx 0, \sigma_1 \approx 1$
+                    (pure noise). <strong>Time runs from data ($t=0$) to noise ($t=1$)</strong>, as in the
+                    score SDE paper and SD3. (Lipman et al. use the opposite direction; I've flipped their
+                    formulas to match.) The single most useful scalar is the <strong>log signal-to-noise
+                    ratio</strong>:
+                </p>
+
+                <div class="math-block">
+                    $$\lambda_t = \log \frac{\alpha_t^2}{\sigma_t^2}$$
+                </div>
+
+                <p>
+                    It decreases monotonically from $+\infty$ (data) to $-\infty$ (noise). Two schedules
+                    we'll keep coming back to:
+                </p>
+
+                <ul>
+                    <li><strong>Variance preserving (VP), cosine</strong>: $\alpha_t = \cos(\tfrac{\pi t}{2})$, $\sigma_t = \sin(\tfrac{\pi t}{2})$. The DDPM / improved-DDPM family.</li>
+                    <li><strong>Rectified flow (RF) / linear</strong>: $\alpha_t = 1 - t$, $\sigma_t = t$. The flow matching default.</li>
+                </ul>
+
+                <p>
+                    From the score side, we train $\mathbf{s}_\theta(\mathbf{x}, t) \approx \nabla_\mathbf{x} \log p_t(\mathbf{x})$
+                    with denoising score matching, then sample with the reverse SDE or the
+                    <strong>probability flow ODE</strong>. For the path above, the forward SDE has drift
+                    $f_t \mathbf{x}$ and diffusion $g_t$ with
+                </p>
+
+                <div class="math-block">
+                    $$f_t = \frac{\dot\alpha_t}{\alpha_t}, \qquad g_t^2 = \frac{d\sigma_t^2}{dt} - 2 f_t \sigma_t^2 = -\sigma_t^2 \dot\lambda_t$$
+                </div>
+
+                <p>
+                    and the probability flow ODE is
+                </p>
+
+                <div class="math-block">
+                    $$\frac{d\mathbf{x}}{dt} = f_t \mathbf{x} - \tfrac{1}{2} g_t^2 \, \nabla_\mathbf{x} \log p_t(\mathbf{x}) = \frac{\dot\alpha_t}{\alpha_t}\mathbf{x} + \frac{\sigma_t^2 \dot\lambda_t}{2} \nabla_\mathbf{x} \log p_t(\mathbf{x})$$
+                </div>
+
+                <p>
+                    Hold on to that last expression. It is going to reappear from a completely different
+                    direction.
+                </p>
+
+                <h2><span class="sec-num">03<span class="dark-only"> //</span></span> FLOW MATCHING FROM FIRST PRINCIPLES</h2>
+
+                <h3>Continuous normalizing flows, without the simulation</h3>
+
+                <p>
+                    A <strong>continuous normalizing flow</strong> (CNF) moves samples with an ODE
+                    $\frac{d\mathbf{x}}{dt} = \mathbf{u}_t(\mathbf{x})$. If $\mathbf{x}$ starts with density
+                    $p_1$, its density $p_t$ evolves by the <strong>continuity equation</strong>:
+                </p>
+
+                <div class="math-block">
+                    $$\partial_t p_t(\mathbf{x}) + \nabla \cdot \big(p_t(\mathbf{x})\, \mathbf{u}_t(\mathbf{x})\big) = 0$$
+                </div>
+
+                <p>
+                    CNFs were trained by maximum likelihood, which means integrating the ODE (and a
+                    divergence trace) inside every training step. Expensive and unstable. Flow matching
+                    (Lipman et al., 2023) flips the problem around: <em>pick</em> a probability path
+                    $p_t$ that connects noise to data, find a vector field $\mathbf{u}_t$ that generates it,
+                    and simply regress onto it:
+                </p>
+
+                <div class="math-block">
+                    $$\mathcal{L}_{FM}(\theta) = \mathbb{E}_{t,\, \mathbf{x} \sim p_t} \left\| \mathbf{v}_\theta(\mathbf{x}, t) - \mathbf{u}_t(\mathbf{x}) \right\|^2$$
+                </div>
+
+                <p>
+                    No ODE solves during training. The catch is the same one score matching hit in 2005:
+                    the target $\mathbf{u}_t(\mathbf{x})$ depends on the unknown data distribution.
+                </p>
+
+                <h3>The conditioning trick (again)</h3>
+
+                <p>
+                    Build the marginal path out of simple per-sample paths. For each data point
+                    $\mathbf{x}_0$, define a conditional path $p_t(\mathbf{x} | \mathbf{x}_0)$ with a known
+                    conditional field $\mathbf{u}_t(\mathbf{x} | \mathbf{x}_0)$. For our Gaussian path the
+                    conditional trajectory is $\mathbf{x}_t = \alpha_t \mathbf{x}_0 + \sigma_t \boldsymbol{\epsilon}$
+                    and its velocity is simply its time derivative:
+                </p>
+
+                <div class="math-block">
+                    $$\mathbf{u}_t(\mathbf{x}_t | \mathbf{x}_0) = \dot\alpha_t \mathbf{x}_0 + \dot\sigma_t \boldsymbol{\epsilon} \quad \xrightarrow{\text{RF}} \quad \boldsymbol{\epsilon} - \mathbf{x}_0$$
+                </div>
+
+                <p>
+                    Lipman et al. prove two facts. First, the <strong>marginal field</strong>, defined as
+                    the posterior average of conditional fields,
+                </p>
+
+                <div class="math-block">
+                    $$\mathbf{u}_t(\mathbf{x}) = \mathbb{E}\left[\, \mathbf{u}_t(\mathbf{x}_t | \mathbf{x}_0) \;\middle|\; \mathbf{x}_t = \mathbf{x} \right] = \dot\alpha_t\, \mathbb{E}[\mathbf{x}_0 | \mathbf{x}_t = \mathbf{x}] + \dot\sigma_t\, \mathbb{E}[\boldsymbol{\epsilon} | \mathbf{x}_t = \mathbf{x}]$$
+                </div>
+
+                <p>
+                    generates the marginal path $p_t$ (plug it into the continuity equation and the
+                    per-sample equations average out). Second, the <strong>conditional flow matching</strong>
+                    loss
+                </p>
+
+                <div class="math-block">
+                    $$\mathcal{L}_{CFM}(\theta) = \mathbb{E}_{t,\, \mathbf{x}_0,\, \boldsymbol{\epsilon}} \left\| \mathbf{v}_\theta(\mathbf{x}_t, t) - (\dot\alpha_t \mathbf{x}_0 + \dot\sigma_t \boldsymbol{\epsilon}) \right\|^2$$
+                </div>
+
+                <p>
+                    differs from $\mathcal{L}_{FM}$ by a constant that doesn't depend on $\theta$. The proof
+                    is three lines: expand both squares; the $\|\mathbf{v}_\theta\|^2$ terms match; the cross
+                    terms match by the tower property, because
+                    $\mathbb{E}[\langle \mathbf{v}_\theta(\mathbf{x}_t), \mathbf{u}_t(\mathbf{x}_t|\mathbf{x}_0)\rangle] = \mathbb{E}[\langle \mathbf{v}_\theta(\mathbf{x}_t), \mathbb{E}[\mathbf{u}_t(\mathbf{x}_t|\mathbf{x}_0)|\mathbf{x}_t]\rangle]$;
+                    what's left doesn't involve $\theta$.
+                </p>
+
+                <div class="info-box">
+                    <div class="info-title">DÉJÀ VU</div>
+                    <p>
+                        This is <em>exactly</em> Vincent's 2011 argument for denoising score matching.
+                        DSM regresses onto the conditional score $\nabla \log p(\mathbf{x}_t | \mathbf{x}_0)$,
+                        whose posterior mean is the marginal score. CFM regresses onto the conditional
+                        velocity, whose posterior mean is the marginal velocity. Same trick, different
+                        regression target. <strong>Both methods are least-squares estimators of a posterior
+                        mean</strong>, and that is the root of everything that follows.
+                    </p>
+                </div>
+
+                <h3>Rectified flow and stochastic interpolants</h3>
+
+                <p>
+                    Two concurrent papers reached the same place from other directions.
+                    <strong>Rectified flow</strong> (Liu, Gong &amp; Liu, 2023) starts from any coupling of
+                    two distributions, draws straight lines between paired points, and fits the velocity
+                    by least squares. Its distinctive contribution is <strong>reflow</strong>: re-pair the
+                    points using the trained ODE and train again. More on that in section 06.
+                    <strong>Stochastic interpolants</strong> (Albergo &amp; Vanden-Eijnden, 2023; Albergo,
+                    Boffi &amp; Vanden-Eijnden, 2023) generalize further:
+                </p>
+
+                <div class="math-block">
+                    $$\mathbf{x}_t = I(t, \mathbf{x}_0, \mathbf{x}_1) + \gamma_t \mathbf{z}, \qquad (\mathbf{x}_0, \mathbf{x}_1) \sim \pi(\mathbf{x}_0, \mathbf{x}_1), \quad \mathbf{z} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$$
+                </div>
+
+                <p>
+                    Any two endpoint distributions, any coupling $\pi$, any interpolation function, and an
+                    optional latent noise $\gamma_t \mathbf{z}$. The framework shows that the same
+                    marginals can be produced by an ODE <em>or</em> by a family of SDEs with tunable noise,
+                    and that both drifts are minimizers of simple quadratic losses. Gaussian-source flow
+                    matching is the special case $\mathbf{x}_1 = \boldsymbol{\epsilon}$, independent coupling,
+                    $\gamma_t = 0$.
+                </p>
+
+                <h2><span class="sec-num">04<span class="dark-only"> //</span></span> THE DICTIONARY: ONE POSTERIOR MEAN, FIVE OUTFITS</h2>
+
+                <p>
+                    Since $\mathbf{x}_t = \alpha_t \mathbf{x}_0 + \sigma_t \boldsymbol{\epsilon}$ holds exactly, the
+                    two posterior means are tied together:
+                    $\mathbf{x}_t = \alpha_t \hat{\mathbf{x}}_0 + \sigma_t \hat{\boldsymbol{\epsilon}}$, where
+                    $\hat{\mathbf{x}}_0 = \mathbb{E}[\mathbf{x}_0 | \mathbf{x}_t]$ and
+                    $\hat{\boldsymbol{\epsilon}} = \mathbb{E}[\boldsymbol{\epsilon} | \mathbf{x}_t]$. Given $\mathbf{x}_t$,
+                    <strong>one</strong> vector determines the other. And Tweedie's formula ties the score to
+                    the same object:
+                </p>
+
+                <div class="math-block">
+                    $$\nabla_\mathbf{x} \log p_t(\mathbf{x}_t) = -\frac{\hat{\boldsymbol{\epsilon}}}{\sigma_t} = -\frac{\mathbf{x}_t - \alpha_t \hat{\mathbf{x}}_0}{\sigma_t^2}$$
+                </div>
+
+                <p>
+                    So every popular network output is a fixed, time-dependent linear function of
+                    $(\mathbf{x}_t, \hat{\mathbf{x}}_0)$:
+                </p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Target</th>
+                            <th>Definition</th>
+                            <th>Optimal value</th>
+                            <th>Used by</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>$\mathbf{x}_0$</td>
+                            <td>clean data</td>
+                            <td>$\hat{\mathbf{x}}_0$</td>
+                            <td>EDM (via preconditioning), JiT</td>
+                        </tr>
+                        <tr>
+                            <td>$\boldsymbol{\epsilon}$</td>
+                            <td>noise</td>
+                            <td>$(\mathbf{x}_t - \alpha_t\hat{\mathbf{x}}_0)/\sigma_t$</td>
+                            <td>DDPM, SD 1.x</td>
+                        </tr>
+                        <tr>
+                            <td>score</td>
+                            <td>$\nabla \log p_t$</td>
+                            <td>$-\hat{\boldsymbol{\epsilon}}/\sigma_t$</td>
+                            <td>NCSN, score SDE</td>
+                        </tr>
+                        <tr>
+                            <td>$\mathbf{v}$</td>
+                            <td>$\alpha_t \boldsymbol{\epsilon} - \sigma_t \mathbf{x}_0$ (VP)</td>
+                            <td>$\alpha_t \hat{\boldsymbol{\epsilon}} - \sigma_t \hat{\mathbf{x}}_0$</td>
+                            <td>progressive distillation, SD 2.x</td>
+                        </tr>
+                        <tr>
+                            <td>$\mathbf{u}$</td>
+                            <td>$\dot\alpha_t \mathbf{x}_0 + \dot\sigma_t \boldsymbol{\epsilon}$</td>
+                            <td>$\dot\alpha_t \hat{\mathbf{x}}_0 + \dot\sigma_t \hat{\boldsymbol{\epsilon}}$</td>
+                            <td>flow matching, RF, SD3, &pi;<sub>0</sub></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p>
+                    $\mathbf{v}$ and $\mathbf{u}$ are close cousins: on the VP cosine path,
+                    $\mathbf{u} = \tfrac{\pi}{2}\mathbf{v}$ exactly, which is why $\mathbf{v}$-prediction is often
+                    described as "predicting the velocity". A perfectly trained network of one kind is a
+                    perfectly trained network of every other kind. Now substitute $\hat{\mathbf{x}}_0 = (\mathbf{x}_t + \sigma_t^2 \nabla \log p_t)/\alpha_t$
+                    into the velocity:
+                </p>
+
+                <div class="math-block">
+                    $$\mathbf{u}_t(\mathbf{x}) = \frac{\dot\alpha_t}{\alpha_t}\mathbf{x} + \left(\frac{\dot\alpha_t}{\alpha_t}\sigma_t^2 - \sigma_t\dot\sigma_t\right) \nabla_\mathbf{x} \log p_t(\mathbf{x}) = \frac{\dot\alpha_t}{\alpha_t}\mathbf{x} + \frac{\sigma_t^2 \dot\lambda_t}{2} \nabla_\mathbf{x} \log p_t(\mathbf{x})$$
+                </div>
+
+                <div class="info-box">
+                    <div class="info-title">THE PUNCHLINE</div>
+                    <p>
+                        This is the probability flow ODE from section 02, term for term. <strong>The
+                        flow matching velocity field <em>is</em> the probability flow drift.</strong>
+                        Training a Gaussian-path flow matching model trains a score model in a different
+                        parameterization; integrating its ODE is running the probability flow ODE. For
+                        rectified flow it simplifies to
+                        $$\mathbf{u}_t(\mathbf{x}) = -\frac{\mathbf{x} + t\, \nabla_\mathbf{x} \log p_t(\mathbf{x})}{1-t}$$
+                    </p>
+                </div>
+
+                <p>
+                    One more consequence that matters in practice: <strong>the schedule itself is mostly a
+                    change of coordinates</strong>. Two Gaussian paths with the same $\lambda$ range differ
+                    only by a rescaling $\mathbf{x} \mapsto \mathbf{x}/(\alpha_t + \sigma_t)$ and a
+                    reparameterization of time. For RF, $\lambda_t = 2\log\frac{1-t}{t}$, i.e.
+                    $t = \text{sigmoid}(-\lambda/2)$. The linear path is one more point in the space of noise
+                    schedules diffusion people already explored, not a new kind of object (Kingma &amp; Gao,
+                    2023; Gao et al., 2024).
+                </p>
+
+                <h2><span class="sec-num">05<span class="dark-only"> //</span></span> LOSSES ARE WEIGHTED ELBOs</h2>
+
+                <p>
+                    If the optimal networks coincide, the losses must differ only in <em>how they weight
+                    errors at each noise level</em>. Let's make that precise. Write every loss in terms of the
+                    error of an implied $\hat{\boldsymbol{\epsilon}}$. Since all targets are linear in
+                    $\hat{\boldsymbol{\epsilon}}$ given $\mathbf{x}_t$, an error $\delta\boldsymbol{\epsilon}$ becomes
+                    a scaled error in every other target. Using $\sigma_t / \alpha_t = e^{-\lambda/2}$:
+                </p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Loss on</th>
+                            <th>Error relation</th>
+                            <th>Weight on $\|\delta\boldsymbol{\epsilon}\|^2$</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>$\boldsymbol{\epsilon}$-MSE</td>
+                            <td>$\delta\boldsymbol{\epsilon}$</td>
+                            <td>$1$</td>
+                        </tr>
+                        <tr>
+                            <td>$\mathbf{x}_0$-MSE</td>
+                            <td>$\delta\mathbf{x}_0 = -\tfrac{\sigma_t}{\alpha_t}\delta\boldsymbol{\epsilon}$</td>
+                            <td>$e^{-\lambda}$</td>
+                        </tr>
+                        <tr>
+                            <td>$\mathbf{v}$-MSE (VP)</td>
+                            <td>$\delta\mathbf{v} = \delta\boldsymbol{\epsilon}/\alpha_t$</td>
+                            <td>$1 + e^{-\lambda}$</td>
+                        </tr>
+                        <tr>
+                            <td>$\mathbf{u}$-MSE (RF)</td>
+                            <td>$\delta\mathbf{u} = (1 + \tfrac{\sigma_t}{\alpha_t})\delta\boldsymbol{\epsilon}$</td>
+                            <td>$(1 + e^{-\lambda/2})^2$</td>
+                        </tr>
+                        <tr>
+                            <td>DSM with $\lambda(\sigma) = \sigma^2$</td>
+                            <td>$\delta\mathbf{s} = -\delta\boldsymbol{\epsilon}/\sigma_t$</td>
+                            <td>$1$</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p>
+                    That's half the story. The other half is <strong>which noise levels you sample</strong>.
+                    Training draws $t$ from some density, which induces a density $p(\lambda)$ over
+                    log-SNR. The full objective is
+                </p>
+
+                <div class="math-block">
+                    $$\mathcal{L} = \int p(\lambda)\, w(\lambda)\; \mathbb{E}\left\| \hat{\boldsymbol{\epsilon}}_\theta(\mathbf{x}_\lambda, \lambda) - \boldsymbol{\epsilon} \right\|^2 d\lambda$$
+                </div>
+
+                <p>
+                    and only the product $p(\lambda)\,w(\lambda)$ matters for the <em>expected</em> gradient.
+                </p>
+
+                <div class="info-box">
+                    <div class="info-title">SAME TARGET, DIFFERENT NOISE</div>
+                    <p>
+                        If only the product matters, is raising the weight the same as sampling more often?
+                        In expectation, yes. In a finite minibatch, no: the split is a choice of Monte Carlo
+                        estimator. Moving emphasis into $w$ means rare samples with large weights, so the
+                        gradient is spiky; moving it into $p$ means more samples at that level, each with
+                        an ordinary weight. This is importance sampling: for a fixed product, the variance
+                        is lowest when $p(\lambda)$ follows the product itself (scaled by how noisy the
+                        per-level gradients are), leaving $w/p$ close to flat. Adam makes this sharper still:
+                        its per-parameter normalization is calibrated by the typical gradient, so occasional
+                        heavily weighted samples either get washed out or destabilize the second-moment
+                        estimate. That's why modern recipes like SD3's prefer to change the
+                        <strong>sampling density</strong> and keep the per-sample loss simple.
+                    </p>
+                </div>
+
+                <p>
+                    Let's compute the product for vanilla rectified flow, $t \sim \mathcal{U}[0, 1]$. From
+                    $t = \text{sigmoid}(-\lambda/2)$:
+                </p>
+
+                <div class="math-block">
+                    $$p(\lambda) = \left|\frac{dt}{d\lambda}\right| = \frac{1}{8}\,\text{sech}^2\!\left(\frac{\lambda}{4}\right), \qquad w(\lambda) = (1 + e^{-\lambda/2})^2 = 4 e^{-\lambda/2}\cosh^2\!\left(\frac{\lambda}{4}\right)$$
+                </div>
+
+                <div class="math-block">
+                    $$\Longrightarrow \quad p(\lambda)\, w(\lambda) = \tfrac{1}{2} e^{-\lambda/2}$$
+                </div>
+
+                <p>
+                    The cosh terms cancel exactly. Vanilla rectified flow is $\boldsymbol{\epsilon}$-prediction
+                    with an effective weight $e^{-\lambda/2}$, which <strong>decreases monotonically</strong>
+                    with SNR. That brings us to Kingma &amp; Gao (2023), the most underrated paper in this
+                    whole story.
+                </p>
+
+                <div class="info-box">
+                    <div class="info-title">KINGMA &amp; GAO, IN ONE SENTENCE</div>
+                    <p>
+                        Every weighted diffusion loss is an integral of ELBOs over noise levels, and when the
+                        effective weight is <strong>monotonically decreasing in $\lambda$</strong>, the loss is
+                        exactly the ELBO of the data under Gaussian-noise data augmentation. Rectified
+                        flow's $e^{-\lambda/2}$ is monotone, so vanilla flow matching is a likelihood
+                        objective in disguise. Their Table 1 lists the same $e^{-\lambda/2}$ for
+                        $\mathbf{v}$-prediction with the cosine schedule (another quiet equivalence), while
+                        $\boldsymbol{\epsilon}$-prediction with the cosine schedule ($\text{sech}(\lambda/2)$) and
+                        EDM ($\mathcal{N}(\lambda; 2.4, 2.4^2)(e^{-\lambda} + 0.52)$) are not monotone. They then
+                        reached state-of-the-art ImageNet FIDs while searching only over monotone weightings.
+                    </p>
+                </div>
+
+                <p>
+                    Now look at what SD3 actually ships. Esser et al. (2024) ran a large sweep of
+                    formulations and timestep samplers for text-to-image and the winner was rectified flow
+                    with <strong>logit-normal timestep sampling</strong>: $\text{logit}(t) \sim \mathcal{N}(m, s^2)$.
+                    Since $\text{logit}(t) = -\lambda/2$, that is simply
+                </p>
+
+                <div class="math-block">
+                    $$\lambda \sim \mathcal{N}(-2m,\; 4s^2)$$
+                </div>
+
+                <p>
+                    With their default $m=0, s=1$, $\lambda$ has standard deviation 2. Uniform $t$ gives a
+                    logistic density in $\lambda$ with standard deviation $2\pi/\sqrt{3} \approx 3.6$. So the
+                    famous trick is: <strong>spend less compute on the nearly-clean and nearly-pure-noise
+                    ends, and concentrate it around $\lambda \approx 0$</strong>, where the network decides
+                    what the image actually contains. The effective weight is no longer monotone, so this is
+                    a deliberate move away from likelihood toward perceptual quality.
+                </p>
+
+                <p>
+                    The same lens explains a whole shelf of papers. Min-SNR weighting (Hang et al., 2023)
+                    clips $w$ at high SNR. EDM samples $\log\sigma \sim \mathcal{N}(-1.2, 1.2^2)$, a
+                    Gaussian in $\lambda$ again. Lee et al. (2024) use a U-shaped timestep density for
+                    reflow, putting mass at <em>both</em> ends because a near-straight flow's errors live there.
+                    &pi;<sub>0</sub> uses a Beta distribution that favors the noisy end for actions.
+                    Different papers, one function being tuned: $p(\lambda)w(\lambda)$.
+                </p>
+
+                <h2><span class="sec-num">06<span class="dark-only"> //</span></span> GEOMETRY: THE MYTH OF STRAIGHT PATHS</h2>
+
+                <p>
+                    The most repeated claim about flow matching is that its paths are straight, so it
+                    samples in fewer steps. The <em>conditional</em> paths are straight: each
+                    $\mathbf{x}_t = (1-t)\mathbf{x}_0 + t\boldsymbol{\epsilon}$ is a line segment. The
+                    <em>marginal</em> ODE, the thing you actually integrate, is not, and there's a clean way
+                    to see exactly when it bends.
+                </p>
+
+                <h3>Curvature is the posterior changing its mind</h3>
+
+                <p>
+                    Along an RF trajectory, $\mathbf{x}_t = (1-t)\hat{\mathbf{x}}_0 + t\hat{\boldsymbol{\epsilon}}$
+                    and $\dot{\mathbf{x}}_t = \hat{\boldsymbol{\epsilon}} - \hat{\mathbf{x}}_0$, where the hats are
+                    evaluated along the path. Differentiate the first identity and subtract the second:
+                    $(1-t)\dot{\hat{\mathbf{x}}}_0 + t\dot{\hat{\boldsymbol{\epsilon}}} = 0$. Then
+                </p>
+
+                <div class="math-block">
+                    $$\ddot{\mathbf{x}}_t = \dot{\hat{\boldsymbol{\epsilon}}} - \dot{\hat{\mathbf{x}}}_0 = -\frac{1}{t}\,\frac{d\hat{\mathbf{x}}_0}{dt}$$
+                </div>
+
+                <p>
+                    <strong>The path accelerates exactly when the denoiser's estimate of the clean sample
+                    changes.</strong> At high noise, $\hat{\mathbf{x}}_0$ is a blurry average of everything
+                    plausible. As noise drops, the posterior commits to one mode, $\hat{\mathbf{x}}_0$ swings
+                    toward it, and the trajectory turns. With multimodal data and an independent coupling,
+                    that turn is unavoidable: ODE trajectories cannot cross, while the straight conditional
+                    lines they average over cross all the time.
+                </p>
+
+                <p>
+                    The same view explains why Gao et al. (2024) found that VP paths can be
+                    <em>straighter</em> than RF paths on some data: straightness is a property of how
+                    $\hat{\mathbf{x}}_0$ evolves along the path, which depends on the data distribution and
+                    the schedule together, not on the conditional paths being lines.
+                </p>
+
+                <h3>Euler on rectified flow is DDIM</h3>
+
+                <p>
+                    The DDIM update freezes the current predictions and jumps along the path:
+                    $\mathbf{x}_s = \alpha_s \hat{\mathbf{x}}_0 + \sigma_s \hat{\boldsymbol{\epsilon}}$. Under RF,
+                    one Euler step from $t$ to $s$ gives
+                </p>
+
+                <div class="math-block">
+                    $$\mathbf{x}_s = \mathbf{x}_t + (s - t)(\hat{\boldsymbol{\epsilon}} - \hat{\mathbf{x}}_0) = (1-s)\hat{\mathbf{x}}_0 + s\hat{\boldsymbol{\epsilon}}$$
+                </div>
+
+                <p>
+                    which is the DDIM update with the RF schedule. And because DDIM depends on the schedule
+                    only through the noise-to-signal ratio at each step, <strong>DDIM on any Gaussian
+                    schedule is Euler on the RF ODE</strong> after rescaling $\mathbf{x}$ by
+                    $1/(\alpha_t + \sigma_t)$ and mapping time to $\sigma_t/(\alpha_t + \sigma_t)$. A lot of
+                    "flow matching samples faster" is "people stopped using the plain Euler–Maruyama DDPM
+                    sampler and started using what amounts to DDIM". DDIM is exact whenever
+                    $\hat{\mathbf{x}}_0$ stays constant, which by the identity above is precisely when the
+                    path is straight.
+                </p>
+
+                <h3>What actually straightens paths: the coupling</h3>
+
+                <p>
+                    If curvature comes from posterior uncertainty about which $\mathbf{x}_0$ a noise sample
+                    belongs to, the fix is to reduce that uncertainty, by choosing <em>which</em> noise goes
+                    with <em>which</em> data point during training.
+                </p>
+
+                <ul>
+                    <li><strong>Minibatch optimal transport</strong> (Tong et al., 2024; Pooladian et al., 2023): pair noise and data within each batch by solving a small OT problem. Conditional lines cross less, so the marginal field bends less. Effective in low dimensions; the benefit fades as batch size becomes tiny relative to the data's complexity.</li>
+                    <li><strong>Reflow</strong> (Liu et al., 2023): integrate the trained ODE to get deterministic pairs $(\boldsymbol{\epsilon}, \text{ODE}(\boldsymbol{\epsilon}))$, then train a new flow on those pairs. Because the pairs come from a flow, their lines don't cross in the limit, and the new flow is straighter with provably non-increasing transport cost. Lee et al. (2024) showed one round is nearly enough, if you fix the timestep density and the loss (U-shaped $t$, LPIPS-Huber).</li>
+                    <li><strong>Distill the flow map</strong> instead of straightening the field. That is the consistency / MeanFlow family in section 09.</li>
+                </ul>
+
+                <h3>See it</h3>
+
+                <p>
+                    For a Gaussian mixture, $\hat{\mathbf{x}}_0$ is available in closed form, so we can draw
+                    the <em>exact</em> marginal ODE with no training. Each particle below starts from
+                    the same noise. The faint wide curve is the true trajectory (RK4, 400 steps); the thin colored
+                    polyline is what an $N$-step sampler actually does. Read the endpoint error and the
+                    straightness ratio (chord length over arc length; 1.00 is a perfect line).
+                </p>
+
+                <figure class="fm-demo" id="fm-demo">
+                    <canvas id="fm-canvas" width="720" height="460" aria-label="Interactive plot of flow trajectories from noise to a Gaussian mixture"></canvas>
+                    <div class="fm-controls">
+                        <label>Data
+                            <select id="fm-data">
+                                <option value="ring">8-mode ring</option>
+                                <option value="two">two modes</option>
+                                <option value="wide">one wide Gaussian</option>
+                            </select>
+                        </label>
+                        <label>Schedule
+                            <select id="fm-sched">
+                                <option value="rf">rectified flow (linear)</option>
+                                <option value="vp">VP cosine</option>
+                            </select>
+                        </label>
+                        <label>Sampler
+                            <select id="fm-solver">
+                                <option value="euler">Euler in t</option>
+                                <option value="ddim">DDIM</option>
+                            </select>
+                        </label>
+                        <label>Steps <span id="fm-steps-val">4</span>
+                            <input type="range" id="fm-steps" min="1" max="32" value="4">
+                        </label>
+                    </div>
+                    <div class="fm-stats" id="fm-stats"></div>
+                    <figcaption>
+                        Three things to try. (1) Under rectified flow, "Euler in t" and "DDIM" print identical
+                        numbers: they are the same algorithm. (2) Switch the schedule to VP cosine: the exact
+                        paths get <em>straighter</em> in space (on the ring, chord/arc goes from about 0.72 to
+                        0.83, matching Gao et al.'s observation), yet DDIM's error barely moves, because DDIM
+                        sees the schedule only through its time grid. Spatial straightness of the path is not
+                        what limits the sampler. (3) Whatever you pick, the ring needs roughly 16 steps for
+                        small error, because the posterior has to choose among eight modes. The data and the
+                        coupling set the difficulty; the schedule mostly reshuffles it.
+                    </figcaption>
+                </figure>
+
+                <h2><span class="sec-num">07<span class="dark-only"> //</span></span> STOCHASTICITY: ODE vs SDE</h2>
+
+                <p>
+                    Flow matching models are usually sampled deterministically, but nothing forces that.
+                    For any $\beta_t \ge 0$, the reverse-time SDE
+                </p>
+
+                <div class="math-block">
+                    $$d\mathbf{x} = \left[\mathbf{u}_t(\mathbf{x}) - \frac{\beta_t^2}{2}\nabla_\mathbf{x}\log p_t(\mathbf{x})\right]dt + \beta_t\, d\bar{\mathbf{w}}$$
+                </div>
+
+                <p>
+                    (integrated from $t=1$ down to $0$) has the same marginals $p_t$: the extra drift and the
+                    injected noise cancel in the Fokker–Planck equation. $\beta_t = 0$ is the flow ODE;
+                    $\beta_t = g_t$ is Anderson's reverse SDE; anything in between is EDM's "churn". With a
+                    Gaussian source, the score comes free from the velocity via the identity in section 04,
+                    so <strong>every flow matching model is also an SDE sampler</strong>, and every diffusion
+                    model is also a flow.
+                </p>
+
+                <p>
+                    Why would you want noise? Because the network is never perfect. A deterministic ODE
+                    carries every early error to the end, while the Langevin-like part of the SDE pulls
+                    the sample distribution back toward $p_t$ at each step. Albergo, Boffi &amp;
+                    Vanden-Eijnden make this precise: with stochastic dynamics, the KL divergence of the
+                    generated distribution is controlled by the quadratic training losses; for the
+                    deterministic ODE that control is much weaker. The price is that stochastic samplers need
+                    more steps; at very low step counts the ODE wins.
+                </p>
+
+                <p>
+                    One modern reason to care: <strong>RL fine-tuning</strong>. Policy-gradient methods need a
+                    stochastic policy with tractable step likelihoods, and a deterministic ODE has neither.
+                    Flow-GRPO (Liu et al., 2025) converts the flow ODE into an equivalent-marginal SDE exactly
+                    as above, which turns each denoising step into a Gaussian policy step that GRPO can
+                    optimize.
+                </p>
+
+                <h2><span class="sec-num">08<span class="dark-only"> //</span></span> IN PRACTICE: WHAT MATTERS AT SCALE</h2>
+
+                <h3>Timestep density and the resolution shift</h3>
+
+                <p>
+                    At higher resolution, the same per-pixel noise destroys <em>less</em> information: average
+                    a $2\times 2$ block of pixels and the noise standard deviation halves while the signal
+                    stays, so the coarse structure has 4&times; the SNR. Hoogeboom et al. (2023) argued the
+                    schedule should shift the SNR by the ratio of resolutions squared; SD3 shifts timesteps by
+                </p>
+
+                <div class="math-block">
+                    $$t' = \frac{a\, t}{1 + (a - 1)\, t}, \qquad a = \sqrt{m/n}$$
+                </div>
+
+                <p>
+                    where $m/n$ is the ratio of pixel counts (they use $a = 3$ at $1024^2$). In log-SNR this
+                    is a pure translation: $\text{logit}(t') = \text{logit}(t) + \log a$, i.e.
+                </p>
+
+                <div class="math-block">
+                    $$\lambda' = \lambda - \log\frac{m}{n}$$
+                </div>
+
+                <p>
+                    which is <em>exactly</em> Hoogeboom's rule. The two recipes are the same idea, written in
+                    different coordinates. Video models apply the same shift for the extra frames. The
+                    lesson is general: <strong>specify noise in $\lambda$, and shift it when the data's
+                    redundancy changes.</strong>
+                </p>
+
+                <h3>Prediction targets and numerical conditioning</h3>
+
+                <p>
+                    All targets have the same optimum but very different <em>error amplification</em>, and that
+                    is where real differences appear:
+                </p>
+
+                <ul>
+                    <li><strong>$\boldsymbol{\epsilon}$-prediction breaks at the noisy end.</strong> Recovering $\hat{\mathbf{x}}_0 = (\mathbf{x}_t - \sigma_t\hat{\boldsymbol{\epsilon}})/\alpha_t$ divides by $\alpha_t \to 0$. At exactly zero terminal SNR it's undefined, which is why common DDPM schedules left residual signal at $t=1$, and why models trained that way can't make very dark or very bright images (Lin et al., 2024). Their fix: zero terminal SNR plus $\mathbf{v}$-prediction.</li>
+                    <li><strong>$\mathbf{x}_0$-prediction breaks at the clean end</strong>, symmetrically: $\hat{\boldsymbol{\epsilon}}$ divides by $\sigma_t \to 0$.</li>
+                    <li><strong>$\mathbf{v}$ and $\mathbf{u}$ are bounded at both ends.</strong> $\mathbf{u} = \boldsymbol{\epsilon} - \mathbf{x}_0$ has the same scale everywhere. That alone makes flow matching a robust default, which is a big part of why it "just works". EDM's preconditioning ($c_\text{skip}, c_\text{out}$) achieves the same conditioning in a diffusion parameterization.</li>
+                    <li><strong>In very high dimensions, predict the data.</strong> Li &amp; He (2025) train plain ViTs on raw pixels with large patches (JiT). Under the manifold hypothesis, clean images live on a low-dimensional manifold, while $\boldsymbol{\epsilon}$ and $\mathbf{v}$ are full-dimensional; a network whose width is smaller than the patch dimension simply cannot output them. $\mathbf{x}_0$-prediction works there where $\boldsymbol{\epsilon}$- and $\mathbf{v}$-prediction fail badly. Prediction target and loss space are separate choices: you can predict $\mathbf{x}_0$ and still compute the loss on the implied velocity.</li>
+                </ul>
+
+                <h3>Guidance carries over exactly</h3>
+
+                <p>
+                    The velocity is affine in the score, and the affine part $\frac{\dot\alpha_t}{\alpha_t}\mathbf{x}$
+                    does not depend on the condition $\mathbf{c}$. So
+                </p>
+
+                <div class="math-block">
+                    $$\mathbf{u}_t(\mathbf{x}|\mathbf{c}) - \mathbf{u}_t(\mathbf{x}|\varnothing) = \frac{\sigma_t^2\dot\lambda_t}{2}\Big(\nabla\log p_t(\mathbf{x}|\mathbf{c}) - \nabla\log p_t(\mathbf{x})\Big)$$
+                </div>
+
+                <p>
+                    and classifier-free guidance on velocities, $\tilde{\mathbf{u}} = \mathbf{u}_\varnothing + w(\mathbf{u}_\mathbf{c} - \mathbf{u}_\varnothing)$,
+                    is <em>identical</em> to CFG on scores. All the folklore about guidance scales,
+                    oversaturation and guidance intervals transfers unchanged.
+                </p>
+
+                <h3>Robotics: why action generation moved to flow matching</h3>
+
+                <p>
+                    Diffusion Policy (Chi et al., 2023) generated robot action sequences with a DDPM-style
+                    $\boldsymbol{\epsilon}$-prediction model and showed that diffusion handles the
+                    multimodality of demonstrations far better than regression. &pi;<sub>0</sub> (Black et al.,
+                    2024) uses flow matching instead: a separate "action expert" attached to a VLM backbone
+                    predicts the velocity for a 50-step action chunk, integrated with <strong>10 Euler
+                    steps</strong>, at up to 50 Hz control. Its timestep density is a Beta distribution that
+                    emphasizes the <em>noisy</em> end, the opposite of image models' bias toward the middle.
+                </p>
+
+                <p>
+                    Through the lens of this post, every one of those choices is one of the four knobs. The
+                    bounded $\mathbf{u}$ target makes training robust. Euler on RF is DDIM, so 10 steps behave
+                    like a well-tuned 10-step DDIM. And the Beta density is a statement about where the hard
+                    decisions are: once the robot's observations are in context, the fine detail of an
+                    action chunk is nearly determined; what's hard is choosing the <em>mode</em> (go left or
+                    right around the cup), and that choice happens at low SNR. (That last interpretation is
+                    mine, not the paper's.)
+                </p>
+
+                <div class="info-box">
+                    <div class="info-title">DRAFT NOTE FOR HAO</div>
+                    <p>
+                        Space for your own perspective from VLA work: latency budgets, how many steps you
+                        can afford on-vehicle, whether trajectory generation looks more like images or like
+                        &pi;<sub>0</sub>'s actions. Remove this box before publishing.
+                    </p>
+                </div>
+
+                <h2><span class="sec-num">09<span class="dark-only"> //</span></span> A UNIFYING LENS ON IMPROVEMENTS</h2>
+
+                <p>
+                    With the equivalence in hand, most improvements from either camp sort into four knobs,
+                    plus one genuinely new direction.
+                </p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Knob</th>
+                            <th>Methods</th>
+                            <th>Why it works</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Path / coupling</td>
+                            <td>OT-CFM, multisample FM, reflow, Schrödinger bridges</td>
+                            <td>Reduce posterior uncertainty about $\mathbf{x}_0$, so $\hat{\mathbf{x}}_0$ moves less and paths bend less.</td>
+                        </tr>
+                        <tr>
+                            <td>Prediction target</td>
+                            <td>$\mathbf{v}$-pred, EDM preconditioning, RF's $\mathbf{u}$, JiT's $\mathbf{x}_0$</td>
+                            <td>Keep the network's output well-scaled at every noise level and inside what the architecture can represent.</td>
+                        </tr>
+                        <tr>
+                            <td>Weighting &times; density</td>
+                            <td>logit-normal, Min-SNR, EDM log-normal, U-shaped, resolution shift</td>
+                            <td>Put capacity on the noise levels that matter for the metric you care about. Monotone weights are ELBOs; others trade likelihood for perception.</td>
+                        </tr>
+                        <tr>
+                            <td>Sampler</td>
+                            <td>DDIM, DPM-Solver, Heun, churn</td>
+                            <td>Higher-order or exponential integrators exploit the semi-linear structure; noise injection corrects accumulated error.</td>
+                        </tr>
+                        <tr>
+                            <td>Learn the flow map</td>
+                            <td>consistency models, sCM, shortcut models, MeanFlow</td>
+                            <td>Learn the <em>integral</em> of the field, not the field. Few-step quality no longer depends on straightness.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>The new direction: learn the integral, not the derivative</h3>
+
+                <p>
+                    Everything so far learns the instantaneous velocity $\mathbf{u}_t(\mathbf{x})$ and leaves
+                    integration to a solver. The flow-map family learns the solver's output directly: a
+                    function $\mathbf{X}_\theta(\mathbf{x}_t, t, s)$ that maps a point at time $t$ to where the
+                    ODE would put it at time $s$.
+                </p>
+
+                <ul>
+                    <li><strong>Consistency models</strong> (Song et al., 2023) learn the map straight to $s = 0$ by enforcing that all points on one trajectory map to the same output. <strong>sCM</strong> (Lu &amp; Song, 2025) makes the continuous-time version stable, partly through a "TrigFlow" parameterization that unifies EDM and flow matching, and scales it to 1.5B parameters with 2-step sampling.</li>
+                    <li><strong>Shortcut models</strong> (Frans et al., 2025) condition the network on the step size $d$ and enforce self-consistency: two steps of size $d$ equal one step of size $2d$.</li>
+                    <li><strong>MeanFlow</strong> (Geng et al., 2025) learns the <em>average</em> velocity $\bar{\mathbf{u}}(\mathbf{x}_t, s, t) = \frac{1}{t-s}\int_s^t \mathbf{u}_\tau\, d\tau$. Differentiating the definition gives an identity, $\bar{\mathbf{u}} = \mathbf{u} - (t-s)\frac{d}{dt}\bar{\mathbf{u}}$, that the network is trained to satisfy using a Jacobian-vector product, from scratch, with no distillation. It reaches FID 3.43 on ImageNet 256 with a single network evaluation.</li>
+                </ul>
+
+                <p>
+                    Notice how naturally these are phrased in flow language: velocities, average
+                    velocities, step sizes. That's the real legacy of flow matching. It didn't change what
+                    the model learns in the Gaussian case, but it gave us coordinates in which the next idea
+                    is easier to see.
+                </p>
+
+                <p>
+                    One family sits outside the knobs entirely: <strong>representation alignment</strong>
+                    (REPA, Yu et al., 2025) adds a loss that aligns intermediate features with a pretrained
+                    encoder like DINOv2, and speeds up training of both diffusion and flow transformers by a
+                    large factor. It changes what the network learns internally, not the generative
+                    framework, which is another reminder that the framework is rarely the bottleneck.
+                </p>
+
+                <h2><span class="sec-num">10<span class="dark-only"> //</span></span> WHERE THEY GENUINELY DIFFER</h2>
+
+                <p>
+                    Everything above assumed a Gaussian source and an independent coupling. Remove those
+                    and the two frameworks stop being the same:
+                </p>
+
+                <ul>
+                    <li><strong>Data-to-data transport.</strong> Image-to-image translation, super-resolution from a low-res source, mapping one cell population to another: the source is not Gaussian, so there is no "score of the noised data" to speak of. Flow matching and stochastic interpolants handle any pair of distributions and any coupling directly; diffusion needs bridge constructions to do the same.</li>
+                    <li><strong>Manifolds.</strong> Riemannian flow matching (Chen &amp; Lipman, 2024) needs only geodesics or a premetric on the manifold, and stays simulation-free on simple geometries. Riemannian diffusion requires heat kernels or simulation.</li>
+                    <li><strong>Discrete data.</strong> Discrete flow matching (Gat et al., 2024) builds probability paths over tokens with continuous-time Markov chains, alongside masked diffusion models. Here the "same model, different knobs" equivalence doesn't straightforwardly apply, and the design space is still being mapped.</li>
+                    <li><strong>When you need the score itself.</strong> Langevin correction steps, energy-based composition, guidance by an external likelihood, exact SDE likelihoods: these need $\nabla\log p_t$. With a Gaussian source you can always recover it from $\mathbf{u}$; with an arbitrary source you can't.</li>
+                </ul>
+
+                <h2><span class="sec-num">11<span class="dark-only"> //</span></span> TAKEAWAYS</h2>
+
+                <ol>
+                    <li><strong>Same model, different knobs.</strong> With a Gaussian source, the flow matching velocity is the probability flow drift: $\mathbf{u}_t = \frac{\dot\alpha_t}{\alpha_t}\mathbf{x} + \frac{\sigma_t^2\dot\lambda_t}{2}\nabla\log p_t$.</li>
+                    <li><strong>Losses are weighted ELBOs.</strong> Compare objectives by $p(\lambda)w(\lambda)$. Vanilla RF is $\boldsymbol{\epsilon}$-MSE with weight $e^{-\lambda/2}$, a monotone, likelihood-flavored weighting; logit-normal is a deliberate move toward mid-SNR.</li>
+                    <li><strong>Straightness is about the coupling, not the line.</strong> Paths bend when $\hat{\mathbf{x}}_0$ changes. Euler on RF is DDIM. Real straightening needs OT couplings, reflow, or learning the flow map.</li>
+                    <li><strong>Defaults matter more than frameworks.</strong> If you're starting fresh: $\mathbf{u}$ or $\mathbf{v}$ target (or $\mathbf{x}_0$ in very high-dimensional pixel space), logit-normal timesteps with a resolution shift, Euler or a second-order ODE solver, CFG on velocities, and a stochastic sampler if you have the step budget or need RL.</li>
+                    <li><strong>Reach for flow language when you leave the Gaussian world</strong>: data-to-data, manifolds, discrete tokens, flow maps. That's where it's more than a renaming.</li>
+                </ol>
+
+                <p>
+                    In the previous post, two communities converged on the score from opposite directions. This
+                    time the convergence happened again, one level up: flow matching people rediscovered
+                    diffusion through ODEs and optimal transport, diffusion people recognized their own
+                    probability flow ODE, and both are now better for it.
+                </p>
+
+                <h2><span class="sec-num">12<span class="dark-only"> //</span></span> REFERENCES</h2>
+
+                <div class="references">
+                    <ol class="ref-list">
+                        <li id="ref-1">
+                            <span class="ref-authors">Lipman, Y., Chen, R. T. Q., Ben-Hamu, H., Nickel, M. &amp; Le, M.</span>
+                            <span class="ref-title">Flow Matching for Generative Modeling.</span>
+                            <span class="ref-venue">ICLR 2023.</span>
+                            <a href="https://arxiv.org/abs/2210.02747" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-2">
+                            <span class="ref-authors">Liu, X., Gong, C. &amp; Liu, Q.</span>
+                            <span class="ref-title">Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow.</span>
+                            <span class="ref-venue">ICLR 2023.</span>
+                            <a href="https://arxiv.org/abs/2209.03003" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-3">
+                            <span class="ref-authors">Albergo, M. S. &amp; Vanden-Eijnden, E.</span>
+                            <span class="ref-title">Building Normalizing Flows with Stochastic Interpolants.</span>
+                            <span class="ref-venue">ICLR 2023.</span>
+                            <a href="https://arxiv.org/abs/2209.15571" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-4">
+                            <span class="ref-authors">Albergo, M. S., Boffi, N. M. &amp; Vanden-Eijnden, E.</span>
+                            <span class="ref-title">Stochastic Interpolants: A Unifying Framework for Flows and Diffusions.</span>
+                            <span class="ref-venue">arXiv:2303.08797, 2023.</span>
+                            <a href="https://arxiv.org/abs/2303.08797" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-5">
+                            <span class="ref-authors">Lipman, Y., Havasi, M., Holderrieth, P., Shaul, N., Le, M., et al.</span>
+                            <span class="ref-title">Flow Matching Guide and Code.</span>
+                            <span class="ref-venue">arXiv:2412.06264, 2024.</span>
+                            <a href="https://arxiv.org/abs/2412.06264" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-6">
+                            <span class="ref-authors">Song, Y., Sohl-Dickstein, J., Kingma, D. P., Kumar, A., Ermon, S. &amp; Poole, B.</span>
+                            <span class="ref-title">Score-Based Generative Modeling through Stochastic Differential Equations.</span>
+                            <span class="ref-venue">ICLR 2021.</span>
+                            <a href="https://arxiv.org/abs/2011.13456" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-7">
+                            <span class="ref-authors">Vincent, P.</span>
+                            <span class="ref-title">A Connection Between Score Matching and Denoising Autoencoders.</span>
+                            <span class="ref-venue">Neural Computation, 23(7), 2011.</span>
+                            <a href="https://doi.org/10.1162/NECO_a_00142" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-8">
+                            <span class="ref-authors">Kingma, D. P., Salimans, T., Poole, B. &amp; Ho, J.</span>
+                            <span class="ref-title">Variational Diffusion Models.</span>
+                            <span class="ref-venue">NeurIPS 2021.</span>
+                            <a href="https://arxiv.org/abs/2107.00630" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-9">
+                            <span class="ref-authors">Kingma, D. P. &amp; Gao, R.</span>
+                            <span class="ref-title">Understanding Diffusion Objectives as the ELBO with Simple Data Augmentation.</span>
+                            <span class="ref-venue">NeurIPS 2023.</span>
+                            <a href="https://arxiv.org/abs/2303.00848" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-10">
+                            <span class="ref-authors">Gao, R., Hoogeboom, E., Heek, J., De Bortoli, V., Murphy, K. P. &amp; Salimans, T.</span>
+                            <span class="ref-title">Diffusion Meets Flow Matching: Two Sides of the Same Coin.</span>
+                            <span class="ref-venue">Blog post, 2024.</span>
+                            <a href="https://diffusionflow.github.io/" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-11">
+                            <span class="ref-authors">Song, J., Meng, C. &amp; Ermon, S.</span>
+                            <span class="ref-title">Denoising Diffusion Implicit Models.</span>
+                            <span class="ref-venue">ICLR 2021.</span>
+                            <a href="https://arxiv.org/abs/2010.02502" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-12">
+                            <span class="ref-authors">Salimans, T. &amp; Ho, J.</span>
+                            <span class="ref-title">Progressive Distillation for Fast Sampling of Diffusion Models.</span>
+                            <span class="ref-venue">ICLR 2022.</span>
+                            <a href="https://arxiv.org/abs/2202.00512" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-13">
+                            <span class="ref-authors">Karras, T., Aittala, M., Aila, T. &amp; Laine, S.</span>
+                            <span class="ref-title">Elucidating the Design Space of Diffusion-Based Generative Models.</span>
+                            <span class="ref-venue">NeurIPS 2022.</span>
+                            <a href="https://arxiv.org/abs/2206.00364" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-14">
+                            <span class="ref-authors">Esser, P., Kulal, S., Blattmann, A., et al.</span>
+                            <span class="ref-title">Scaling Rectified Flow Transformers for High-Resolution Image Synthesis.</span>
+                            <span class="ref-venue">ICML 2024.</span>
+                            <a href="https://arxiv.org/abs/2403.03206" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-15">
+                            <span class="ref-authors">Hoogeboom, E., Heek, J. &amp; Salimans, T.</span>
+                            <span class="ref-title">simple diffusion: End-to-end Diffusion for High Resolution Images.</span>
+                            <span class="ref-venue">ICML 2023.</span>
+                            <a href="https://arxiv.org/abs/2301.11093" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-16">
+                            <span class="ref-authors">Hang, T., Gu, S., Li, C., et al.</span>
+                            <span class="ref-title">Efficient Diffusion Training via Min-SNR Weighting Strategy.</span>
+                            <span class="ref-venue">ICCV 2023.</span>
+                            <a href="https://arxiv.org/abs/2303.09556" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-17">
+                            <span class="ref-authors">Lin, S., Liu, B., Li, J. &amp; Yang, X.</span>
+                            <span class="ref-title">Common Diffusion Noise Schedules and Sample Steps are Flawed.</span>
+                            <span class="ref-venue">WACV 2024.</span>
+                            <a href="https://arxiv.org/abs/2305.08891" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-18">
+                            <span class="ref-authors">Tong, A., Fatras, K., Malkin, N., Huguet, G., Zhang, Y., Rector-Brooks, J., Wolf, G. &amp; Bengio, Y.</span>
+                            <span class="ref-title">Improving and Generalizing Flow-Based Generative Models with Minibatch Optimal Transport.</span>
+                            <span class="ref-venue">TMLR 2024.</span>
+                            <a href="https://arxiv.org/abs/2302.00482" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-19">
+                            <span class="ref-authors">Pooladian, A.-A., Ben-Hamu, H., Domingo-Enrich, C., Amos, B., Lipman, Y. &amp; Chen, R. T. Q.</span>
+                            <span class="ref-title">Multisample Flow Matching: Straightening Flows with Minibatch Couplings.</span>
+                            <span class="ref-venue">ICML 2023.</span>
+                            <a href="https://arxiv.org/abs/2304.14772" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-20">
+                            <span class="ref-authors">Lee, S., Lin, Z. &amp; Fanti, G.</span>
+                            <span class="ref-title">Improving the Training of Rectified Flows.</span>
+                            <span class="ref-venue">NeurIPS 2024.</span>
+                            <a href="https://arxiv.org/abs/2405.20320" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-21">
+                            <span class="ref-authors">Li, T. &amp; He, K.</span>
+                            <span class="ref-title">Back to Basics: Let Denoising Generative Models Denoise.</span>
+                            <span class="ref-venue">CVPR 2026.</span>
+                            <a href="https://arxiv.org/abs/2511.13720" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-22">
+                            <span class="ref-authors">Song, Y., Dhariwal, P., Chen, M. &amp; Sutskever, I.</span>
+                            <span class="ref-title">Consistency Models.</span>
+                            <span class="ref-venue">ICML 2023.</span>
+                            <a href="https://arxiv.org/abs/2303.01469" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-23">
+                            <span class="ref-authors">Lu, C. &amp; Song, Y.</span>
+                            <span class="ref-title">Simplifying, Stabilizing and Scaling Continuous-Time Consistency Models.</span>
+                            <span class="ref-venue">ICLR 2025.</span>
+                            <a href="https://arxiv.org/abs/2410.11081" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-24">
+                            <span class="ref-authors">Frans, K., Hafner, D., Levine, S. &amp; Abbeel, P.</span>
+                            <span class="ref-title">One Step Diffusion via Shortcut Models.</span>
+                            <span class="ref-venue">ICLR 2025.</span>
+                            <a href="https://arxiv.org/abs/2410.12557" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-25">
+                            <span class="ref-authors">Geng, Z., Deng, M., Bai, X., Kolter, J. Z. &amp; He, K.</span>
+                            <span class="ref-title">Mean Flows for One-step Generative Modeling.</span>
+                            <span class="ref-venue">NeurIPS 2025.</span>
+                            <a href="https://arxiv.org/abs/2505.13447" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-26">
+                            <span class="ref-authors">Yu, S., Kwak, S., Jang, H., Jeong, J., Huang, J., Shin, J. &amp; Xie, S.</span>
+                            <span class="ref-title">Representation Alignment for Generation: Training Diffusion Transformers Is Easier Than You Think.</span>
+                            <span class="ref-venue">ICLR 2025.</span>
+                            <a href="https://arxiv.org/abs/2410.06940" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-27">
+                            <span class="ref-authors">Liu, J., Liu, G., Liang, J., et al.</span>
+                            <span class="ref-title">Flow-GRPO: Training Flow Matching Models via Online RL.</span>
+                            <span class="ref-venue">arXiv:2505.05470, 2025.</span>
+                            <a href="https://arxiv.org/abs/2505.05470" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-28">
+                            <span class="ref-authors">Chi, C., Feng, S., Du, Y., Xu, Z., Cousineau, E., Burchfiel, B. &amp; Song, S.</span>
+                            <span class="ref-title">Diffusion Policy: Visuomotor Policy Learning via Action Diffusion.</span>
+                            <span class="ref-venue">RSS 2023.</span>
+                            <a href="https://arxiv.org/abs/2303.04137" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-29">
+                            <span class="ref-authors">Black, K., Brown, N., Driess, D., et al.</span>
+                            <span class="ref-title">&pi;<sub>0</sub>: A Vision-Language-Action Flow Model for General Robot Control.</span>
+                            <span class="ref-venue">arXiv:2410.24164, 2024.</span>
+                            <a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-30">
+                            <span class="ref-authors">Chen, R. T. Q. &amp; Lipman, Y.</span>
+                            <span class="ref-title">Flow Matching on General Geometries.</span>
+                            <span class="ref-venue">ICLR 2024.</span>
+                            <a href="https://arxiv.org/abs/2302.03660" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-31">
+                            <span class="ref-authors">Gat, I., Remez, T., Shaul, N., Kreuk, F., Chen, R. T. Q., Synnaeve, G., Adi, Y. &amp; Lipman, Y.</span>
+                            <span class="ref-title">Discrete Flow Matching.</span>
+                            <span class="ref-venue">NeurIPS 2024.</span>
+                            <a href="https://arxiv.org/abs/2407.15595" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-32">
+                            <span class="ref-authors">Lu, C., Zhou, Y., Bao, F., Chen, J., Li, C. &amp; Zhu, J.</span>
+                            <span class="ref-title">DPM-Solver: A Fast ODE Solver for Diffusion Probabilistic Model Sampling in Around 10 Steps.</span>
+                            <span class="ref-venue">NeurIPS 2022.</span>
+                            <a href="https://arxiv.org/abs/2206.00927" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </article>
+
+        <aside class="post-author">
+            <p><span class="dark-only">// </span>I'm Hao Xin, a senior ML engineer at Zoox working on vision-language-action models for robotaxis. Before that: on-device VLMs at Apple, generative AI at Walmart, and a PhD in statistics at Purdue. New posts go out on <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>, or say hi at <a href="mailto:hao9xin@gmail.com">hao9xin@gmail.com</a>.</p>
+        </aside>
+
+        <div class="post-nav">
+            <a href="multi-gpu-training-pitfalls.html"><i class="fas fa-arrow-left"></i> <span class="dark-only">THE MULTI-GPU TRAINING GAUNTLET</span><span class="light-only">The Multi-GPU Training Gauntlet</span></a>
+            <a href="../index.html"><span class="dark-only">BACK TO BLOG</span><span class="light-only">All writing</span> <i class="fas fa-arrow-right"></i></a>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-gradient"></div>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="https://github.com/MuserHao" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://www.linkedin.com/in/hao9xin/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                <a href="https://scholar.google.com/citations?hl=en&user=6y09MRIAAAAJ" target="_blank" rel="noopener noreferrer">Scholar</a>
+                <a href="https://haoxin9.substack.com" target="_blank" rel="noopener noreferrer">Substack</a>
+            </div>
+            <p class="footer-text dark-only">// built with caffeine and curiosity</p>
+            <p class="footer-text light-only">made with curiosity and care</p>
+            <p class="footer-copy">&copy; 2026 Hao Xin</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="../../shared.js"></script>
+    <script>
+        // ── Reading progress bar ──
+        const bar = document.createElement('div');
+        bar.id = 'reading-progress';
+        document.body.prepend(bar);
+        window.addEventListener('scroll', () => {
+            const doc = document.documentElement;
+            const pct = doc.scrollTop / (doc.scrollHeight - doc.clientHeight) * 100;
+            bar.style.width = Math.min(pct, 100) + '%';
+        }, { passive: true });
+
+        // ── Copy buttons on code blocks ──
+        document.querySelectorAll('.post-content pre').forEach(pre => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pre-wrapper';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = 'COPY';
+            btn.addEventListener('click', () => {
+                navigator.clipboard.writeText(pre.innerText).then(() => {
+                    btn.textContent = 'COPIED';
+                    btn.classList.add('copied');
+                    setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 2000);
+                });
+            });
+            wrapper.appendChild(btn);
+        });
+
+        // ── Flow trajectory demo: exact marginal ODE for a Gaussian mixture ──
+        (function () {
+            const canvas = document.getElementById('fm-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width, H = canvas.height, SCALE = 76;
+
+            const DATA = {
+                ring: Array.from({ length: 8 }, (_, k) => ({
+                    w: 1 / 8, s: 0.15,
+                    m: [2.2 * Math.cos(2 * Math.PI * k / 8), 2.2 * Math.sin(2 * Math.PI * k / 8)]
+                })),
+                two: [
+                    { w: 0.7, s: 0.25, m: [-2.2, 0.8] },
+                    { w: 0.3, s: 0.25, m: [2.2, -0.8] }
+                ],
+                wide: [{ w: 1, s: 1.8, m: [1.2, 0.4] }]
+            };
+            const SCHED = {
+                rf: t => ({ a: 1 - t, s: t, da: -1, ds: 1 }),
+                vp: t => ({
+                    a: Math.cos(Math.PI * t / 2), s: Math.sin(Math.PI * t / 2),
+                    da: -Math.PI / 2 * Math.sin(Math.PI * t / 2), ds: Math.PI / 2 * Math.cos(Math.PI * t / 2)
+                })
+            };
+
+            // Posterior means E[x0 | x_t] and E[eps | x_t] in closed form
+            function denoise(mix, x, y, a, s) {
+                let logs = [], best = -Infinity;
+                for (const c of mix) {
+                    const v = a * a * c.s * c.s + s * s;
+                    const dx = x - a * c.m[0], dy = y - a * c.m[1];
+                    const l = Math.log(c.w) - Math.log(v) - (dx * dx + dy * dy) / (2 * v);
+                    logs.push(l); if (l > best) best = l;
+                }
+                let Z = 0, x0x = 0, x0y = 0, ex = 0, ey = 0;
+                mix.forEach((c, k) => {
+                    const r = Math.exp(logs[k] - best); Z += r;
+                    const v = a * a * c.s * c.s + s * s;
+                    const dx = x - a * c.m[0], dy = y - a * c.m[1];
+                    x0x += r * (c.m[0] + a * c.s * c.s / v * dx);
+                    x0y += r * (c.m[1] + a * c.s * c.s / v * dy);
+                    ex += r * (s / v * dx); ey += r * (s / v * dy);
+                });
+                return [x0x / Z, x0y / Z, ex / Z, ey / Z];
+            }
+            function vel(mix, sch, x, y, t) {
+                const p = sch(t), d = denoise(mix, x, y, p.a, p.s);
+                return [p.da * d[0] + p.ds * d[2], p.da * d[1] + p.ds * d[3]];
+            }
+
+            // Deterministic noise (seeded) so every setting starts from the same particles
+            let seed = 7;
+            const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+            const gauss = () => Math.sqrt(-2 * Math.log(rand())) * Math.cos(2 * Math.PI * rand());
+            const NOISE = Array.from({ length: 300 }, () => [gauss(), gauss()]);
+            const DRAWN = 90;
+
+            function exactPath(mix, sch, x, y) {
+                const n = 400, h = -1 / n, pts = [[x, y]];
+                let t = 1;
+                for (let i = 0; i < n; i++) {
+                    const k1 = vel(mix, sch, x, y, t);
+                    const k2 = vel(mix, sch, x + h / 2 * k1[0], y + h / 2 * k1[1], t + h / 2);
+                    const k3 = vel(mix, sch, x + h / 2 * k2[0], y + h / 2 * k2[1], t + h / 2);
+                    const k4 = vel(mix, sch, x + h * k3[0], y + h * k3[1], t + h);
+                    x += h / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]);
+                    y += h / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+                    t += h; pts.push([x, y]);
+                }
+                return pts;
+            }
+            function samplerPath(mix, sch, solver, N, x, y) {
+                const pts = [[x, y]];
+                for (let i = 0; i < N; i++) {
+                    const t = 1 - i / N, tn = 1 - (i + 1) / N;
+                    if (solver === 'euler') {
+                        const u = vel(mix, sch, x, y, t);
+                        x += (tn - t) * u[0]; y += (tn - t) * u[1];
+                    } else {
+                        const p = sch(t), q = sch(tn), d = denoise(mix, x, y, p.a, p.s);
+                        x = q.a * d[0] + q.s * d[2]; y = q.a * d[1] + q.s * d[3];
+                    }
+                    pts.push([x, y]);
+                }
+                return pts;
+            }
+
+            const el = id => document.getElementById(id);
+            const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            const X = p => W / 2 + p[0] * SCALE, Y = p => H / 2 - p[1] * SCALE;
+            const cache = {};
+
+            function draw() {
+                const dataKey = el('fm-data').value, schedKey = el('fm-sched').value;
+                const solver = el('fm-solver').value, N = +el('fm-steps').value;
+                el('fm-steps-val').textContent = N;
+                const mix = DATA[dataKey], sch = SCHED[schedKey];
+                const key = dataKey + schedKey;
+                if (!cache[key]) cache[key] = NOISE.map(z => exactPath(mix, sch, z[0], z[1]));
+                const exact = cache[key];
+                const approx = NOISE.map(z => samplerPath(mix, sch, solver, N, z[0], z[1]));
+
+                const ink = css('--text-primary') || '#ddd';
+                const accA = css('--neon-cyan') || '#58c4dc';
+                const accB = css('--neon-pink') || '#e07098';
+                ctx.clearRect(0, 0, W, H);
+
+                // Data modes as 1- and 2-sigma rings
+                ctx.strokeStyle = accA; ctx.globalAlpha = 0.6; ctx.lineWidth = 1;
+                for (const c of mix) for (const r of [1, 2]) {
+                    ctx.beginPath(); ctx.arc(X(c.m), Y(c.m), r * c.s * SCALE, 0, 2 * Math.PI); ctx.stroke();
+                }
+                // Exact trajectories
+                ctx.strokeStyle = ink; ctx.globalAlpha = 0.3; ctx.lineWidth = 2;
+                for (let i = 0; i < DRAWN; i++) {
+                    ctx.beginPath();
+                    exact[i].forEach((p, j) => j ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p)));
+                    ctx.stroke();
+                }
+                // Sampler polylines and endpoints
+                ctx.strokeStyle = accB; ctx.fillStyle = accB; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.3;
+                for (let i = 0; i < DRAWN; i++) {
+                    ctx.beginPath();
+                    approx[i].forEach((p, j) => j ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p)));
+                    ctx.stroke();
+                    const e = approx[i][N];
+                    ctx.beginPath(); ctx.arc(X(e), Y(e), 2.2, 0, 2 * Math.PI); ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+
+                // Stats over all particles
+                let err = 0, ratio = 0;
+                exact.forEach((path, i) => {
+                    const end = path[path.length - 1], e = approx[i][N];
+                    err += Math.hypot(e[0] - end[0], e[1] - end[1]);
+                    let arc = 0;
+                    for (let j = 1; j < path.length; j++)
+                        arc += Math.hypot(path[j][0] - path[j - 1][0], path[j][1] - path[j - 1][1]);
+                    ratio += Math.hypot(end[0] - path[0][0], end[1] - path[0][1]) / arc;
+                });
+                el('fm-stats').innerHTML =
+                    '<span>mean endpoint error <b>' + (err / exact.length).toFixed(3) + '</b></span>' +
+                    '<span>straightness (chord / arc) <b>' + (ratio / exact.length).toFixed(3) + '</b></span>';
+            }
+
+            ['fm-data', 'fm-sched', 'fm-solver', 'fm-steps'].forEach(id => el(id).addEventListener('input', draw));
+            new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+            draw();
+        })();
+    </script>
+</body>
+</html>
