@@ -503,10 +503,29 @@
                 </div>
 
                 <p>
-                    and only the product $p(\lambda)\,w(\lambda)$ matters for the expected gradient. (The
-                    split still matters for variance: sampling a noise level often with a small weight is
-                    not the same as sampling it rarely with a large weight.) Let's compute it for
-                    vanilla rectified flow, $t \sim \mathcal{U}[0, 1]$. From $t = \text{sigmoid}(-\lambda/2)$:
+                    and only the product $p(\lambda)\,w(\lambda)$ matters for the <em>expected</em> gradient.
+                </p>
+
+                <div class="info-box">
+                    <div class="info-title">SAME TARGET, DIFFERENT NOISE</div>
+                    <p>
+                        If only the product matters, is raising the weight the same as sampling more often?
+                        In expectation, yes. In a finite minibatch, no: the split is a choice of Monte Carlo
+                        estimator. Moving emphasis into $w$ means rare samples with large weights, so the
+                        gradient is spiky; moving it into $p$ means more samples at that level, each with
+                        an ordinary weight. This is importance sampling: for a fixed product, the variance
+                        is lowest when $p(\lambda)$ follows the product itself (scaled by how noisy the
+                        per-level gradients are), leaving $w/p$ close to flat. Adam makes this sharper still:
+                        its per-parameter normalization is calibrated by the typical gradient, so occasional
+                        heavily weighted samples either get washed out or destabilize the second-moment
+                        estimate. That's why modern recipes like SD3's prefer to change the
+                        <strong>sampling density</strong> and keep the per-sample loss simple.
+                    </p>
+                </div>
+
+                <p>
+                    Let's compute the product for vanilla rectified flow, $t \sim \mathcal{U}[0, 1]$. From
+                    $t = \text{sigmoid}(-\lambda/2)$:
                 </p>
 
                 <div class="math-block">
