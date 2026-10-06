@@ -126,7 +126,7 @@
 
                 <p>
                     If you've been following the generative AI space, you've probably heard of
-                    <strong>diffusion models</strong> -- the family of models behind DALL-E, Stable Diffusion,
+                    <strong>diffusion models</strong> -- the family of models behind DALL-E 2, Stable Diffusion,
                     and many other image generators. But at the mathematical core of these models lies
                     a beautifully elegant concept: <strong>score matching</strong>.
                 </p>
@@ -231,7 +231,8 @@
                 </div>
 
                 <p>
-                    This is <strong>explicit score matching</strong>. The first term is the trace of the
+                    This is <strong>implicit score matching</strong> (the name used since Vincent, 2011; the
+                    Fisher-divergence form above, which needs the true score, is the <em>explicit</em> one). The first term is the trace of the
                     Jacobian of the score model -- it only depends on our model, not on the unknown data
                     distribution. Brilliant in theory, but computing that Jacobian trace for a deep
                     neural network is expensive ($O(d)$ backward passes for $d$-dimensional data).
@@ -240,7 +241,7 @@
                 <h3>Sliced Score Matching</h3>
 
                 <p>
-                    Song et al. (2020) proposed <strong>sliced score matching</strong> to avoid the
+                    Song et al. (UAI 2019) <a href="#ref-11">[11]</a> proposed <strong>sliced score matching</strong> to avoid the
                     Jacobian trace. The idea: project the score onto random directions $\mathbf{v}$
                     and match the projected scores:
                 </p>
@@ -572,8 +573,8 @@
                 <h2><span class="sec-num">09<span class="dark-only"> //</span></span> FAST SAMPLING: DDIM AND BEYOND</h2>
 
                 <p>
-                    The original DDPM requires ~1000 denoising steps to generate a sample. Song et al.
-                    (2021b) introduced <strong>DDIM</strong> (Denoising Diffusion Implicit Models), which
+                    The original DDPM requires ~1000 denoising steps to generate a sample. Song, Meng &amp; Ermon
+                    (2021) introduced <strong>DDIM</strong> (Denoising Diffusion Implicit Models), which
                     defines a family of non-Markovian forward processes that share the same marginals
                     $q(\mathbf{x}_t | \mathbf{x}_0)$ but allow deterministic sampling:
                 </p>
@@ -680,6 +681,12 @@
                             <span class="ref-title">Reverse-time Diffusion Equation Models.</span>
                             <span class="ref-venue">Stochastic Processes and their Applications, 12(3), 313-326, 1982.</span>
                             <a href="https://doi.org/10.1016/0304-4149(82)90051-5" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-11">
+                            <span class="ref-authors">Song, Y., Garg, S., Shi, J. &amp; Ermon, S.</span>
+                            <span class="ref-title">Sliced Score Matching: A Scalable Approach to Density and Score Estimation.</span>
+                            <span class="ref-venue">UAI 2019.</span>
+                            <a href="https://arxiv.org/abs/1905.07088" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
                         </li>
                     </ol>
                 </div>
