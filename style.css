@@ -98,7 +98,7 @@
    accent, generous whitespace. Tokens only here; component rules live in
    zen.css, loaded after style.css and blog.css on every page. */
 [data-theme="light"] {
-    --neon-pink: #2e4868;          /* aizome indigo, the only accent */
+    --neon-pink: #b0412b;          /* shu vermilion (seal ink), the only accent */
     --neon-cyan: #5f5d58;
     --neon-green: #5f5d58;
 
