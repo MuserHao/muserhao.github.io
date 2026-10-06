@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><!-- 辛昊之印 · glyphs: 崇羲篆體 (Chong Xi Small Seal), © Academia Sinica -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><!-- 辛昊之印 · glyphs set in 崇羲篆體 (Chong Xi Small Seal) by 王心怡 (Wang Hsin-yi), © 2022 Academia Sinica, licensed CC BY-ND 3.0 TW: https://xiaoxue.iis.sinica.edu.tw/chongxi/copyright.htm -->
 <defs><filter id="w" x="-4%" y="-4%" width="108%" height="108%">
   <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="11" result="t"/>
   <feDisplacementMap in="SourceGraphic" in2="t" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="d"/>
