@@ -13,6 +13,9 @@ html[data-theme="light"] {
     --zen-step-1: 1.1875rem;
     --zen-step-2: 1.5rem;
     --zen-step-4: clamp(2.75rem, 7vw, 4.75rem);
+    --text-faint: #858279;
+    --cyan-text-glow: transparent;
+    --cyan-glow-lg: transparent;
 }
 
 /* ── Ground: plain washi, no ornament layers ── */
@@ -31,7 +34,7 @@ html[data-theme="light"] .vignette,
 html[data-theme="light"] .scroll-indicator {
     display: none !important;
 }
-html[data-theme="light"] ::selection { background: rgba(46, 72, 104, 0.14); color: var(--text-primary); }
+html[data-theme="light"] ::selection { background: rgba(176, 65, 43, 0.14); color: var(--text-primary); }
 html[data-theme="light"] a:focus-visible,
 html[data-theme="light"] button:focus-visible,
 html[data-theme="light"] input:focus-visible { outline: 1px solid var(--neon-pink); outline-offset: 4px; }
@@ -581,3 +584,88 @@ html[data-theme="light"] .post-author p { font-family: var(--font-body); font-si
 html[data-theme="light"] .post-author a { color: var(--neon-pink); text-decoration: underline; text-decoration-color: var(--border-hover); text-underline-offset: 3px; }
 html[data-theme="light"] .post-author + .post-nav { border-top: none; }
 html[data-theme="light"] .pub-group { font-family: var(--font-body); font-size: 0.75rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-faint); text-align: left; margin: 2rem 0 0; padding-top: 2rem; border-top: 1px solid var(--border-subtle); }
+
+/* ---------- v2: shuin accent, section characters, washi ---------- */
+/* Washi: a whisper of fibre so the ground reads as paper, not a flat fill */
+html[data-theme="light"] {
+    --zen-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.42  0 0 0 0 0.36  0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+html[data-theme="light"] body { background-image: var(--zen-grain); }
+html[data-theme="light"] header,
+html[data-theme="light"] header.scrolled { background-color: var(--nav-bg); background-image: var(--zen-grain); }
+
+/* Seal (印) beside the name: 白文, white characters cut into vermilion */
+.zen-seal { display: none; }
+html[data-theme="light"] .zen-seal {
+    display: inline-grid;
+    place-items: center;
+    width: 2.7rem;
+    height: 2.7rem;
+    margin-left: 1.2rem;
+    vertical-align: 0.75em;
+    background: var(--neon-pink);
+    color: #f3efe6;
+    border-radius: 4px;
+    font-family: 'Noto Serif TC', var(--font-display);
+    font-weight: 700;
+    font-size: 1.02rem;
+    line-height: 1.08;
+    letter-spacing: 0;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    box-shadow: inset 0 0 0 2px var(--neon-pink), inset 0 0 0 3px rgba(243, 239, 230, 0.8);
+    transform: rotate(-2deg);
+    opacity: 0.93;
+}
+@media (max-width: 720px) {
+    html[data-theme="light"] .zen-seal { width: 2.2rem; height: 2.2rem; font-size: 0.84rem; margin-left: 0.9rem; }
+}
+
+/* Section names: one character, then the quiet Latin word */
+html[data-theme="light"] main > section > .section-title::before {
+    display: inline;
+    font-family: 'Noto Serif TC', var(--font-display);
+    font-weight: 500;
+    font-size: 1.5rem;
+    letter-spacing: 0;
+    color: var(--neon-pink);
+    margin-inline-end: 0.9rem;
+}
+html[data-theme="light"] #about > .section-title::before { content: "序"; }
+html[data-theme="light"] #lore > .section-title::before { content: "途"; }
+html[data-theme="light"] #publications > .section-title::before { content: "研"; }
+html[data-theme="light"] #blog > .section-title::before { content: "文"; }
+html[data-theme="light"] #contact > .section-title::before { content: "緣"; }
+
+/* About: the first sentence is the lead, set in Mincho */
+html[data-theme="light"] .about .journal-text:first-child {
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    line-height: 1.75;
+    letter-spacing: 0.01em;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    text-wrap: pretty;
+}
+html[data-theme="light"] .hero-ornament { width: 3rem; }
+
+/* Journey on phones: title, company and details stay in the one column */
+@media (max-width: 720px) {
+    html[data-theme="light"] .timeline-content { display: flex; flex-direction: column; }
+    html[data-theme="light"] .timeline-date { order: -1; padding: 0 0 0.25rem; }
+}
+
+/* Small spacing and alignment fixes */
+html[data-theme="light"] .pub-group { margin-bottom: 1.75rem; }
+html[data-theme="light"] .substack-input { padding-left: 0; padding-right: 0; text-indent: 0; }
+
+/* Leftover dark glows: post divider, 404 numeral */
+html[data-theme="light"] .post-divider { background: var(--neon-pink); height: 1px; width: 3rem; box-shadow: none; }
+html[data-theme="light"] .nf-code { text-shadow: none !important; color: var(--text-primary) !important; font-weight: 400; }
+
+/* Posts: a soft vermilion rule under links, a hairline on quotes */
+html[data-theme="light"] .post-content a { border-bottom-color: rgba(176, 65, 43, 0.3); }
+html[data-theme="light"] .post-content a:hover { border-bottom-color: var(--neon-pink); }
+html[data-theme="light"] .post-content blockquote { border-left: 1px solid var(--neon-pink); background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-theme="light"] .math-block,
+html[data-theme="light"] .info-box { backdrop-filter: none; -webkit-backdrop-filter: none; }
