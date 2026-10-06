@@ -41,7 +41,10 @@
             for (let i = 0; i < steps; i++) {
                 const t = i / steps;
                 const pressure = Math.sin(Math.min(1, t * 1.6) * Math.PI * 0.5) * (1 - Math.pow(t, 3) * 0.85);
-                if (t > 0.55 && rand() > load * (1.15 - t)) continue;   // dry-brush gaps near the end
+                // Dry brush: the chance a bristle skips rises smoothly from t = 0.3,
+                // so ink thins out gradually instead of breaking off at one point.
+                const dry = t < 0.3 ? 0 : Math.pow((t - 0.3) / 0.7, 1.3);
+                if (rand() < dry * (1 - load * 0.12)) continue;
                 const width = size * 0.075 * pressure;
                 const a = start + sweep * t;
                 const r = R + off * width + Math.sin(t * 9 + wob) * size * 0.003 + (rand() - 0.5) * size * 0.006;
