@@ -193,7 +193,7 @@ def compute_fid(samples):
 
                 <ul>
                     <li>Python's GIL allows only <strong>one thread to execute Python bytecode at a time</strong></li>
-                    <li>PyTorch releases the GIL during CUDA kernel execution, but <strong>not</strong> during: DataLoader iteration, optimizer.step(), loss.backward() Python overhead, or any pure-Python code</li>
+                    <li>PyTorch releases the GIL inside its C++ code (CUDA kernel launches, the autograd engine during <code>loss.backward()</code>), but <strong>not</strong> in the Python around it: DataLoader iteration and collation, the Python side of <code>optimizer.step()</code>, the training loop itself, and any pure-Python code</li>
                     <li>With 8 threads competing for the GIL, each thread gets ~1/8 of the CPU time to feed its GPU</li>
                     <li>Result: GPUs starve waiting for data, utilization crashes</li>
                 </ul>
@@ -354,7 +354,7 @@ if __name__ == '__main__':
                 Instead, pass a serializable dict like <code>{"type": "edm", "sigma_min": 0.01, ...}</code> and reconstruct the function inside each subprocess.</p>
 
                 <p><strong>Separate training from evaluation.</strong>
-                If your evaluation code has threading issues (as ours did with clean-fid), don't try to fix it &mdash; just run it sequentially after all training is complete. The evaluation is typically much faster than training anyway.</p>
+                If your evaluation code has threading issues (as ours did with clean-fid), don't try to fix it &mdash; just run it sequentially after all training is complete. Here that cost us ~3 hours, more than the training itself; the same subprocess pattern would fan the FID runs out across the GPUs too, one process per model, with nothing shared.</p>
 
                 <p><strong>Don't use <code>torch.compile</code> in parallel settings.</strong>
                 <code>torch.compile</code> with dynamo does heavy Python-level analysis on the first forward pass. In multi-process settings, 8 simultaneous compilations can saturate your CPU.
@@ -401,7 +401,7 @@ if __name__ == '__main__':
                         <tr>
                             <td style="text-decoration: line-through;">Any GPU workload</td>
                             <td style="text-decoration: line-through;"><code>ThreadPoolExecutor</code></td>
-                            <td><strong>Never.</strong> GIL kills performance.</td>
+                            <td><strong>Avoid</strong> for training loops: the GIL serializes the Python half of every step.</td>
                         </tr>
                     </tbody>
                 </table>
