@@ -490,22 +490,86 @@
                     $\mathbf{v}$ and $\mathbf{u}$ are close cousins: on the VP cosine path,
                     $\mathbf{u} = \tfrac{\pi}{2}\mathbf{v}$ exactly, which is why $\mathbf{v}$-prediction is often
                     described as "predicting the velocity". A perfectly trained network of one kind is a
-                    perfectly trained network of every other kind. Now substitute $\hat{\mathbf{x}}_0 = (\mathbf{x}_t + \sigma_t^2 \nabla \log p_t)/\alpha_t$
-                    into the velocity:
+                    perfectly trained network of every other kind.
+                </p>
+
+                <h3>Deriving the punchline, step by step</h3>
+
+                <p>
+                    We want to compare two vector fields: the flow matching velocity $\mathbf{u}_t(\mathbf{x})$ and
+                    the probability flow drift. Four short steps.
+                </p>
+
+                <p>
+                    <strong>Step 1: the score is a posterior average (Tweedie).</strong> The marginal
+                    $p_t(\mathbf{x}) = \int p_t(\mathbf{x}|\mathbf{x}_0)\,q(\mathbf{x}_0)\,d\mathbf{x}_0$ is a mixture
+                    of Gaussians $\mathcal{N}(\alpha_t\mathbf{x}_0, \sigma_t^2\mathbf{I})$. Differentiating under the
+                    integral and dividing by $p_t$:
                 </p>
 
                 <div class="math-block">
-                    $$\mathbf{u}_t(\mathbf{x}) = \frac{\dot\alpha_t}{\alpha_t}\mathbf{x} + \left(\frac{\dot\alpha_t}{\alpha_t}\sigma_t^2 - \sigma_t\dot\sigma_t\right) \nabla_\mathbf{x} \log p_t(\mathbf{x}) = \frac{\dot\alpha_t}{\alpha_t}\mathbf{x} + \frac{\sigma_t^2 \dot\lambda_t}{2} \nabla_\mathbf{x} \log p_t(\mathbf{x})$$
+                    $$\nabla\log p_t(\mathbf{x}) = \frac{\int \nabla p_t(\mathbf{x}|\mathbf{x}_0)\, q(\mathbf{x}_0)\, d\mathbf{x}_0}{p_t(\mathbf{x})} = \mathbb{E}\!\left[\nabla\log p_t(\mathbf{x}|\mathbf{x}_0) \,\middle|\, \mathbf{x}_t = \mathbf{x}\right] = \mathbb{E}\!\left[-\frac{\mathbf{x} - \alpha_t\mathbf{x}_0}{\sigma_t^2} \,\middle|\, \mathbf{x}_t = \mathbf{x}\right] = -\frac{\mathbf{x} - \alpha_t\hat{\mathbf{x}}_0}{\sigma_t^2}$$
                 </div>
+
+                <p>
+                    Solving for the two posterior means, with $\mathbf{s} = \nabla\log p_t(\mathbf{x})$:
+                </p>
+
+                <div class="math-block">
+                    $$\hat{\mathbf{x}}_0 = \frac{\mathbf{x} + \sigma_t^2\,\mathbf{s}}{\alpha_t}, \qquad \hat{\boldsymbol{\epsilon}} = \frac{\mathbf{x} - \alpha_t\hat{\mathbf{x}}_0}{\sigma_t} = -\sigma_t\,\mathbf{s}$$
+                </div>
+
+                <p>
+                    <strong>Step 2: write the velocity in terms of the score.</strong> From section 03, the
+                    marginal velocity is the posterior average of the conditional velocity,
+                    $\mathbf{u}_t(\mathbf{x}) = \dot\alpha_t\hat{\mathbf{x}}_0 + \dot\sigma_t\hat{\boldsymbol{\epsilon}}$.
+                    Substitute step 1:
+                </p>
+
+                <div class="math-block">
+                    $$\mathbf{u}_t(\mathbf{x}) = \frac{\dot\alpha_t}{\alpha_t}\left(\mathbf{x} + \sigma_t^2\mathbf{s}\right) - \dot\sigma_t\sigma_t\,\mathbf{s} = \frac{\dot\alpha_t}{\alpha_t}\mathbf{x} + \left(\frac{\dot\alpha_t}{\alpha_t}\sigma_t^2 - \sigma_t\dot\sigma_t\right)\mathbf{s}$$
+                </div>
+
+                <p>
+                    <strong>Step 3: tidy the coefficient with log-SNR.</strong> Differentiate
+                    $\lambda_t = 2\log\alpha_t - 2\log\sigma_t$ to get
+                    $\dot\lambda_t = 2\dot\alpha_t/\alpha_t - 2\dot\sigma_t/\sigma_t$. Multiply by $\sigma_t^2/2$:
+                    $\tfrac{1}{2}\sigma_t^2\dot\lambda_t = \tfrac{\dot\alpha_t}{\alpha_t}\sigma_t^2 - \sigma_t\dot\sigma_t$,
+                    which is exactly the bracket. So
+                </p>
+
+                <div class="math-block">
+                    $$\mathbf{u}_t(\mathbf{x}) = \frac{\dot\alpha_t}{\alpha_t}\mathbf{x} + \frac{\sigma_t^2\dot\lambda_t}{2}\,\nabla\log p_t(\mathbf{x})$$
+                </div>
+
+                <p>
+                    <strong>Step 4: derive the probability flow drift for the same path.</strong> Take the
+                    linear forward SDE $d\mathbf{x} = f_t\mathbf{x}\,dt + g_t\,d\mathbf{w}$ started at $\mathbf{x}_0$. Its
+                    mean $\mathbf{m}_t$ and per-coordinate variance $v_t$ obey
+                    $\dot{\mathbf{m}}_t = f_t\mathbf{m}_t$ and $\dot v_t = 2f_t v_t + g_t^2$. Matching them to our
+                    path, $\mathbf{m}_t = \alpha_t\mathbf{x}_0$ and $v_t = \sigma_t^2$, forces
+                </p>
+
+                <div class="math-block">
+                    $$f_t = \frac{\dot\alpha_t}{\alpha_t}, \qquad g_t^2 = 2\sigma_t\dot\sigma_t - 2\frac{\dot\alpha_t}{\alpha_t}\sigma_t^2 = -\sigma_t^2\dot\lambda_t$$
+                </div>
+
+                <p>
+                    so the probability flow drift is
+                    $f_t\mathbf{x} - \tfrac{1}{2}g_t^2\,\nabla\log p_t = \tfrac{\dot\alpha_t}{\alpha_t}\mathbf{x} + \tfrac{1}{2}\sigma_t^2\dot\lambda_t\,\nabla\log p_t$.
+                    That is step 3, term for term. (Since $\lambda_t$ decreases, $\dot\lambda_t \lt 0$ and
+                    $g_t^2 \gt 0$, as it should be.)
+                </p>
 
                 <div class="info-box">
                     <div class="info-title">THE PUNCHLINE</div>
                     <p>
-                        This is the probability flow ODE from section 02, term for term. <strong>The
+                        Steps 3 and 4 give the same vector field. <strong>The
                         flow matching velocity field <em>is</em> the probability flow drift.</strong>
                         Training a Gaussian-path flow matching model trains a score model in a different
                         parameterization; integrating its ODE is running the probability flow ODE. For
-                        rectified flow it simplifies to
+                        rectified flow ($\alpha_t = 1-t$, $\sigma_t = t$, so $\dot\alpha_t/\alpha_t = -\tfrac{1}{1-t}$ and
+                        $\tfrac12\sigma_t^2\dot\lambda_t = -\tfrac{t}{1-t}$) it simplifies to
                         $$\mathbf{u}_t(\mathbf{x}) = -\frac{\mathbf{x} + t\, \nabla_\mathbf{x} \log p_t(\mathbf{x})}{1-t}$$
                     </p>
                 </div>
