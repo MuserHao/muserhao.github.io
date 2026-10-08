@@ -8,9 +8,15 @@
     </url>
     <url>
         <loc>https://muserhao.github.io/blog/</loc>
-        <lastmod>2026-03-25</lastmod>
+        <lastmod>2026-10-02</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>https://muserhao.github.io/blog/posts/flow-matching-vs-score-matching.html</loc>
+        <lastmod>2026-10-02</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.9</priority>
     </url>
     <url>
         <loc>https://muserhao.github.io/blog/posts/multi-gpu-training-pitfalls.html</loc>
