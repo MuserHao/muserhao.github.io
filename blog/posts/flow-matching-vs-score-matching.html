@@ -77,6 +77,15 @@
         .post-content table { display: block; overflow-x: auto; width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.9rem; }
         .post-content th, .post-content td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }
         .post-content th { color: var(--text-secondary); font-weight: 500; letter-spacing: 0.04em; }
+        .sch-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .sch-panels canvas { display: block; width: 100%; height: auto; min-width: 0; }
+        @media (max-width: 600px) { .sch-panels { grid-template-columns: 1fr; } }
+        .sch-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; margin-top: 0.6rem; font-size: 0.82rem; color: var(--text-secondary); }
+        .sch-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+        .sch-legend line { stroke-width: 2; }
+        .sch-l-rf { stroke: var(--neon-cyan); }
+        .sch-l-vp { stroke: var(--neon-pink); stroke-dasharray: 7 5; }
+        .sch-l-ln { stroke: var(--neon-cyan); stroke-dasharray: 2 4; }
     </style>
 </head>
 <body>
@@ -213,6 +222,72 @@
                     <li><strong>Variance preserving (VP), cosine</strong>: $\alpha_t = \cos(\tfrac{\pi t}{2})$, $\sigma_t = \sin(\tfrac{\pi t}{2})$. The DDPM / improved-DDPM family.</li>
                     <li><strong>Rectified flow (RF) / linear</strong>: $\alpha_t = 1 - t$, $\sigma_t = t$. The flow matching default.</li>
                 </ul>
+
+                <h3>Why the schedule matters if it's "just coordinates"</h3>
+
+                <p>
+                    Section 04 will show that, for a perfectly trained model, the schedule is only a change of
+                    coordinates: same $\hat{\mathbf{x}}_0$ at the same $\lambda$. So why do papers fight over
+                    it? Because in practice the schedule quietly decides three things.
+                </p>
+
+                <ol>
+                    <li><strong>The shape of the path in $\mathbf{x}$-space.</strong> VP moves $\mathbf{x}_t$ along an arc that keeps its overall scale ($\alpha_t^2 + \sigma_t^2 = 1$). RF moves along the straight chord, so mid-path samples shrink: at $t = 0.5$ the scale is $1/\sqrt{2}$ of the endpoints. So the network sees inputs of a different overall size at different times.</li>
+                    <li><strong>Where training spends its samples.</strong> Drawing $t$ uniformly is the default in both camps, so the schedule decides which noise levels the network practices most (section 05).</li>
+                    <li><strong>Where a sampler spends its steps.</strong> A sampler on a uniform $t$ grid lands on whatever noise levels the schedule maps those times to (section 06).</li>
+                </ol>
+
+                <p>
+                    The figures below show all three. The surprise is in the second one: as functions of
+                    time, RF and VP are almost the same schedule in log-SNR. Their big practical differences
+                    come from the geometry and from what was bundled with them (the prediction target and the
+                    timestep density), not from where they put the noise levels.
+                </p>
+
+                <figure class="fm-demo" id="sch-geo">
+                    <canvas id="sch-geo-canvas" width="720" height="380" aria-label="A data point and a noise vector joined by the RF straight chord and the VP quarter-circle arc"></canvas>
+                    <div class="fm-controls">
+                        <label for="sch-t">Time $t$ <span id="sch-t-val">0.50</span>
+                            <input type="range" id="sch-t" min="0" max="1" step="0.01" value="0.5">
+                        </label>
+                    </div>
+                    <div class="fm-stats" id="sch-geo-stats"></div>
+                    <figcaption>
+                        One data point $\mathbf{x}_0$ and one noise draw $\boldsymbol{\epsilon}$. In high dimensions
+                        the two are almost exactly orthogonal, so the picture is faithful: VP (dashed) rotates
+                        from data to noise along a quarter circle, while RF (solid) slides along the chord and dips
+                        toward the origin in the middle. The ticks mark $t = 0, 0.1, \dots, 1$: VP covers its arc
+                        at constant speed, RF covers its chord at constant speed, and the two disagree about how
+                        noisy the sample is at the same $t$. The dotted rays show the link to log-SNR: every
+                        point on one ray through the origin has the same ratio $\sigma_t/\alpha_t$, hence the same
+                        $\lambda$. Two schedules at the same $\lambda$ hold the same noisy sample up to an overall
+                        scale, which is exactly why the schedule is "just" a change of coordinates. At $t=0.5$ both
+                        sit on the same ray ($\lambda = 0$); elsewhere they don't.
+                    </figcaption>
+                </figure>
+
+                <figure class="fm-demo" id="sch-snr">
+                    <div class="sch-panels">
+                        <canvas id="sch-lam-canvas" width="360" height="300" aria-label="Log-SNR as a function of time for the RF and VP schedules"></canvas>
+                        <canvas id="sch-dens-canvas" width="360" height="300" aria-label="Distribution of log-SNR visited by uniform-t training under each schedule"></canvas>
+                    </div>
+                    <div class="sch-legend">
+                        <span><svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" class="sch-l-rf"/></svg> RF (linear)</span>
+                        <span><svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" class="sch-l-vp"/></svg> VP (cosine)</span>
+                        <span><svg width="26" height="8" aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" class="sch-l-ln"/></svg> RF + logit-normal $t$ (SD3)</span>
+                    </div>
+                    <figcaption>
+                        Left: log-SNR $\lambda$ along time, with dots where a 10-step uniform-$t$ sampler lands
+                        (the slider above moves the crosshair). The two curves nearly overlap: RF's
+                        $2\log\frac{1-t}{t}$ and VP's $2\log\cot\frac{\pi t}{2}$ differ by at most $2\log\frac{\pi}{2} \approx 0.9$ in
+                        $\lambda$ anywhere. Right: which $\lambda$ values training visits when $t$ is
+                        drawn uniformly. RF gives a logistic density, $\tfrac18\text{sech}^2(\lambda/4)$; VP gives
+                        $\tfrac{1}{2\pi}\text{sech}(\lambda/2)$, somewhat more peaked at $\lambda = 0$. Switching RF to
+                        SD3's logit-normal timesteps (dotted) moves the emphasis far more than switching the
+                        schedule does, which is why that, not the linear path, was SD3's big lever.
+                    </figcaption>
+                </figure>
+
 
                 <p>
                     From the score side, we train $\mathbf{s}_\theta(\mathbf{x}, t) \approx \nabla_\mathbf{x} \log p_t(\mathbf{x})$
@@ -1206,6 +1281,134 @@
             });
             wrapper.appendChild(btn);
         });
+
+        // ── Schedule intuition figures: path geometry and log-SNR coverage ──
+        (function () {
+            const geo = document.getElementById('sch-geo-canvas');
+            if (!geo) return;
+            const lamC = document.getElementById('sch-lam-canvas');
+            const denC = document.getElementById('sch-dens-canvas');
+            const slider = document.getElementById('sch-t');
+            const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+            const S = {
+                rf: t => [1 - t, t],
+                vp: t => [Math.cos(Math.PI * t / 2), Math.sin(Math.PI * t / 2)]
+            };
+            const lam = (s, t) => { const [a, g] = S[s](t); return 2 * Math.log(a / g); };
+            const DASH = { rf: [], vp: [7, 5], ln: [2, 4] };
+
+            function colors() {
+                return {
+                    ink: css('--text-primary') || '#ddd', sub: css('--text-secondary') || '#999',
+                    grid: css('--border-subtle') || '#333',
+                    rf: css('--neon-cyan') || '#58c4dc', vp: css('--neon-pink') || '#e07098'
+                };
+            }
+            function line(ctx, pts, color, dash, w) {
+                ctx.save(); ctx.strokeStyle = color; ctx.setLineDash(dash); ctx.lineWidth = w || 2;
+                ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+                ctx.stroke(); ctx.restore();
+            }
+            function dot(ctx, x, y, r, color, ring) {
+                ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fillStyle = color; ctx.fill();
+                if (ring) { ctx.lineWidth = 2; ctx.strokeStyle = ring; ctx.stroke(); }
+            }
+            function label(ctx, txt, x, y, color, align) {
+                ctx.fillStyle = color; ctx.font = '13px ' + (css('--font-mono') || 'monospace');
+                ctx.textAlign = align || 'left'; ctx.fillText(txt, x, y);
+            }
+
+            function drawGeo(t, c) {
+                const ctx = geo.getContext('2d'), W = geo.width, H = geo.height;
+                ctx.clearRect(0, 0, W, H);
+                const O = [W / 2 - 150, H - 50], R = 270;
+                const P = (a, g) => [O[0] + a * R, O[1] - g * R];   // x0 along +x, eps along +y
+                // axes from the origin
+                line(ctx, [O, P(1.08, 0)], c.grid, [], 1);
+                line(ctx, [O, P(0, 1.12)], c.grid, [], 1);
+                label(ctx, 'origin', O[0] - 8, O[1] + 18, c.sub, 'right');
+                // paths
+                const N = 80, arc = [], chord = [];
+                for (let i = 0; i <= N; i++) { arc.push(P(...S.vp(i / N))); chord.push(P(...S.rf(i / N))); }
+                line(ctx, arc, c.vp, DASH.vp); line(ctx, chord, c.rf, DASH.rf);
+                // ticks every 0.1
+                for (let k = 1; k < 10; k++) {
+                    dot(ctx, ...P(...S.vp(k / 10)), 2.5, c.vp);
+                    dot(ctx, ...P(...S.rf(k / 10)), 2.5, c.rf);
+                }
+                // endpoints
+                dot(ctx, ...P(1, 0), 5, c.ink); label(ctx, 'x₀ (data)', P(1, 0)[0] + 10, P(1, 0)[1] + 18, c.ink);
+                dot(ctx, ...P(0, 1), 5, c.ink); label(ctx, 'ε (noise)', P(0, 1)[0] + 12, P(0, 1)[1] + 4, c.ink);
+                // radius to current points, then the points
+                const pv = P(...S.vp(t)), pr = P(...S.rf(t));
+                line(ctx, [O, pv], c.vp, [2, 4], 1); line(ctx, [O, pr], c.rf, [2, 4], 1);
+                dot(ctx, ...pv, 7, c.vp, css('--bg-dark') || '#000');
+                dot(ctx, ...pr, 7, c.rf, css('--bg-dark') || '#000');
+                label(ctx, 'VP', pv[0] + 12, pv[1] - 8, c.ink);
+                label(ctx, 'RF', pr[0] - 12, pr[1] + 20, c.ink, 'right');
+
+                const fmt = s => { const [a, g] = S[s](t); const l = lam(s, t);
+                    return 'α=' + a.toFixed(2) + ' σ=' + g.toFixed(2) + ' scale=' + Math.hypot(a, g).toFixed(2) +
+                        ' λ=' + (isFinite(l) ? l.toFixed(1) : (l > 0 ? '+∞' : '−∞')); };
+                document.getElementById('sch-geo-stats').innerHTML =
+                    '<span>RF <b>' + fmt('rf') + '</b></span><span>VP <b>' + fmt('vp') + '</b></span>';
+            }
+
+            const LMAX = 10;
+            function drawLam(t, c) {
+                const ctx = lamC.getContext('2d'), W = lamC.width, H = lamC.height;
+                ctx.clearRect(0, 0, W, H);
+                const L = 44, Rr = W - 12, T = 16, B = H - 36;
+                const X = u => L + u * (Rr - L), Y = l => T + (LMAX - l) / (2 * LMAX) * (B - T);
+                for (const l of [-10, -5, 0, 5, 10]) {
+                    line(ctx, [[L, Y(l)], [Rr, Y(l)]], c.grid, [], 1);
+                    label(ctx, String(l), L - 6, Y(l) + 4, c.sub, 'right');
+                }
+                for (const u of [0, 0.5, 1]) label(ctx, String(u), X(u), B + 18, c.sub, 'center');
+                label(ctx, 'time t', (L + Rr) / 2, B + 32, c.sub, 'center');
+                label(ctx, 'log-SNR λ', L + 8, T + 2, c.sub);
+                for (const s of ['rf', 'vp']) {
+                    const pts = [];
+                    for (let i = 1; i < 400; i++) {
+                        const u = i / 400, l = lam(s, u);
+                        if (l > -LMAX - 2 && l < LMAX + 2) pts.push([X(u), Y(Math.max(-LMAX, Math.min(LMAX, l)))]);
+                    }
+                    line(ctx, pts, c[s], DASH[s]);
+                    for (let k = 1; k < 10; k++) dot(ctx, X(k / 10), Y(lam(s, k / 10)), 3.5, c[s]);
+                }
+                line(ctx, [[X(t), T], [X(t), B]], c.sub, [3, 3], 1);
+            }
+
+            function drawDens(c) {
+                const ctx = denC.getContext('2d'), W = denC.width, H = denC.height;
+                ctx.clearRect(0, 0, W, H);
+                const L = 16, Rr = W - 12, T = 16, B = H - 36, PMAX = 0.22;
+                const X = l => L + (l + LMAX) / (2 * LMAX) * (Rr - L), Y = p => B - p / PMAX * (B - T);
+                line(ctx, [[L, B], [Rr, B]], c.grid, [], 1);
+                for (const l of [-10, -5, 0, 5, 10]) label(ctx, String(l), X(l), B + 18, c.sub, 'center');
+                label(ctx, 'log-SNR λ visited in training', (L + Rr) / 2, B + 32, c.sub, 'center');
+                label(ctx, 'density, uniform t', L, T - 4, c.sub);
+                const f = {
+                    rf: l => 1 / (8 * Math.cosh(l / 4) ** 2),
+                    vp: l => 1 / (2 * Math.PI * Math.cosh(l / 2)),
+                    ln: l => Math.exp(-l * l / 8) / Math.sqrt(8 * Math.PI)
+                };
+                for (const s of ['ln', 'vp', 'rf']) {
+                    const pts = [];
+                    for (let i = 0; i <= 300; i++) { const l = -LMAX + 2 * LMAX * i / 300; pts.push([X(l), Y(f[s](l))]); }
+                    line(ctx, pts, s === 'ln' ? c.rf : c[s], DASH[s]);
+                }
+            }
+
+            function draw() {
+                const t = +slider.value, c = colors();
+                document.getElementById('sch-t-val').textContent = t.toFixed(2);
+                drawGeo(t, c); drawLam(t, c); drawDens(c);
+            }
+            slider.addEventListener('input', draw);
+            new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+            draw();
+        })();
 
         // ── Flow trajectory demo: exact marginal ODE for a Gaussian mixture ──
         (function () {
