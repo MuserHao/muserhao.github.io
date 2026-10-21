@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser | Hao Xin</title>
-    <meta name="description" content="How we built a Lunar Lander with DQN, A2C, and PPO in pure JavaScript -- ~4,200 parameters, zero GPUs, and a live actor-critic visualization that makes the GAN-RL connection click.">
+    <meta name="description" content="How we built a Lunar Lander with DQN, A2C, and PPO in pure JavaScript -- ~10,000 parameters, zero GPUs, and a live actor-critic visualization that makes the GAN-RL connection click.">
     <meta name="author" content="Hao Xin">
     <link rel="canonical" href="https://muserhao.github.io/blog/posts/rl-lander-browser.html">
     <!-- Open Graph -->
@@ -24,7 +24,7 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser">
-    <meta name="twitter:description" content="DQN, A2C, and PPO learn to land a spacecraft in pure JS. ~4,200 parameters, zero GPUs.">
+    <meta name="twitter:description" content="DQN, A2C, and PPO learn to land a spacecraft in pure JS. ~10,000 parameters, zero GPUs.">
     <meta name="twitter:image" content="https://muserhao.github.io/og-image.png">
     <!-- JSON-LD Article -->
     <script type="application/ld+json">
@@ -116,7 +116,7 @@
                     <span class="blog-tag">TUTORIAL</span>
                 </div>
                 <h1 class="post-title">Landing the Actor-Critic: DQN, A2C &amp; PPO in the Browser</h1>
-                <p class="post-subtitle"><span class="dark-only">// </span>~4,200 parameters, zero GPUs, and the visualization that makes RLHF click</p>
+                <p class="post-subtitle"><span class="dark-only">// </span>~10,000 parameters, zero GPUs, and the visualization that makes RLHF click</p>
                 <div class="post-divider"></div>
                 <p class="post-subtitle"><em>Update, October 2026: the first version&rsquo;s agents were gaming their reward and almost never landed. <a href="#postmortem">The postmortem</a> explains how that was found and fixed. Parameter counts and success rates in the earlier sections describe the first version.</em></p>
             </div>
@@ -126,7 +126,7 @@
 <h2><span class="sec-num">01<span class="dark-only"> //</span></span> THE SETUP</h2>
 
 <p>
-After <a href="rl-pong-browser.html">building RL Pong</a> with Q-Learning, DQN, and REINFORCE, the natural next step was the algorithm family that actually runs the modern world: <strong>Actor-Critic methods</strong>. A2C is how DeepMind's agents learn. PPO is how ChatGPT was aligned via RLHF. And if you read <a href="gan-meets-rl.html">When GANs Meet RL</a>, you already know the punchline &mdash; the actor is the generator, the critic is the discriminator. Same adversarial game, different costume.
+After <a href="rl-pong-browser.html">building RL Pong</a> with Q-Learning, DQN, and REINFORCE, the natural next step was the algorithm family that actually runs the modern world: <strong>Actor-Critic methods</strong>. A2C is how DeepMind's agents learn. PPO is how ChatGPT was aligned via RLHF. And if you read <a href="gan-meets-rl.html">When GANs Meet RL</a>, you already know the punchline &mdash; the actor is the generator, the critic plays the evaluator&rsquo;s role. The difference is that a critic is not an adversary: it predicts returns rather than trying to catch the actor out.
 </p>
 
 <p>
@@ -148,7 +148,7 @@ DQN is the same Double DQN from Pong, scaled up to 6 actions. One network estima
 $$Q(s, a) \leftarrow r + \gamma \, Q_{\text{target}}(s', \arg\max_{a'} Q_{\text{online}}(s', a'))$$
 
 <p>
-Architecture: MiniNet2(8, 64, 48, 6) = <strong>~2,200 parameters</strong>. It works, but it only learns <em>values</em> &mdash; there&rsquo;s no explicit policy. This is where actor-critic enters.
+Architecture: MiniNet2(8, 64, 48, 6) = <strong>~4,000 parameters</strong>. It works, but it only learns <em>values</em> &mdash; there&rsquo;s no explicit policy. This is where actor-critic enters.
 </p>
 
 <h3>A2C &mdash; Advantage Actor-Critic</h3>
@@ -172,7 +172,7 @@ And the critic trains via MSE on the TD target:
 $$\mathcal{L}_{\text{critic}} = \Big( r + \gamma \, V_\phi(s') - V_\phi(s) \Big)^2$$
 
 <p>
-Two networks, two loss functions, one elegant loop. Actor: MiniNet2(8, 64, 48, 6) = ~2,200 params. Critic: MiniNet2(8, 64, 48, 1) = ~2,000 params. <strong>Total: ~4,200 parameters.</strong>
+Two networks, two loss functions, one elegant loop. Actor: MiniNet2(8, 64, 48, 6) = 3,990 params. Critic: MiniNet2(8, 64, 48, 1) = 3,745 params. <strong>Total: ~7,700 parameters.</strong>
 </p>
 
 <h3>PPO &mdash; Proximal Policy Optimization</h3>
@@ -194,7 +194,7 @@ PPO also uses <strong>Generalized Advantage Estimation (GAE)</strong> instead of
 $$\hat{A}_t = \sum_{l=0}^{T-t} (\gamma \lambda)^l \, \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$$
 
 <p>
-The $\lambda$ parameter (0.95 here) interpolates between high-bias/low-variance (TD, $\lambda=0$) and low-bias/high-variance (Monte Carlo, $\lambda=1$). Same architecture as A2C: <strong>~4,200 parameters</strong>.
+The $\lambda$ parameter (0.95 here) interpolates between high-bias/low-variance (TD, $\lambda=0$) and low-bias/high-variance (Monte Carlo, $\lambda=1$). Same architecture as A2C: <strong>~7,700 parameters</strong>.
 </p>
 
 <h2><span class="sec-num">03<span class="dark-only"> //</span></span> THE PHYSICS</h2>
@@ -322,8 +322,8 @@ Two more structural changes each contributed ~5 percentage points:
 </p>
 
 <ul>
-    <li><strong>Two hidden layers instead of one.</strong> The value function for landing depends on interactions between position and velocity (close + slow = good, close + fast = bad). A single ReLU layer produces piecewise linear functions &mdash; it can&rsquo;t represent products. Two layers can, because the first layer computes features (closeness, speed) and the second combines them non-linearly.</li>
-    <li><strong>Curriculum spawn altitude.</strong> Level 0 originally spawned at 120&ndash;200px. Free-fall from 160px builds $v_y = 3.2$ by impact &mdash; impossible to land. Dropping to 35&ndash;60px lets the agent discover braking within 50 episodes, bootstrapping the learning signal.</li>
+    <li><strong>Two hidden layers instead of one.</strong> The value function for landing depends on interactions between position and velocity (close + slow = good, close + fast = bad). Any ReLU network is piecewise linear, so neither depth represents a product exactly; both can only approximate one. In practice the second layer made that approximation much cheaper: the first layer computes features (closeness, speed) and the second combines them.</li>
+    <li><strong>Curriculum spawn altitude.</strong> Level 0 originally spawned at 120&ndash;200px. Free-fall from 160px builds $v_y \approx 3.6$ by impact &mdash; impossible to land. Dropping to 35&ndash;60px lets the agent discover braking within 50 episodes, bootstrapping the learning signal.</li>
 </ul>
 
 <h2><span class="sec-num">05<span class="dark-only"> //</span></span> THE TRAINING LOOP</h2>
@@ -389,19 +389,19 @@ PPO&rsquo;s weakness: it trains less frequently than A2C (every 64 steps vs ever
     <tbody>
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">DQN (SGD)</td>
-            <td style="text-align:center; padding:0.5rem;">~2,200</td>
+            <td style="text-align:center; padding:0.5rem;">~4,000</td>
             <td style="text-align:center; padding:0.5rem;">21%</td>
             <td style="text-align:center; padding:0.5rem;">19&ndash;23%</td>
         </tr>
         <tr style="border-bottom:1px solid var(--border-subtle);">
             <td style="padding:0.5rem;">A2C (Adam)</td>
-            <td style="text-align:center; padding:0.5rem;">~4,200</td>
+            <td style="text-align:center; padding:0.5rem;">~7,700</td>
             <td style="text-align:center; padding:0.5rem;">14%</td>
             <td style="text-align:center; padding:0.5rem;">12&ndash;19%</td>
         </tr>
         <tr>
             <td style="padding:0.5rem;">PPO (SGD)</td>
-            <td style="text-align:center; padding:0.5rem;">~4,200</td>
+            <td style="text-align:center; padding:0.5rem;">~7,700</td>
             <td style="text-align:center; padding:0.5rem;">23%</td>
             <td style="text-align:center; padding:0.5rem;">22&ndash;24%</td>
         </tr>
@@ -439,11 +439,11 @@ This is the teaching payoff. When you select A2C or PPO, a visualization panel a
 </p>
 
 <p>
-If you&rsquo;ve read the <a href="gan-meets-rl.html">GAN-RL blog post</a>, this should feel viscerally familiar. The actor is the generator &mdash; it produces actions (samples). The critic is the discriminator &mdash; it evaluates states (scores). The actor tries to take actions that the critic approves of. The critic tries to accurately predict outcomes. Same adversarial game, same convergent dynamic.
+If you&rsquo;ve read the <a href="gan-meets-rl.html">GAN-RL blog post</a>, this should feel viscerally familiar. The actor is the generator &mdash; it produces actions (samples). The critic plays the discriminator&rsquo;s role &mdash; it evaluates states (scores). The actor tries to take actions that the critic approves of. The critic tries to accurately predict outcomes. Where the analogy stops: a discriminator is trained to catch the generator, while a critic is trained only to be accurate, so the game here is cooperative rather than adversarial.
 </p>
 
 <p>
-In RLHF for LLMs, the actor is the language model (generating tokens), and the critic is the reward model (scoring responses). PPO is the training algorithm. Every piece of this visualization maps directly onto how ChatGPT was trained.
+In RLHF for LLMs, the actor is the language model (generating tokens). The reward model scores finished responses and plays the role of the environment&rsquo;s reward; PPO also trains a separate critic, a value model that predicts that reward from a partial response, exactly like the critic meter here. PPO is the training algorithm. Every piece of this visualization maps directly onto how ChatGPT was trained.
 </p>
 
 <h2><span class="sec-num">08<span class="dark-only"> //</span></span> TECHNICAL DETAILS</h2>

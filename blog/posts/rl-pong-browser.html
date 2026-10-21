@@ -202,7 +202,7 @@ Total: 8×48 + 48 + 48×3 + 3 = 579 parameters</code></pre>
 
                 <p>
                     The network is implemented from scratch -- no TensorFlow, no WebGL. Just <code>Float64Array</code>
-                    matrix multiplies, manual backprop, and Xavier initialization via Box-Muller sampling.
+                    matrix multiplies, manual backprop, and He initialization via Box-Muller sampling.
                 </p>
 
                 <h3>REINFORCE: The Policy Gradient</h3>
@@ -246,7 +246,7 @@ Total: 8×48 + 48 + 48×3 + 3 = 579 parameters</code></pre>
 
                 <p>
                     We don't have 3 days. We have maybe 10 seconds of the visitor's patience. So we use
-                    <strong>engineered features</strong> -- 6 numbers that capture everything the agent needs
+                    <strong>engineered features</strong> -- 8 numbers that capture everything the agent needs
                     to know:
                 </p>
 
@@ -346,7 +346,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 <p>
                     <strong>The calibration matters.</strong> If the hit reward is too large (say, 1.0), the agent
                     learns to hit the ball but doesn't care about scoring -- it's already getting rewarded.
-                    Too small (0.05) and it gets drowned out by noise. 0.3 hit us a sweet spot where the
+                    Too small (0.05) and it gets drowned out by noise. 0.3 was the sweet spot where the
                     agent learns to rally first, then gradually optimizes for scoring as &epsilon; decays.
                 </p>
 
@@ -584,7 +584,8 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 <p>
                     The lesson: the best RL algorithm depends on the problem structure, not on
                     how modern it sounds. For 3 actions and 1,728 states, a lookup table beats
-                    a neural network.
+                    a neural network. (Or so it looked: the <a href="#postmortem">postmortem</a> shows the two
+                    networks were broken, and once fixed they beat the table.)
                 </p>
 
 
@@ -596,7 +597,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
                 <ul>
-                    <li><strong>Xavier initialization</strong> (scale = $\sqrt{2/n_\text{in}}$) via Box-Muller random normals</li>
+                    <li><strong>He initialization</strong> (scale = $\sqrt{2/n_\text{in}}$) via Box-Muller random normals</li>
                     <li><strong>Forward pass:</strong> matrix multiply &rarr; ReLU &rarr; matrix multiply &rarr; output</li>
                     <li><strong>MSE backprop</strong> for DQN: compute $\partial L / \partial w$ and apply gradient descent</li>
                     <li><strong>Policy gradient backprop</strong> for REINFORCE: gradient of $\log \pi(a|s)$ weighted by advantage</li>
@@ -611,7 +612,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
                 <p>
-                    <strong>Performance:</strong> A forward pass through the 6&rarr;32&rarr;3 network takes
+                    <strong>Performance:</strong> A forward pass through the 8&rarr;48&rarr;3 network takes
                     roughly 0.01ms on modern hardware. That's 100,000 forward passes per second. During
                     auto-training at 200 steps per frame, the bottleneck is DQN's batch training (32
                     forward+backward passes every 4 steps), not the game physics.
@@ -745,7 +746,7 @@ reward = -0.01 * Math.abs(aiY - ball.y) / H;</code></pre>
                 </p>
 
                 <p>
-                    The entire implementation is four files totaling ~600 lines of JavaScript:
+                    The entire implementation is about 1,100 lines of JavaScript:
                 </p>
 
                 <ul>

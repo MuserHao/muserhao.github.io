@@ -221,11 +221,13 @@
                 <div class="info-box">
                     <div class="info-title">THE MINIMAX THEOREM</div>
                     <p>
-                        Von Neumann's minimax theorem guarantees that for convex-concave games,
-                        $\max_\phi \min_\theta V = \min_\theta \max_\phi V$.
-                        This means the order of optimization doesn't matter at convergence --
-                        the Nash equilibrium is well-defined. Goodfellow et al. <a href="#ref-1">[1]</a>
-                        proved convergence for the non-parametric case (infinite-capacity $G$ and $D$).
+                        Von Neumann's minimax theorem says that for convex-concave games,
+                        $\max_\phi \min_\theta V = \min_\theta \max_\phi V$, so the order of play
+                        doesn't matter. The GAN game is convex-concave only in function space
+                        (over the distributions $p_g$ and the functions $D$), not in the network
+                        parameters. That is why Goodfellow et al. <a href="#ref-1">[1]</a> could prove convergence
+                        only for the non-parametric case (infinite-capacity $G$ and $D$); with real networks
+                        there is no such guarantee, which is part of why GANs are hard to train.
                     </p>
                 </div>
 
@@ -471,11 +473,13 @@
                 </div>
 
                 <p>
-                    where $Z(r) = \int \exp(r(\tau)) d\tau$ is the partition function. Compare this with the
-                    f-divergence variational bound. Setting $T = r$ and $f^*(T) = \log Z(r)$, the IRL objective
-                    is a special case of f-divergence estimation -- specifically, it corresponds to the
-                    <strong>reverse KL divergence</strong> between the occupancy measures of the expert and
-                    learned policies.
+                    where $Z(r) = \int \exp(r(\tau)) d\tau$ is the partition function. This is maximum
+                    likelihood of the expert trajectories under the model $p_r(\tau) \propto \exp(r(\tau))$,
+                    so it minimizes the <strong>forward KL divergence</strong> $D_{\text{KL}}(p_{\pi_E} \| p_r)$.
+                    The adversarial methods fill in the rest of the f-divergence family: Ghasemipour et al.
+                    <a href="#ref-15">[15]</a> show that GAIL minimizes the Jensen-Shannon divergence between the
+                    expert's and the policy's state-action occupancy measures (exactly the GAN objective), and
+                    AIRL minimizes the reverse KL. Choosing an imitation algorithm is choosing an $f$.
                 </p>
 
                 <div class="info-box">
@@ -664,13 +668,14 @@
                 </p>
 
                 <div class="math-block">
-                    $$\text{TrueReward}(\pi_\theta) \propto \alpha \cdot D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}}) - \gamma \cdot D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})^2$$
+                    $$R_{\text{BoN}}(d) = d\,(\alpha - \beta d), \qquad R_{\text{RL}}(d) = d\,(\alpha - \beta \log d), \qquad d = \sqrt{D_{\text{KL}}(\pi_\theta \| \pi_{\text{ref}})}$$
                 </div>
 
                 <p>
-                    The linear term is genuine improvement from aligning with human preferences.
-                    The quadratic term is overoptimization -- exploiting the gap between proxy reward
-                    and true quality. This is <strong>Goodhart's Law</strong> in mathematical form: "when
+                    Here $d$ is the square root of the KL, and the gold-standard reward is fit as a function of it,
+                    for best-of-$n$ sampling and for RL respectively. The $\alpha d$ term is genuine improvement
+                    from aligning with human preferences. The $-\beta$ term is overoptimization -- exploiting the
+                    gap between proxy reward and true quality -- and it eventually wins. This is <strong>Goodhart's Law</strong> in mathematical form: "when
                     a measure becomes a target, it ceases to be a good measure."
                 </p>
 
@@ -887,7 +892,7 @@
                             <a href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
                         </li>
                         <li id="ref-8">
-                            <span class="ref-authors">Schulman, J., Wolski, F., Dhariwal, P., Klimov, O. &amp; Radford, A.</span>
+                            <span class="ref-authors">Schulman, J., Wolski, F., Dhariwal, P., Radford, A. &amp; Klimov, O.</span>
                             <span class="ref-title">Proximal Policy Optimization Algorithms.</span>
                             <span class="ref-venue">arXiv:1707.06347, 2017.</span>
                             <a href="https://arxiv.org/abs/1707.06347" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
@@ -925,6 +930,12 @@
                             <span class="ref-title">Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor.</span>
                             <span class="ref-venue">ICML 2018.</span>
                             <a href="https://arxiv.org/abs/1801.01290" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
+                        </li>
+                        <li id="ref-15">
+                            <span class="ref-authors">Ghasemipour, S. K. S., Zemel, R. &amp; Gu, S.</span>
+                            <span class="ref-title">A Divergence Minimization Perspective on Imitation Learning Methods.</span>
+                            <span class="ref-venue">CoRL 2019.</span>
+                            <a href="https://arxiv.org/abs/1911.02256" target="_blank" rel="noopener noreferrer" class="ref-link"><i class="fas fa-external-link-alt"></i></a>
                         </li>
                     </ol>
                 </div>
